@@ -1,0 +1,2105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PokéVault v3.5.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d1117;--surf:#161b22;--surf2:#21262d;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;--dim:#484f58;
+  --little:#f78166;--great:#58a6ff;--ultra:#bc8cff;--master:#ffa657;
+  --green:#3fb950;--red:#f85149;--gold:#e3b341;--cyan:#79c0ff;
+  --keep-bg:rgba(63,185,80,0.06);--trade-bg:rgba(248,81,73,0.06);
+  --review-bg:rgba(88,166,255,0.06);--protected-bg:rgba(227,179,65,0.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;font-size:14px;min-height:100vh;}
+
+/* HEADER */
+header{background:var(--surf);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{font-size:18px;font-weight:800;letter-spacing:1px;}.logo em{color:var(--great);font-style:normal;}
+#hdr-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+#hdr-stats span strong{color:var(--text);}
+
+/* UPLOAD */
+#upload-section{max-width:560px;margin:80px auto;padding:0 20px;}
+.drop-zone{border:2px dashed var(--border);border-radius:12px;padding:60px 40px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surf);}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--great);background:rgba(88,166,255,0.05);}
+.drop-zone h2{font-size:16px;font-weight:600;margin-bottom:8px;}
+.drop-zone p{color:var(--muted);font-size:13px;}
+#fileInput{display:none;}
+
+/* LOADING */
+#loading-section{max-width:400px;margin:120px auto;text-align:center;padding:0 20px;display:none;}
+.progress-bar{height:4px;background:var(--surf2);border-radius:2px;overflow:hidden;margin:16px 0;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--great),var(--ultra));transition:width .4s;border-radius:2px;width:5%;}
+#loading-msg{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--great);letter-spacing:1px;}
+#loading-sub{font-size:12px;color:var(--muted);margin-top:8px;}
+
+/* ERROR */
+#error-section{display:none;max-width:580px;margin:60px auto;padding:0 20px;}
+.error-box{padding:28px;background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.3);border-radius:10px;text-align:center;}
+.error-box h3{color:var(--red);margin-bottom:10px;}
+.error-detail{font-family:'Share Tech Mono',monospace;font-size:11px;background:var(--surf2);padding:10px;border-radius:6px;text-align:left;word-break:break-all;margin:10px 0;color:var(--muted);}
+
+/* DASHBOARD */
+#dashboard{display:none;}
+
+/* SUMMARY STRIP */
+.summary-strip{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;}
+.sum-card{flex:1;min-width:90px;padding:12px 14px;border-right:1px solid var(--border);cursor:pointer;transition:background .15s;}
+.sum-card:last-child{border-right:none;}
+.sum-card:hover,.sum-card.active{background:var(--surf2);}
+.sum-label{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:4px;}
+.sum-val{font-size:22px;font-weight:800;}
+.s-total .sum-val{color:var(--text);}
+.s-keep .sum-val{color:var(--green);}
+.s-trade .sum-val{color:var(--red);}
+.s-review .sum-val{color:var(--great);}
+.s-protected .sum-val{color:var(--gold);}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:6px;padding:10px 14px;background:var(--surf);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;}
+.search-wrap{position:relative;flex:1;min-width:160px;}
+.search-wrap input{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:6px 10px 6px 28px;color:var(--text);font-family:'Exo 2',sans-serif;font-size:13px;outline:none;}
+.search-wrap input:focus{border-color:var(--great);}
+.search-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;}
+.evo-toggle{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;}
+.btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);font-family:'Exo 2',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn:hover{border-color:var(--great);color:var(--text);}
+.btn.active{background:var(--great);border-color:var(--great);color:#000;}
+.btn.act-trade{background:var(--red);border-color:var(--red);color:#fff;}
+.btn.act-review{background:var(--great);border-color:var(--great);color:#000;}
+.btn.act-protected{background:var(--gold);border-color:var(--gold);color:#000;}
+.league-btn{border-radius:20px;}
+.lb-L{border-color:var(--little);color:var(--little);}
+.lb-G{border-color:var(--great);color:var(--great);}
+.lb-U{border-color:var(--ultra);color:var(--ultra);}
+.lb-M{border-color:var(--master);color:var(--master);}
+.lb-L.active{background:var(--little);color:#000;}
+.lb-G.active{background:var(--great);color:#000;}
+.lb-U.active{background:var(--ultra);color:#000;}
+.lb-M.active{background:var(--master);color:#000;}
+.export-btn{background:linear-gradient(135deg,var(--great),var(--ultra));border:none;color:#000;font-weight:700;}
+.export-btn:hover{opacity:.85;color:#000;}
+
+/* MAIN */
+#main-content{padding:10px 14px;}
+
+/* FAMILY CARD */
+.family-card{background:var(--surf);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;}
+.family-header{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;user-select:none;transition:background .15s;}
+.family-header:hover{background:var(--surf2);}
+.family-name{font-size:14px;font-weight:700;}
+.fam-chevron{color:var(--muted);font-size:11px;transition:transform .2s;margin-left:auto;flex-shrink:0;}
+.family-card.open .fam-chevron{transform:rotate(90deg);}
+.fam-badge{padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;}
+.fb-keep{background:rgba(63,185,80,.15);color:var(--green);}
+.fb-trade{background:rgba(248,81,73,.15);color:var(--red);}
+.fb-review{background:rgba(88,166,255,.15);color:var(--great);}
+.fam-count{color:var(--muted);font-size:12px;font-weight:600;}
+.fam-count-large{color:var(--red)!important;}
+
+/* TABLE */
+.family-body{display:none;border-top:1px solid var(--border);overflow-x:auto;}
+.family-card.open .family-body{display:block;}
+.poke-table{width:100%;border-collapse:collapse;font-size:12px;}
+.poke-table th{padding:7px 9px;text-align:left;font-size:9px;font-weight:700;letter-spacing:1px;color:var(--muted);background:var(--surf2);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+.poke-table th:hover{color:var(--text);}
+.poke-table th.sort-asc::after{content:' ▲';}
+.poke-table th.sort-desc::after{content:' ▼';}
+.poke-table td{padding:7px 9px;border-bottom:1px solid rgba(48,54,61,0.4);vertical-align:top;}
+.poke-table tr:last-child td{border-bottom:none;}
+.poke-table tr:hover td{background:rgba(255,255,255,.015);}
+tr.row-keep{background:var(--keep-bg);}
+tr.row-trade{background:var(--trade-bg);opacity:.7;}
+tr.row-review{background:var(--review-bg);}
+tr.row-protected{background:var(--protected-bg);}
+tr.row-hidden{display:none;}
+
+/* STAR CELL */
+.star-cell{text-align:center;min-width:40px;}
+.star-icon{font-size:15px;line-height:1;}
+.star-type{font-size:9px;font-weight:700;letter-spacing:.5px;margin-top:2px;line-height:1;}
+.st-legendary{color:var(--gold);}
+.st-mythical{color:var(--ultra);}
+.st-ub{color:var(--little);}
+.st-mega{color:var(--great);}
+
+/* POKEMON NAME CELL */
+.poke-name-cell{min-width:80px;}
+.poke-variants{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:3px;}
+.vtag{display:inline-block;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:700;}
+.vt-shadow{background:rgba(248,81,73,.2);color:var(--red);}
+.vt-purified{background:rgba(63,185,80,.2);color:var(--green);}
+.vt-lucky{background:rgba(227,179,65,.3);color:var(--gold);}
+.vt-shiny{background:rgba(227,179,65,.2);color:var(--gold);}
+.vt-fav{color:var(--gold);}
+.poke-name{font-weight:700;font-size:12px;}
+.poke-form{color:var(--dim);font-size:10px;}
+
+/* NICK CELLS */
+.nick-suggested{font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:600;color:var(--cyan);}
+.nick-starred{font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:800;color:#fff;letter-spacing:.5px;text-shadow:0 0 8px var(--cyan);}
+.pvp-tag{font-size:11px;color:var(--great);font-weight:700;text-align:center;}
+
+/* IV */
+.iv-bar{display:flex;align-items:center;gap:5px;}
+.iv-fill{height:3px;border-radius:2px;min-width:2px;flex-shrink:0;}
+.iv-num{font-size:11px;min-width:28px;}
+.iv-ivs{font-size:10px;color:var(--muted);}
+
+/* LEAGUE RANK */
+.lrank{font-size:11px;white-space:nowrap;}
+.lr-90{color:var(--green);font-weight:700;}
+.lr-70{color:var(--cyan);}
+.lr-low{color:var(--muted);}
+.lr-num{color:var(--dim);font-size:10px;display:block;}
+
+/* DUST */
+.dust-ok{color:var(--green);font-size:11px;}
+.dust-warn{color:var(--gold);font-size:11px;}
+.dust-over{color:var(--red);font-size:11px;}
+
+/* TARGET EVO */
+.target-evo{font-size:11px;color:var(--cyan);font-weight:600;}
+.target-evo-none{color:var(--dim);font-size:10px;}
+
+/* MOVES */
+.move-good{color:var(--green);font-size:11px;}
+.move-bad{color:var(--red);font-size:11px;}
+.move-unknown{color:var(--dim);font-size:10px;font-style:italic;}
+.move-tm{color:var(--gold);font-size:10px;}
+
+/* SLOT BADGES */
+.slot{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;margin:1px;}
+.sl-L{background:rgba(247,129,102,.2);color:var(--little);}
+.sl-G{background:rgba(88,166,255,.2);color:var(--great);}
+.sl-U{background:rgba(188,140,255,.2);color:var(--ultra);}
+.sl-M{background:rgba(255,166,87,.2);color:var(--master);}
+.sl-shiny{background:rgba(227,179,65,.2);color:var(--gold);}
+.sl-shadow{background:rgba(248,81,73,.2);color:var(--red);}
+.sl-purified{background:rgba(63,185,80,.2);color:var(--green);}
+.sl-lucky{background:rgba(227,179,65,.3);color:var(--gold);}
+.sl-nundo{background:rgba(188,140,255,.2);color:var(--ultra);}
+
+/* DECISION */
+.dec{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;}
+.dec-keep{background:rgba(63,185,80,.15);color:var(--green);}
+.dec-trade{background:rgba(248,81,73,.15);color:var(--red);}
+.dec-review{background:rgba(88,166,255,.15);color:var(--great);}
+.dec-protected{background:rgba(227,179,65,.15);color:var(--gold);}
+
+/* HIDE BUTTON */
+.hide-btn{background:none;border:none;color:var(--dim);cursor:pointer;font-size:11px;padding:2px 5px;border-radius:3px;transition:color .15s;}
+.edit-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:3px;transition:color .15s;}
+.edit-btn:hover{color:var(--cyan);}
+.override-row td{border-bottom:1px solid var(--border)!important;}
+.hide-btn:hover{color:var(--red);}
+.show-hidden-wrap{padding:6px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);}
+.show-hidden-btn{background:none;border:none;color:var(--great);cursor:pointer;font-size:11px;text-decoration:underline;}
+
+/* EEVEE TIP */
+.eevee-tip{background:rgba(88,166,255,.06);border-left:3px solid var(--great);margin:6px 10px;padding:6px 10px;font-size:11px;color:var(--great);border-radius:0 4px 4px 0;}
+
+/* STAR COLOURS */
+.star-yellow{color:var(--gold);font-size:18px;font-weight:900;}
+.star-green{color:var(--green);font-size:18px;font-weight:900;}
+.star-red{color:var(--red);font-size:18px;font-weight:900;}
+.star-none{color:var(--dim);font-size:14px;}
+.evo-ind{font-size:11px;font-weight:700;margin-right:2px;}
+.evo-gold{color:var(--gold);}
+.evo-grey{color:var(--muted);}
+tr.row-hundo td{background:rgba(227,179,65,0.04)!important;}
+/* COPY BUTTON */
+.copy-nicks-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 7px;transition:all .15s;white-space:nowrap;}
+.copy-nicks-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+.copy-nicks-btn.copied{border-color:var(--green);color:var(--green);}
+
+/* PAGINATION */
+.pagination{display:flex;justify-content:center;gap:5px;padding:14px;flex-wrap:wrap;align-items:center;}
+.page-btn{padding:4px 9px;border-radius:5px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:12px;cursor:pointer;transition:all .15s;}
+.page-btn:hover,.page-btn.active{border-color:var(--great);color:var(--great);}
+.page-info{color:var(--muted);font-size:12px;}
+
+@media(max-width:768px){
+  header{flex-direction:column;gap:6px;align-items:flex-start;}
+  @media(max-width:600px){
+  .poke-table th:nth-child(n+12),.poke-table td:nth-child(n+12){display:none;}
+  .poke-table td,.poke-table th{padding:4px 5px!important;font-size:10px!important;}
+  .star-cell{min-width:22px;padding:2px 3px!important;}
+  .star-icon{font-size:16px!important;display:block!important;}
+  .star-type{display:none;}
+  .star-none{display:block!important;}
+  .poke-name-cell{min-width:60px!important;}
+  .poke-name{font-size:10px!important;}
+  .poke-variants{flex-wrap:wrap;}
+  .vtag:not(.vt-shadow):not(.vt-purified):not(.vt-lucky):not(.vt-shiny){display:none;}
+  .nick-suggested,.nick-starred{font-size:10px!important;}
+  .iv-bar{display:none;}
+  .iv-ivs{font-size:9px!important;}
+  .lrank{font-size:10px!important;}
+  .lr-num{display:none;}
+  .fam-badge{font-size:9px;padding:1px 4px;}
+  .family-name{font-size:12px;}
+  .toolbar{gap:4px;padding:6px 8px;}
+  .btn{padding:4px 7px;font-size:10px;}
+  .search-wrap input{font-size:12px;padding:5px 8px 5px 24px;}
+}
+@media(max-width:900px) and (min-width:601px){
+  .poke-table th:nth-child(n+13),.poke-table td:nth-child(n+13){display:none;}
+  .poke-table td,.poke-table th{padding:6px 7px;}
+}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.0</span></div>
+  <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
+  <div id="sync-status" style="font-size:11px;color:var(--muted)">Connecting to cloud...</div>
+</header>
+
+<div id="upload-section">
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div style="font-size:36px;margin-bottom:10px">📦</div>
+    <h2>Import Pokégenie Export</h2>
+    <p>Drop your CSV here or click to browse</p>
+    <p style="margin-top:6px;font-size:11px;color:var(--great)">Supports full Pokégenie CSV export format</p>
+  </div>
+  <div style="text-align:center;margin-top:16px">
+    <button class="btn" id="cloudLoadBtn" onclick="handleCloudLoad()" style="padding:10px 24px;font-size:13px;display:none">
+      ☁ Load last collection from cloud
+    </button>
+    <div id="cloud-load-status" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+  </div>
+  <input type="file" id="fileInput" accept=".csv">
+</div>
+
+<div id="loading-section">
+  <div id="loading-msg">READING FILE...</div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  <div id="loading-sub">Large collections (40,000+) may take 5–15 seconds</div>
+</div>
+
+<div id="error-section">
+  <div class="error-box">
+    <h3>⚠ Import Failed</h3>
+    <div id="error-msg"></div>
+    <div class="error-detail" id="error-detail"></div>
+    <button class="btn" onclick="location.reload()">↺ Try Again</button>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="summary-strip" id="summary-strip"></div>
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchBox" placeholder="Search Pokémon...">
+    </div>
+    <label class="evo-toggle"><input type="checkbox" id="evoToggle"> Include evolutions</label>
+    <button class="btn active" data-f="all" onclick="setDecFilter('all',this)">All</button>
+    <button class="btn" data-f="keep" onclick="setDecFilter('keep',this)">✓ Keep</button>
+    <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)">↗ Trade</button>
+    <button class="btn" data-f="review" onclick="setDecFilter('review',this)">⚠ Review</button>
+    <button class="btn" data-f="protected" onclick="setDecFilter('protected',this)">🛡 Protected</button>
+    <button class="league-btn btn lb-L" data-l="L" onclick="toggleLeague('L',this)">Little</button>
+    <button class="league-btn btn lb-G" data-l="G" onclick="toggleLeague('G',this)">Great</button>
+    <button class="league-btn btn lb-U" data-l="U" onclick="toggleLeague('U',this)">Ultra</button>
+    <button class="league-btn btn lb-M" data-l="M" onclick="toggleLeague('M',this)">Master</button>
+    <button class="btn" id="sortCountBtn" onclick="toggleSortByCount(this)">Sort by Count</button>
+    <button class="btn" data-f="hundo" onclick="setDecFilter('hundo',this)">✚ Hundos</button>
+    <button class="btn" data-f="canEvolve" onclick="setDecFilter('canEvolve',this)">Can Evolve</button>
+    <button class="btn" data-f="neverEvolved" onclick="setDecFilter('neverEvolved',this)">Never Evolved</button>
+    <button class="btn export-btn" onclick="exportCSV()">⬇ Export</button>
+  </div>
+  <div id="main-content"></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════
+// SUPABASE CLOUD STORAGE
+// Table setup SQL (run once in Supabase SQL editor):
+/*
+create table if not exists pokemon_overrides (
+  id bigserial primary key,
+  pokemon_index text unique not null,
+  is_shiny boolean default false,
+  is_dynamax boolean default false,
+  is_gigantamax boolean default false,
+  vivillon_pattern text default '',
+  manual_decision text default '',
+  notes text default '',
+  updated_at timestamptz default now()
+);
+alter table pokemon_overrides disable row level security;
+*/
+// ═══════════════════════════════════════════════
+const SUPABASE_URL = 'https://jsozfpsfvvnnmipsksoh.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impzb3pmcHNmdnZubm1pcHNrc29oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODQ2OTksImV4cCI6MjA4OTQ2MDY5OX0.Qyqo4cF1C_2STXPcMoob9jMRt_VoESmhJqTQkux6i30';
+
+// In-memory cache of overrides loaded from Supabase
+let overridesCache = {};
+let supabaseConnected = false;
+
+async function supabaseFetch(method, path, body, isDeleteAll) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+  try {
+    const opts = {
+      method,
+      signal: controller.signal,
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': isDeleteAll ? 'count=exact' : method === 'POST' ? 'return=minimal,resolution=merge-duplicates' : 'return=minimal'
+      }
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, opts);
+    clearTimeout(timeout);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error('HTTP ' + res.status + ' — ' + errText.slice(0,200));
+    }
+    if (res.status === 204) return {};
+    const text = await res.text();
+    return text ? JSON.parse(text) : {};
+  } catch(e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') {
+      console.warn('Supabase timeout — project may be paused. Visit supabase.com to wake it.');
+      updateSyncStatus('⚠ Cloud timeout — Supabase may be paused. Visit supabase.com to wake it.', 'warn');
+    } else {
+      console.warn('Supabase error:', e.message);
+    }
+    return null;
+  }
+}
+
+// Collection sync state
+let cloudCollectionDate = null;
+
+async function saveCollectionToCloud(pokemon) {
+  updateSyncStatus('Saving collection to cloud...', 'ok');
+  // Delete existing collection first
+  // Delete all rows — use id=gte.0 with Prefer:count=exact to ensure full delete
+  const delResult = await supabaseFetch('DELETE', 'pokemon_collection?id=gte.0', null, true);
+  if (delResult === null) {
+    updateSyncStatus('⚠ Could not clear old collection — check Supabase permissions', 'warn');
+    return;
+  }
+  // Chunk into smaller batches to stay within payload limits
+  const BATCH = 100;
+  const slim = pokemon.map(p => ({
+    pokemon_index: p.stableKey,
+    name: p.name,
+    form: p.form||'',
+    pokemon_num: p.pokeNum||'',
+    cp: p.cp||0,
+    atk_iv: p.atkIV||0,
+    def_iv: p.defIV||0,
+    sta_iv: p.staIV||0,
+    iv_avg: p.ivAvg||0,
+    level: p.level||0,
+    rank_pct_g: p.rankPctG||0,
+    rank_pct_u: p.rankPctU||0,
+    rank_pct_l: p.rankPctL||0,
+    rank_num_g: p.rankNumG||null,
+    rank_num_u: p.rankNumU||null,
+    rank_num_l: p.rankNumL||null,
+    dust_g: p.dustG||0,
+    dust_u: p.dustU||0,
+    dust_l: p.dustL||0,
+    quick_move: p.quickMove||'',
+    charge_move1: p.chargeMove1||'',
+    charge_move2: p.chargeMove2||'',
+    is_lucky: p.isLucky||false,
+    is_shadow: p.isShadow||false,
+    is_purified: p.isPurified||false,
+    is_favorite: p.isFavorite||false,
+    catch_date: p.catchDate||'',
+    pvp_tag: p.pvpTag||'',
+    evolved_name_g: p.evolvedNameG||'',
+    evolved_name_u: p.evolvedNameU||'',
+    evolved_name_l: p.evolvedNameL||'',
+    imported_at: new Date().toISOString()
+  }));
+  let saved = 0;
+  for (let i=0; i<slim.length; i+=BATCH) {
+    const batch = slim.slice(i, i+BATCH);
+    const result = await supabaseFetch('POST', 'pokemon_collection?on_conflict=pokemon_index', batch);
+    if (result === null) {
+      updateSyncStatus('⚠ Cloud save failed at row '+i+' — check F12 console for details', 'warn');
+      console.error('Failed batch:', batch.slice(0,2), '...');
+      return;
+    }
+    saved += batch.length;
+    updateSyncStatus(`Saving... ${saved}/${slim.length}`, 'ok');
+  }
+  cloudCollectionDate = new Date().toISOString();
+  localStorage.setItem('pokevault_last_cloud_save', cloudCollectionDate);
+  updateSyncStatus('✓ Collection saved to cloud ('+slim.length+' Pokémon)', 'ok');
+}
+
+async function loadCollectionFromCloud() {
+  updateSyncStatus('Loading collection from cloud...', 'ok');
+  // Load in batches using range headers
+  let all = [], offset = 0;
+  const BATCH = 1000;
+  while(true) {
+    const data = await supabaseFetch('GET',
+      `pokemon_collection?select=*&order=pokemon_index&limit=${BATCH}&offset=${offset}`);
+    if (!data || !data.length) break;
+    all = all.concat(data);
+    offset += data.length;
+    if (data.length < BATCH) break;
+  }
+  if (!all.length) {
+    updateSyncStatus('No cloud collection found — import a CSV', 'warn');
+    return false;
+  }
+  updateSyncStatus(`✓ Loaded ${all.length} Pokémon from cloud`, 'ok');
+  return all;
+}
+
+async function checkCloudCollection() {
+  // Check if cloud has data
+  const data = await supabaseFetch('GET', 'pokemon_collection?select=count&limit=1');
+  if (data && data.length > 0) {
+    return true;
+  }
+  return false;
+}
+
+async function loadOverrides() {
+  const data = await supabaseFetch('GET', 'pokemon_overrides?select=*');
+  if (data === null) {
+    supabaseConnected = false;
+    // Don't overwrite timeout message if already set
+    const current = document.getElementById('sync-status')?.textContent || '';
+    if (!current.includes('timeout')) {
+      updateSyncStatus('⚠ Cloud unavailable — working offline', 'warn');
+    }
+    return;
+  }
+  supabaseConnected = true;
+  // Show cloud load button if upload section is visible
+  const cloudBtn = document.getElementById('cloudLoadBtn');
+  if (cloudBtn) {
+    // Check if cloud has collection data
+    const hasCloud = await supabaseFetch('GET', 'pokemon_collection?select=pokemon_index&limit=1');
+    if (hasCloud && hasCloud.length > 0) {
+      cloudBtn.style.display = 'inline-block';
+      const status = document.getElementById('cloud-load-status');
+      if (status) status.textContent = 'Cloud collection available — or import a new CSV above';
+    }
+  }
+  overridesCache = {};
+  data.forEach(row => { overridesCache[row.pokemon_index] = row; });
+  updateSyncStatus('✓ Synced — ' + data.length + ' overrides loaded', 'ok');
+  // Apply overrides to already-loaded pokemon
+  if (allPokemon.length) applyOverridesToPokemon();
+}
+
+function applyOverridesToPokemon() {
+  allPokemon.forEach(p => {
+    const ov = overridesCache[p.idx];
+    if (!ov) return;
+    if (ov.is_shiny) p.isShiny = true;
+    if (ov.is_dynamax) p.isDynamax = true;
+    if (ov.is_gigantamax) p.isGigantamax = true;
+    if (ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
+    if (ov.manual_decision) p.manualDecision = ov.manual_decision;
+    if (ov.notes) p.notes = ov.notes;
+  });
+}
+
+async function saveOverride(pokemonIdx, fields) {
+  overridesCache[pokemonIdx] = Object.assign(overridesCache[pokemonIdx]||{}, fields, {pokemon_index: pokemonIdx});
+  if (!supabaseConnected) return;
+  const payload = Object.assign({pokemon_index: pokemonIdx, updated_at: new Date().toISOString()}, fields);
+  await supabaseFetch('POST', 'pokemon_overrides', payload);
+  updateSyncStatus('✓ Saved', 'ok');
+}
+
+async function deleteOverride(pokemonIdx) {
+  delete overridesCache[pokemonIdx];
+  if (!supabaseConnected) return;
+  await supabaseFetch('DELETE', 'pokemon_overrides?pokemon_index=eq.' + encodeURIComponent(pokemonIdx));
+}
+
+function updateSyncStatus(msg, type) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = type === 'ok' ? 'var(--green)' : type === 'warn' ? 'var(--gold)' : 'var(--red)';
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════
+// GENDER DIMORPHIC SPECIES
+// ═══════════════════════════════════════════════
+const GENDER_DIMORPHIC = new Set([
+  'Meowstic','Indeedee','Frillish','Jellicent','Hippopotas','Hippowdon',
+  'Unfezant','Pyroar','Lechonk','Oinkologne','Combee','Vespiquen',
+  'Heracross','Sneasel','Weavile','Medicham','Garchomp','Wobbuffet',
+  'Girafarig','Murkrow','Honchkrow','Tangrowth','Azumarill','Marill'
+]);
+
+// RULES CONFIG — change thresholds and starring logic here
+// ═══════════════════════════════════════════════════════════
+const RULES = {
+  keepThreshold: 90,        // min rank% to qualify for keep
+  dustWarnNormal: 100000,   // flag dust cost over this
+  dustWarnPerfect: 300000,  // flag dust for 100% ranked
+  dustTier1: 100000,        // $ marker
+  dustTier2: 150000,        // $$
+  dustTier3: 200000,        // $$$
+  leagues: ['L','G','U','M'],
+  leagueNames: {L:'Little',G:'Great',U:'Ultra',M:'Master'},
+  // Star rules
+  starDecisions: ['keep','protected'],
+  starAlwaysShiny: true,
+  starAlwaysLucky: true,
+  starIfReviewAboveThreshold: true,
+  starIfExpensiveLowerEvo: true,
+};
+
+// ═══════════════════════════════════════════════
+// SHADOW-SPECIFIC MOVESETS (differ from normal)
+// ═══════════════════════════════════════════════
+const SHADOW_MOVES = {
+  // Shadow versions often prefer faster charging moves
+  Machamp:{G:['Counter','Rock Slide','Cross Chop'],U:['Counter','Rock Slide','Cross Chop'],M:['Counter','Rock Slide','Cross Chop']},
+  Gengar:{G:['Lick','Shadow Ball','Shadow Punch'],U:['Shadow Claw','Shadow Ball'],M:['Shadow Claw','Shadow Ball']},
+  Dragonite:{M:['Dragon Tail','Dragon Claw','Hurricane']}, // Dragon Claw charges faster for shadow
+  Swampert:{G:['Mud Shot','Hydro Cannon','Sludge Wave'],U:['Mud Shot','Hydro Cannon','Sludge Wave']},
+  Gardevoir:{G:['Charm','Shadow Ball','Synchronoise'],U:['Charm','Shadow Ball','Synchronoise']},
+  Salamence:{M:['Dragon Tail','Outrage','Fire Blast']},
+  Mewtwo:{M:['Confusion','Shadow Ball','Psystrike']}, // Shadow Ball better on shadow
+  Charizard:{G:['Fire Spin','Blast Burn','Dragon Claw'],M:['Fire Spin','Blast Burn','Dragon Claw']},
+  Tyranitar:{M:['Smack Down','Crunch','Stone Edge']},
+  Gyarados:{G:['Waterfall','Aqua Tail','Crunch'],U:['Waterfall','Hydro Pump','Crunch']},
+  Snorlax:{G:['Lick','Body Slam','Skull Bash']},
+  Flygon:{G:['Mud Shot','Dragon Claw','Earth Power'],U:['Mud Shot','Dragon Claw','Earth Power']},
+  Electivire:{U:['Thunder Shock','Wild Charge','Ice Punch']},
+  Magmortar:{U:['Fire Spin','Thunderbolt','Fire Punch']},
+  Nidoqueen:{G:['Poison Jab','Poison Fang','Earth Power']},
+  Politoed:{G:['Mud Shot','Weather Ball','Blizzard']},
+  Victreebel:{G:['Razor Leaf','Leaf Blade','Acid Spray']},
+  Hypno:{G:['Confusion','Shadow Ball','Focus Blast']},
+};
+
+// ═══════════════════════════════════════════════
+// POKEMON CLASSIFICATIONS
+// ═══════════════════════════════════════════════
+const LEGENDARY = new Set(['Articuno','Zapdos','Moltres','Mewtwo','Raikou','Entei','Suicune',
+  'Lugia','Ho-Oh','Regirock','Regice','Registeel','Latias','Latios','Kyogre','Groudon',
+  'Rayquaza','Uxie','Mesprit','Azelf','Dialga','Palkia','Heatran','Regigigas','Giratina',
+  'Cresselia','Cobalion','Terrakion','Virizion','Tornadus','Thundurus','Reshiram','Zekrom',
+  'Landorus','Kyurem','Xerneas','Yveltal','Zygarde','Tapu Koko','Tapu Lele','Tapu Bulu',
+  'Tapu Fini','Solgaleo','Lunala','Necrozma','Zacian','Zamazenta','Eternatus','Urshifu',
+  'Regieleki','Regidrago','Glastrier','Spectrier','Calyrex','Enamorus','Koraidon','Miraidon',
+  'Gouging Fire','Raging Bolt','Iron Boulder','Iron Crown','Terapagos']);
+const MYTHICAL = new Set(['Mew','Celebi','Jirachi','Deoxys','Phione','Manaphy','Darkrai',
+  'Shaymin','Arceus','Victini','Keldeo','Meloetta','Genesect','Diancie','Hoopa','Volcanion',
+  'Magearna','Marshadow','Zeraora','Meltan','Melmetal','Zarude','Pecharunt']);
+const ULTRA_BEAST = new Set(['Nihilego','Buzzwole','Pheromosa','Xurkitree','Celesteela',
+  'Kartana','Guzzlord','Poipole','Naganadel','Stakataka','Blacephalon']);
+
+function getPokeType(name) {
+  if (LEGENDARY.has(name)) return 'Legendary';
+  if (MYTHICAL.has(name)) return 'Mythical';
+  if (ULTRA_BEAST.has(name)) return 'Ultra Beast';
+  if (name.startsWith('Mega ') || name.endsWith(' Mega')) return 'Mega';
+  return null;
+}
+
+// ═══════════════════════════════════════════════
+// EVOLUTION FAMILY MAP (Pokémon Number based)
+// Groups pokemon number -> canonical family root number
+// This prevents bad Pokégenie scan data from merging unrelated families
+// ═══════════════════════════════════════════════
+function buildFamilyMap(rows) {
+  // Fast O(n) approach: group by Pokemon Number using a single pass
+  // Then merge families using majority-vote on evolution targets
+  // Uses a simple name->number lookup built in one pass
+
+  // Step 1: Build name+form->familyKey map
+  // Regional variants (Alolan/Galarian/Hisuian/Paldean) get separate family keys
+  const REGIONAL_FORMS = new Set(['Alola','Galar','Hisui','Paldea']);
+  const nameFormToKey = {}; // "Name|Form" -> familyKey (pokeNum|form or pokeNum)
+  const nameToNum = {};
+  rows.forEach(r => {
+    const form = r['Form']||'';
+    const isRegional = REGIONAL_FORMS.has(form);
+    // Family key includes form for regional variants
+    const famKey = isRegional ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
+    const nameKey = r['Name']+'|'+form;
+    if (!nameFormToKey[nameKey]) nameFormToKey[nameKey] = famKey;
+    if (!nameToNum[r['Name']]) nameToNum[r['Name']] = r['Pokemon Number'];
+  });
+
+  // Step 2: Count how many rows per pokeNum
+  const numCount = {};
+  rows.forEach(r => { numCount[r['Pokemon Number']] = (numCount[r['Pokemon Number']]||0)+1; });
+
+  // Step 3: Count evo target votes per (baseFamKey -> targetFamKey) pair
+  const voteCount = {};
+  rows.forEach(r => {
+    const form = r['Form']||'';
+    const isRegional = REGIONAL_FORMS.has(form);
+    const baseFamKey = isRegional ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
+    ['Name (G)','Name (U)','Name (L)'].forEach(col => {
+      const evoName = (r[col]||'').trim();
+      if (!evoName || evoName === r['Name']) return;
+      const evoNum = nameToNum[evoName];
+      if (!evoNum) return;
+      // Evo inherits same regional form
+      const evoFamKey = isRegional ? evoNum+'|'+form : evoNum;
+      if (evoFamKey === baseFamKey) return;
+      const key = baseFamKey + '>' + evoFamKey;
+      voteCount[key] = (voteCount[key]||0) + 1;
+    });
+  });
+
+  // Step 4: Union-Find on family keys
+  const parent = {};
+  const getRoot = n => {
+    if (parent[n] === undefined) parent[n] = n;
+    if (parent[n] === n) return n;
+    parent[n] = getRoot(parent[n]);
+    return parent[n];
+  };
+  const unite = (a, b) => {
+    const ra = getRoot(a), rb = getRoot(b);
+    if (ra !== rb) parent[rb] = ra;
+  };
+
+  // Step 5: Merge if majority agree (>40% of base entries point to that evo)
+  Object.entries(voteCount).forEach(([key, count]) => {
+    const [baseFamKey, evoFamKey] = key.split('>');
+    const baseNum = baseFamKey.split('|')[0];
+    const total = numCount[baseNum] || 1;
+    if (count / total > 0.4) unite(baseFamKey, evoFamKey);
+  });
+
+  // Step 6: Manually unite Eevee family
+  const eeveeNames = ['Eevee','Vaporeon','Jolteon','Flareon','Espeon',
+    'Umbreon','Leafeon','Glaceon','Sylveon'];
+  const eeveeKeys = eeveeNames.map(n => nameToNum[n]).filter(Boolean);
+  if (eeveeKeys.length > 1) eeveeKeys.slice(1).forEach(n => unite(eeveeKeys[0], n));
+
+  // Step 7: Build result map for each row: index -> familyKey
+  // Returns a function to get family key for a given row
+  const famKeyCache = {};
+  const getFamKey = (name, form) => {
+    const isRegional = REGIONAL_FORMS.has(form||'');
+    const num = nameToNum[name];
+    if (!num) return name;
+    const key = isRegional ? num+'|'+(form||'') : num;
+    if (!famKeyCache[key]) famKeyCache[key] = getRoot(key);
+    return famKeyCache[key];
+  };
+  return getFamKey;
+}
+
+
+// ═══════════════════════════════════════════════
+// BEST MOVESETS
+// ═══════════════════════════════════════════════
+const BEST_MOVES = {
+  Feraligatr:{G:['Waterfall','Hydro Cannon','Ice Beam'],U:['Waterfall','Hydro Cannon','Ice Beam'],M:['Waterfall','Hydro Cannon','Crunch']},
+  Croconaw:{G:['Waterfall','Aqua Tail'],L:['Waterfall','Aqua Tail']},
+  Totodile:{L:['Water Gun','Aqua Tail']},
+  Charizard:{G:['Fire Spin','Blast Burn','Dragon Claw'],U:['Fire Spin','Blast Burn','Dragon Claw'],M:['Fire Spin','Blast Burn','Overheat']},
+  Blastoise:{G:['Water Gun','Hydro Cannon','Ice Beam'],U:['Water Gun','Hydro Cannon','Ice Beam']},
+  Venusaur:{G:['Vine Whip','Frenzy Plant','Sludge Bomb'],U:['Vine Whip','Frenzy Plant','Sludge Bomb']},
+  Umbreon:{G:['Snarl','Foul Play','Last Resort'],U:['Snarl','Foul Play','Last Resort']},
+  Sylveon:{G:['Charm','Moonblast','Psyshock'],U:['Charm','Moonblast','Psyshock']},
+  Espeon:{G:['Confusion','Psychic','Shadow Ball'],U:['Confusion','Psychic','Shadow Ball']},
+  Vaporeon:{G:['Water Gun','Aqua Tail','Last Resort'],U:['Water Gun','Hydro Pump']},
+  Glaceon:{G:['Ice Shard','Avalanche'],U:['Ice Shard','Avalanche']},
+  Leafeon:{G:['Razor Leaf','Leaf Blade']},
+  Jolteon:{G:['Thunder Shock','Discharge','Thunderbolt']},
+  Flareon:{M:['Fire Spin','Flamethrower','Superpower']},
+  Azumarill:{G:['Bubble','Ice Beam','Play Rough'],L:['Bubble','Ice Beam','Play Rough']},
+  Machamp:{G:['Counter','Cross Chop','Rock Slide'],U:['Counter','Cross Chop','Rock Slide'],M:['Counter','Cross Chop','Rock Slide']},
+  Gengar:{G:['Lick','Shadow Ball','Shadow Punch'],U:['Shadow Claw','Shadow Ball'],M:['Shadow Claw','Shadow Ball']},
+  Swampert:{G:['Mud Shot','Hydro Cannon','Earthquake'],U:['Mud Shot','Hydro Cannon','Earthquake']},
+  Medicham:{G:['Counter','Ice Punch','Psychic']},
+  Registeel:{G:['Lock On','Flash Cannon','Focus Blast'],U:['Lock On','Flash Cannon','Focus Blast']},
+  Giratina:{U:['Shadow Claw','Dragon Claw','Shadow Sneak'],G:['Shadow Claw','Dragon Claw','Shadow Sneak']},
+  Garchomp:{M:['Mud Shot','Earth Power','Outrage']},
+  Mewtwo:{M:['Confusion','Psystrike','Ice Beam']},
+  Dragonite:{M:['Dragon Breath','Draco Meteor','Hurricane']},
+  Tyranitar:{G:['Smack Down','Stone Edge','Crunch'],U:['Smack Down','Stone Edge','Crunch'],M:['Smack Down','Stone Edge','Crunch']},
+  Lucario:{G:['Counter','Power-Up Punch','Shadow Ball'],M:['Counter','Aura Sphere','Shadow Ball']},
+  Togekiss:{G:['Charm','Ancient Power','Aerial Ace'],U:['Charm','Ancient Power','Flamethrower']},
+  Lickitung:{G:['Lick','Body Slam','Power Whip']},
+  Walrein:{G:['Powder Snow','Icicle Spear','Earthquake']},
+  Trevenant:{G:['Shadow Claw','Shadow Ball','Seed Bomb']},
+  Obstagoon:{G:['Counter','Night Slash','Cross Chop']},
+  Skarmory:{G:['Air Slash','Brave Bird','Flash Cannon']},
+  Altaria:{G:['Dragon Breath','Sky Attack','Moonblast']},
+  Pelipper:{G:['Wing Attack','Weather Ball','Hurricane']},
+  Cresselia:{G:['Psycho Cut','Grass Knot','Moonblast'],U:['Psycho Cut','Grass Knot','Moonblast']},
+  Gallade:{G:['Confusion','Leaf Blade','Close Combat'],U:['Confusion','Leaf Blade','Close Combat']},
+  Stunfisk:{G:['Mud Shot','Discharge','Rock Slide']},
+  Sableye:{G:['Shadow Claw','Foul Play','Return']},
+  Whiscash:{G:['Mud Shot','Mud Bomb','Blizzard']},
+  Dewgong:{G:['Ice Shard','Icy Wind','Water Pulse']},
+  Arcanine:{G:['Snarl','Flamethrower','Wild Charge'],U:['Snarl','Fire Blast','Crunch']},
+  Nidoqueen:{G:['Poison Jab','Poison Fang','Earth Power']},
+  Ferrothorn:{G:['Bullet Seed','Power Whip','Flash Cannon'],U:['Bullet Seed','Power Whip','Flash Cannon']},
+  Tropius:{G:['Razor Leaf','Leaf Blade','Aerial Ace']},
+  Politoed:{G:['Mud Shot','Weather Ball','Blizzard']},
+  Clefable:{G:['Charm','Moonblast','Meteor Mash']},
+  Bastiodon:{G:['Smack Down','Stone Edge','Flamethrower'],L:['Smack Down','Stone Edge','Flamethrower']},
+  Drifblim:{G:['Hex','Icy Wind','Shadow Ball']},
+  Lugia:{U:['Dragon Tail','Aeroblast','Sky Attack'],M:['Dragon Tail','Aeroblast','Sky Attack']},
+  Dialga:{M:['Dragon Breath','Iron Head','Thunder']},
+  Rayquaza:{M:['Dragon Tail','Breaking Swipe','Aerial Ace']},
+  Kyogre:{M:['Waterfall','Surf','Blizzard']},
+  Groudon:{M:['Mud Shot','Precipice Blades','Fire Punch']},
+  Zacian:{M:['Quick Attack','Close Combat','Play Rough']},
+  Chandelure:{U:['Hex','Shadow Ball','Overheat']},
+  Excadrill:{U:['Mud Shot','Drill Run','Rock Slide']},
+  Conkeldurr:{U:['Counter','Dynamic Punch','Stone Edge']},
+  Suicune:{G:['Ice Fang','Ice Beam','Bubble Beam']},
+  Raikou:{U:['Thunder Shock','Wild Charge','Shadow Ball']},
+  Entei:{U:['Fire Fang','Overheat','Iron Head']},
+  Zapdos:{M:['Thunder Shock','Thunderbolt','Drill Peck'],G:['Thunder Shock','Ancient Power','Drill Peck']},
+  Moltres:{M:['Fire Spin','Sky Attack','Ancient Power'],U:['Fire Spin','Sky Attack','Ancient Power']},
+  Articuno:{G:['Ice Shard','Icy Wind','Ancient Power'],U:['Ice Shard','Icy Wind','Hurricane']},
+  Golduck:{G:['Confusion','Hydro Pump','Psychic'],U:['Confusion','Hydro Pump','Psychic']},
+  Oranguru:{U:['Confusion','Foul Play','Psychic']},
+  Lycanroc:{G:['Rock Throw','Stone Edge','Crunch']},
+  Rockruff:{L:['Rock Throw','Crunch']},
+  Poliwrath:{G:['Counter','Ice Punch','Dynamic Punch']},
+  Muk:{G:['Poison Jab','Gunk Shot','Thunder Punch']},
+  Pidgeot:{G:['Gust','Feather Dance','Brave Bird']},
+  Glimmora:{G:['Rollout','Power Gem','Sludge Bomb'],U:['Rollout','Power Gem','Sludge Bomb']},
+  Cinderace:{G:['Quick Attack','Pyro Ball'],U:['Quick Attack','Pyro Ball'],M:['Quick Attack','Pyro Ball']},
+};
+
+// ═══════════════════════════════════════════════
+// NICKNAME BUILDER
+// ═══════════════════════════════════════════════
+const LC = {L:'ⓛ',G:'Ⓖ',U:'Ⓤ',M:'Ⓜ',R:'Ⓡ'};
+const PERFECT = '100';
+const NUNDO = '⓪';
+
+function truncName(name, len) { return (name||'').substring(0,len); }
+
+function buildNickname(p, slot) {
+  const iv = Math.round(p.ivAvg||0);
+  const atkIV=p.atkIV||0, defIV=p.defIV||0, staIV=p.staIV||0;
+  const isNundo = atkIV===0&&defIV===0&&staIV===0;
+
+  // Target name for this slot
+  let base = p.name;
+  if (slot==='G' && p.evolvedNameG) base=p.evolvedNameG;
+  else if (slot==='U' && p.evolvedNameU) base=p.evolvedNameU;
+  else if (slot==='L' && p.evolvedNameL) base=p.evolvedNameL;
+  else if (slot==='M') base=p.evolvedNameU||p.evolvedNameG||p.name;
+
+  if (isNundo) return fitName(base, NUNDO, '', 12);
+
+  // Build suffix first so we know how many chars it needs
+  let suf='';
+
+  // Dust dollars
+  const dust=p.dustCostBest||0;
+  if (dust>=RULES.dustTier3) suf+='$$$';
+  else if (dust>=RULES.dustTier2) suf+='$$';
+  else if (dust>=RULES.dustTier1) suf+='$';
+  // Shiny on non-shiny slots
+  if (p.isShiny&&slot!=='shiny'&&slot!=='shiny_lower') suf+='S';
+  // Shadow purification suffix
+  if (p.isShadow && p.purifyLeague) {
+    suf += p.purifyHundo ? 'p✪' : 'p';
+  }
+
+  // Move flags
+  if (p.hasAllBestMoves) suf+='☆';
+  else if (p.hasTwoMoves&&p.hasBestMoves) suf+='b';
+
+  let mid='', nickSuf=suf;
+
+  if (slot==='trade') {
+    // name + iv + 't' + suf — use lowercase, fit name
+    mid=iv+'t';
+    return fitName(p.name, mid, nickSuf, 12);
+  } else if (slot==='review') {
+    // Holding name: Name + best league IV% + lowercase league letter + next league IV% etc
+    // e.g. Pin95l93g for 95% Little, 93% Great
+    // Sort qualifying leagues by rank% descending
+    const qualLeagues = [
+      {l:'l', pct:Math.round(p.rankPctL||0), qualifies:(p.rankPctL||0)>=RULES.keepThreshold},
+      {l:'g', pct:Math.round(p.rankPctG||0), qualifies:(p.rankPctG||0)>=RULES.keepThreshold},
+      {l:'u', pct:Math.round(p.rankPctU||0), qualifies:(p.rankPctU||0)>=RULES.keepThreshold},
+      {l:'m', pct:Math.round(p.rankPctM||0), qualifies:(p.rankPctM||0)>=RULES.keepThreshold},
+    ].filter(x=>x.qualifies).sort((a,b)=>b.pct-a.pct);
+    if (qualLeagues.length===0) {
+      mid=iv; // fallback to just IV%
+    } else {
+      // Build e.g. 95l93g — best rank first, each showing pct+letter
+      mid = qualLeagues.map(x=>x.pct+x.l).join('');
+    }
+    return fitName(p.name, mid, nickSuf, 12);
+  } else if (slot==='M') {
+    const pv=Math.round(p.rankPctM||p.ivAvg||0);
+    mid=LC.R+(pv===100?PERFECT:String(pv));
+    return fitName(base, mid, nickSuf, 12);
+  } else if (['L','G','U'].includes(slot)) {
+    const pv=Math.round(slot==='L'?p.rankPctL:slot==='G'?p.rankPctG:p.rankPctU);
+    mid=LC[slot]+(pv===100?PERFECT:String(pv));
+    return fitName(base, mid, nickSuf, 12);
+  } else if (slot==='shiny'||slot==='shiny_lower') {
+    const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
+    if (best) {
+      const pv=Math.round(p['rankPct'+best]||0);
+      mid=LC[best]+(pv===100?PERFECT:String(pv));
+    } else {
+      mid=String(iv);
+    }
+    nickSuf='※'+suf;
+    return fitName(p.name, mid, nickSuf, 12);
+  } else if (slot==='lucky') {
+    // Lucky with no league slot: NameⓇIV (Master/level-up candidate)
+    const pv=Math.round(p.rankPctM||p.ivAvg||0);
+    mid=LC.R+String(pv);
+    return fitName(p.name, mid, nickSuf, 12);
+  } else {
+    mid=String(iv);
+    return fitName(p.name, mid, nickSuf, 12);
+  }
+}
+
+// Fit as many chars of name as possible: name + mid + suf <= maxLen
+// mid = the league symbol + number (e.g. Ⓖ96), suf = trailing flags (S, b, ☆, $)
+function fitName(name, mid, suf, maxLen) {
+  const available = maxLen - mid.length - suf.length;
+  const truncated = available > 0 ? name.substring(0, available) : '';
+  return (truncated + mid + suf).substring(0, maxLen);
+}
+
+// ═══════════════════════════════════════════════
+// MOVE EVALUATOR
+// ═══════════════════════════════════════════════
+function evalMoves(name, qm, cm1, cm2, isShadow, isPurified) {
+  // Use shadow moves if available and pokemon is shadow (and not being purified)
+  const moveDb = (isShadow && !isPurified && SHADOW_MOVES[name]) ? SHADOW_MOVES : BEST_MOVES;
+  // Always flag Frustration as needing TM
+  const notes = [];
+  if (qm === 'Frustration') notes.push('TM Fast → remove Frustration!');
+  const best=moveDb[name];
+  if (!best) return {known:false,notes:[],hasAllBestMoves:false,hasBestMoves:false};
+  const lg=['L','G','U','M'].find(l=>best[l]);
+  if (!lg) return {known:false,notes:[],hasAllBestMoves:false,hasBestMoves:false};
+  const [bf,bc1,bc2]=best[lg];
+  if (qm&&bf&&qm!=='Frustration'&&qm!==bf) notes.push(`TM Fast → ${bf}`);
+  if (bc1&&cm1&&cm1!==bc1&&cm1!==bc2) notes.push(`TM Charged → ${bc1}`);
+  if (bc2&&!cm2) notes.push(`Unlock 2nd move (${bc2})`);
+  else if (bc2&&cm2&&cm2!==bc2&&cm2!==bc1) notes.push(`TM 2nd → ${bc2}`);
+  const hasBestMoves=qm===bf&&cm1&&(cm1===bc1||cm1===bc2);
+  const hasAllBestMoves=hasBestMoves&&(!bc2||(cm2&&(cm2===bc2||cm2===bc1)))&&notes.length===0&&!!qm;
+  return {known:true,notes,hasAllBestMoves,hasBestMoves,bestFast:bf,bestC1:bc1,bestC2:bc2};
+}
+
+// ═══════════════════════════════════════════════
+// CATCH DATE PARSER (D/M/YYYY Australian format)
+// ═══════════════════════════════════════════════
+function parseCatchDate(s) {
+  if (!s||!s.trim()) return null;
+  const parts=s.trim().split('/');
+  if (parts.length!==3) return null;
+  const [d,m,y]=parts.map(Number);
+  if (!d||!m||!y) return null;
+  return new Date(y,m-1,d).getTime();
+}
+
+// ═══════════════════════════════════════════════
+// STABLE POKEMON IDENTITY KEY
+// Survives evolution, power-ups, re-exports and purges
+// Format: familyKey|form|gender|atkIV|defIV|staIV|catchDate
+// ═══════════════════════════════════════════════
+function makeStableKey(p) {
+  // Key: PokemonNumber|Form|Gender|AtkIV|DefIV|StaIV|CatchDate|CP
+  // PokemonNumber stable through evolution; CP tiebreaker for same-day catches
+  // No catch date falls back to _idx (won't survive re-export)
+  const date = p.catchDate || ('_idx' + (p.idx||''));
+  return [
+    p.pokeNum || '',
+    p.form || '',
+    p.gender || '',
+    p.atkIV !== undefined ? p.atkIV : '',
+    p.defIV !== undefined ? p.defIV : '',
+    p.staIV !== undefined ? p.staIV : '',
+    date,
+    p.cp || ''
+  ].join('|');
+}
+
+function deduplicateKeys(pokemon) {
+  // For truly identical pokemon (same species/IVs/date/CP), append _2, _3 suffix
+  const seen = {};
+  pokemon.forEach(p => {
+    const base = p.stableKey;
+    seen[base] = (seen[base]||0) + 1;
+    if (seen[base] > 1) p.stableKey = base + '_' + seen[base];
+  });
+}
+
+// ═══════════════════════════════════════════════
+// STARDUST TO MAX
+const DUST_PP={1:200,2:200,3:400,4:400,5:600,6:600,7:800,8:800,9:1000,10:1000,11:1300,12:1300,13:1600,14:1600,15:1900,16:1900,17:2200,18:2200,19:2500,20:2500,21:3000,22:3000,23:3500,24:3500,25:4000,26:4000,27:4500,28:4500,29:5000,30:5000,31:6000,32:6000,33:7000,34:7000,35:8000,36:8000,37:9000,38:9000,39:10000,40:10000};
+function dustToMax(cur,tgt){let t=0;for(let l=Math.floor(cur||1);l<tgt;l++){const c=DUST_PP[l]||10000;t+=(l===Math.floor(cur)&&(cur%1)!==0)?c:c*2;}return t;}
+function formatDust(n){return n>=1000?(n/1000).toFixed(0)+'k':String(n);}
+
+// PURIFICATION SIMULATION
+// ═══════════════════════════════════════════════
+function simulatePurify(p, allRows) {
+  if (!p.isShadow) return;
+  // +2 to each IV capped at 15
+  const pAtk = Math.min(15, (p.atkIV||0)+2);
+  const pDef = Math.min(15, (p.defIV||0)+2);
+  const pSta = Math.min(15, (p.staIV||0)+2);
+  p.purifyHundo = pAtk===15 && pDef===15 && pSta===15;
+
+  // Re-evaluate league ranks with purified IVs
+  // We can't recalculate PvP rank from scratch without the full ranking table
+  // But we can use a heuristic: if original rank% is close, purified will be higher
+  // Better: check if any league rank% when adjusted for IV improvement would cross 90%
+  // Since we don't have the full rank table, use IV average improvement as proxy
+  // Purified IV avg
+  const purifyIvAvg = ((pAtk+pDef+pSta)/45)*100;
+
+  // Check each league - if purified IVs would likely rank well
+  // Use the existing rank data but scale it: if original is within 5% of threshold
+  // and purified IVs are significantly better, flag it
+  // More accurately: check if min(ivs) >= 13 for hundo, or use rank% + improvement
+  const improvement = purifyIvAvg - (p.ivAvg||0);
+
+  // For each league, estimate purified rank
+  const leagueChecks = [
+    {lg:'L', rank:p.rankPctL||0, evo:p.evolvedNameL||p.name},
+    {lg:'G', rank:p.rankPctG||0, evo:p.evolvedNameG||p.name},
+    {lg:'U', rank:p.rankPctU||0, evo:p.evolvedNameU||p.name},
+    {lg:'M', rank:purifyIvAvg, evo:p.evolvedNameU||p.evolvedNameG||p.name},
+  ];
+
+  // Find best league where purified version would qualify
+  // Heuristic: if current rank + (improvement * 0.5) >= 90, likely qualifies
+  let bestLeague='', bestPct=0;
+  leagueChecks.forEach(({lg, rank, evo}) => {
+    if (rank <= 0) return;
+    const estimatedPurified = Math.min(100, rank + improvement * 0.4);
+    if (estimatedPurified >= RULES.keepThreshold && estimatedPurified > bestPct) {
+      bestPct = estimatedPurified;
+      bestLeague = lg;
+      p.purifyEvo = evo;
+    }
+  });
+  p.purifyLeague = bestLeague;
+  p.purifyRankPct = Math.round(bestPct);
+}
+
+// ═══════════════════════════════════════════════
+// MAIN ANALYSIS
+// ═══════════════════════════════════════════════
+function analyse(rows) {
+  // Build family map (robust against bad scans, separates regional variants)
+  const getFamKey = buildFamilyMap(rows);
+
+  // Parse all rows
+  const parsed = rows.map(r => {
+    const sp=Number(r['Shadow/Purified'])||0;
+    const iv=Number(r['IV Avg'])||0;
+    const atkIV=Number(r['Atk IV'])||0, defIV=Number(r['Def IV'])||0, staIV=Number(r['Sta IV'])||0;
+    const rG=parseFloat(r['Rank % (G)'])||0, rU=parseFloat(r['Rank % (U)'])||0, rL=parseFloat(r['Rank % (L)'])||0;
+    const dustG=Number(r['Dust Cost (G)'])||0, dustU=Number(r['Dust Cost (U)'])||0, dustL=Number(r['Dust Cost (L)'])||0;
+    const dusts=[dustG,dustU,dustL].filter(d=>d>0);
+    const dustMin=dusts.length?Math.min(...dusts):0;
+    const mv=evalMoves(r['Name'],r['Quick Move'],r['Charge Move'],r['Charge Move 2'],(Number(r['Shadow/Purified'])||0)===1,(Number(r['Shadow/Purified'])||0)===2);
+
+    // Validate evo names — only trust them if same Pokémon Number family
+    const baseNum=r['Pokemon Number'];
+    const form = r['Form']||'';
+    const myFamKey = getFamKey(r['Name'], form);
+    const validateEvo = name => {
+      if (!name||name===r['Name']) return '';
+      // Trust evo name if it's in same family
+      const evoRow = rows.find(x=>x['Name']===name);
+      if (!evoRow) return name;
+      const evoFamKey = getFamKey(name, form); // use same form for regional
+      return evoFamKey===myFamKey ? name : '';
+    };
+
+    return {
+      idx:r['Index'], name:r['Name'], form:r['Form']||'',
+      pokeNum:baseNum, familyKey:getFamKey(r['Name'], r['Form']||''),
+      gender:r['Gender']||'',
+      cp:Number(r['CP'])||0, hp:Number(r['HP'])||0,
+      atkIV,defIV,staIV, ivAvg:iv,
+      level:Number(r['Level Min'])||0,
+      quickMove:r['Quick Move']||'', chargeMove1:r['Charge Move']||'', chargeMove2:r['Charge Move 2']||'',
+      isLucky:r['Lucky']==='1', isShadow:sp===1, isPurified:sp===2,
+      isFavorite:r['Favorite']==='1', isShiny:false,
+      isNundo:atkIV===0&&defIV===0&&staIV===0,
+      rankPctG:rG, rankPctU:rU, rankPctL:rL, rankPctM:iv,
+      rankNumG:Number(r['Rank # (G)'])||null, rankNumU:Number(r['Rank # (U)'])||null, rankNumL:Number(r['Rank # (L)'])||null,
+      evolvedNameG:validateEvo(r['Name (G)']), evolvedNameU:validateEvo(r['Name (U)']), evolvedNameL:validateEvo(r['Name (L)']),
+      dustG,dustU,dustL,dustMin,dustCostBest:dustMin,
+      catchDate:r['Catch Date']||'', catchDateMs:parseCatchDate(r['Catch Date']),
+      pvpTag:r['Marked for PvP use']||'',
+      moveKnown:mv.known, hasAllBestMoves:mv.hasAllBestMoves, hasBestMoves:mv.hasBestMoves,
+      hasTwoMoves:!!r['Charge Move 2'], moveNotes:mv.notes,
+      bestFast:mv.bestFast, bestC1:mv.bestC1, bestC2:mv.bestC2,
+      pokeType:getPokeType(r['Name']),
+      slots:[], decision:'review', reason:'', nickname:'', suggestStar:false,
+      targetEvo:'', hidden:false, evoIndicator:'', canEvolve:false, neverEvolved:false, isHundo:false, dustToL40:0, belowCapNote:'',
+      isDynamax:false, isGigantamax:false, vivillonPattern:'', manualDecision:'', notes:'', stableKey:'',
+      overBudget100:false, cheaperAvailable:false,
+      purifyHundo:false, purifyLeague:'', purifyRankPct:0,
+    };
+  });
+
+  // Group by family key
+  const byFamily={};
+  parsed.forEach(p=>{
+    if(!byFamily[p.familyKey]) byFamily[p.familyKey]=[];
+    byFamily[p.familyKey].push(p);
+  });
+
+  // Set stable keys now that familyKey is assigned
+  parsed.forEach(p => { p.stableKey = makeStableKey(p); });
+  deduplicateKeys(parsed);
+
+  // Simulate purification for shadows
+  parsed.forEach(p => simulatePurify(p, rows));
+
+  // Determine slots — ONE best per evolution stage per league
+  Object.values(byFamily).forEach(members=>{
+    const isLegendary=members.some(p=>LEGENDARY.has(p.name)||MYTHICAL.has(p.name)||ULTRA_BEAST.has(p.name));
+
+    // Evaluate leagues in priority order M>U>G>L so higher leagues get first pick
+    // Track which pokemon have been assigned to avoid double-assigning
+    const claimed = new Set();
+    ['M','U','G','L'].forEach(lg=>{
+      const rankField=`rankPct${lg}`;
+      const byEvoStage={};
+      members.forEach(p=>{
+        const stageName = lg==='L'?(p.evolvedNameL||p.name)
+          :lg==='G'?(p.evolvedNameG||p.name)
+          :lg==='U'?(p.evolvedNameU||p.name)
+          :(p.evolvedNameU||p.evolvedNameG||p.name);
+        // Split by gender for dimorphic species
+        const isDimorphic = GENDER_DIMORPHIC.has(stageName)||GENDER_DIMORPHIC.has(p.name);
+        const groupKey = (isDimorphic && p.gender) ? stageName+'|'+p.gender : stageName;
+        if (!byEvoStage[groupKey]) byEvoStage[groupKey]=[];
+        byEvoStage[groupKey].push(p);
+      });
+
+      Object.entries(byEvoStage).forEach(([stageName,group])=>{
+        // Master league: only final evolution
+        if (lg==='M') {
+          const hasHigherEvo = members.some(m =>
+            m.name === stageName && (
+              (m.evolvedNameG && m.evolvedNameG !== stageName) ||
+              (m.evolvedNameU && m.evolvedNameU !== stageName)
+            )
+          );
+          if (hasHigherEvo) return;
+        }
+
+        // CP commitment check — exclude from league if already powered past cap
+        const leagueCap = lg==='L'?500:lg==='G'?1500:lg==='U'?2500:99999;
+        const eligible = (lg==='M' ? group : group.filter(p => (p.cp||0) <= leagueCap * 1.05))
+          .filter(p => !claimed.has(p.idx));  // exclude already committed pokemon
+        // Allow 5% over cap to account for rounding/display differences
+        if (!eligible.length) return;
+
+        // Effective dust = half for Lucky (already invested, cheaper to finish)
+        const effectiveDust = p => {
+          const d = (lg==='L'?p.dustL:lg==='G'?p.dustG:lg==='U'?p.dustU:0) || p.dustCostBest || 999999;
+          return p.isLucky ? Math.round(d/2) : d;
+        };
+
+        // Sort by tier then effective dust:
+        // Tier 1: 100% rank (exact 100.00)
+        // Tier 2: 99%+ 
+        // Tier 3: 90%+
+        // Within each tier: cheapest effective dust first
+        const rankTier = p => {
+          const r = p[rankField]||0;
+          if (r >= 99.99) return 0;  // 100%
+          if (r >= 99.0)  return 1;  // 99%+
+          if (r >= 90.0)  return 2;  // 90%+
+          return 3;
+        };
+
+        eligible.sort((a,b) => {
+          const ta = rankTier(a), tb = rankTier(b);
+          if (ta !== tb) return ta - tb;  // better tier first
+          return effectiveDust(a) - effectiveDust(b);  // cheaper first within tier
+        });
+
+        const best = eligible[0];
+        const bestRank = best[rankField]||0;
+
+        // Always promote the best candidate — threshold determines if it's confirmed or tentative
+        const isConfirmed = bestRank >= RULES.keepThreshold;
+        if (bestRank >= 70 || isLegendary) { // Only skip truly weak candidates
+          if (!best.slots.includes(lg)) best.slots.push(lg);
+          best.targetEvo = stageName !== best.name ? stageName : '';
+          best.slotConfirmed = isConfirmed; // true = circled letter, false = review name
+          if (!isConfirmed) best.slots.push(lg+'_tentative');
+          // Mark as claimed for lower leagues ONLY if committed (under 150k budget)
+          const eDustCheck = effectiveDust(best);
+          if (eDustCheck < 150000 && rankTier(best) === 0) {
+            claimed.add(best.idx); // 100% affordable — committed, don't double-assign
+          }
+
+          // If best is expensive ($$+ = 150k+), also keep an affordable backup
+          if (eDustCheck >= 150000) {
+            // Find best affordable candidate (effective dust < 150k) not already assigned
+            const affordableBackup = eligible.slice(1).find(p =>
+              effectiveDust(p) < 150000 && (p[rankField]||0) >= RULES.keepThreshold
+            );
+            if (affordableBackup) {
+              if (!affordableBackup.slots.includes(lg)) affordableBackup.slots.push(lg+'_backup');
+              affordableBackup.isAffordableBackup = true;
+              affordableBackup.backupFor = lg;
+            }
+          }
+
+          // Flag if a cheaper option exists at same tier
+          const bestTier = rankTier(best);
+          const cheaperExists = eligible.slice(1).some(p =>
+            rankTier(p) === bestTier && effectiveDust(p) < effectiveDust(best)
+          );
+          if (cheaperExists) best.cheaperAvailable = (best.cheaperAvailable||[]);
+          // (cheaperAvailable flag is set on winner to show it could be replaced)
+
+          // Check if 200k+ threshold — flag as tentative if over budget
+          const eDust = effectiveDust(best);
+          if (eDust > 200000 && bestTier === 0) {
+            best.overBudget100 = true;
+          }
+
+          // Second runner-up: if another candidate also qualifies at 90%+
+          // assign them to remaining open leagues (handled by league loop)
+        } else if (isLegendary && !eligible.some(m=>(m[rankField]||0)>=RULES.keepThreshold)) {
+          if (!best.slots.includes(lg)) best.slots.push(lg);
+          best.targetEvo = stageName !== best.name ? stageName : '';
+        }
+      });
+    });
+
+    // Shiny, shadow, purified, lucky, nundo slots
+    const shinies=members.filter(p=>p.isShiny).sort((a,b)=>b.ivAvg-a.ivAvg);
+    if(shinies.length){shinies[0].slots.push('shiny');shinies.slice(1).forEach(p=>p.slots.push('shiny_lower'));}
+    const shadows=members.filter(p=>p.isShadow).sort((a,b)=>b.ivAvg-a.ivAvg);
+    if(shadows.length) shadows[0].slots.push('shadow');
+    const purified=members.filter(p=>p.isPurified).sort((a,b)=>b.ivAvg-a.ivAvg);
+    if(purified.length) purified[0].slots.push('purified');
+    members.filter(p=>p.isLucky).forEach(p=>p.slots.push('lucky'));
+    members.filter(p=>p.isNundo).forEach(p=>p.slots.push('nundo'));
+
+    // Set decisions and nicknames
+    members.forEach(p=>{
+      // Fix dustCostBest to use the dust for the assigned league slot
+      const leagueSlot = p.slots.find(s=>['L','G','U','M'].includes(s));
+      if (leagueSlot === 'L' && p.dustL > 0) p.dustCostBest = p.dustL;
+      else if (leagueSlot === 'G' && p.dustG > 0) p.dustCostBest = p.dustG;
+      else if (leagueSlot === 'U' && p.dustU > 0) p.dustCostBest = p.dustU;
+      else if (leagueSlot === 'M') p.dustCostBest = 0;
+      else p.dustCostBest = p.dustMin || 0;
+
+      const hasLeagueSlot=p.slots.some(s=>RULES.leagues.includes(s));
+      const hasBackupSlot=p.slots.some(s=>s.endsWith('_backup'));
+      const hasProtectedSlot=isLegendary&&p.slots.length>0;
+      const qualifiesAny=RULES.leagues.some(l=>(p[`rankPct${l}`]||0)>=RULES.keepThreshold);
+
+      if (p.slots.includes('nundo')) {
+        p.decision='keep'; p.reason='Nundo — 0/0/0';
+        p.nickname=buildNickname(p,'nundo');
+      } else if (hasLeagueSlot) {
+        const lgSlots=p.slots.filter(s=>RULES.leagues.includes(s));
+        const lgNames=lgSlots.map(s=>RULES.leagueNames[s]);
+        const nickSlot=['M','U','G','L'].find(s=>lgSlots.includes(s))||lgSlots[0];
+        if(nickSlot==='M') p.targetEvo=p.evolvedNameU||p.evolvedNameG||'';
+        else if(nickSlot==='G') p.targetEvo=p.evolvedNameG||'';
+        else if(nickSlot==='U') p.targetEvo=p.evolvedNameU||'';
+        else if(nickSlot==='L') p.targetEvo=p.evolvedNameL||'';
+        if (p.slotConfirmed) {
+          // Confirmed best — circled letter nickname
+          p.decision='keep';
+          p.reason='Best '+lgNames.join(' + ');
+          p.nickname=buildNickname(p,nickSlot);
+        } else {
+          // Auto-promoted but below 90% — keep but use review name so you know it's tentative
+          p.decision='review';
+          p.reason='Best available for '+lgNames.join(' + ')+' (below 90% threshold)';
+          p.nickname=buildNickname(p,'review');
+        }
+      } else if (p.slots.includes('lucky')) {
+        p.decision='keep'; p.reason='Lucky — always keep';
+        // Lucky with no league slot gets Ⓡ nickname as Master/level-up candidate
+        p.nickname=buildNickname(p,'lucky');
+      } else if (p.slots.includes('shiny')||p.slots.includes('shiny_lower')) {
+        p.decision='keep'; p.reason='Shiny — always favourite';
+        p.nickname=buildNickname(p,'shiny');
+      } else if (p.slots.includes('shadow')) {
+        p.decision='keep'; p.reason='Best shadow';
+        p.nickname=buildNickname(p,'review');
+      } else if (p.slots.includes('purified')) {
+        p.decision='keep'; p.reason='Best purified';
+        p.nickname=buildNickname(p,'review');
+      } else if (isLegendary&&p.slots.length===0&&qualifiesAny) {
+        p.decision='protected'; p.reason='Legendary — best available';
+        p.nickname=buildNickname(p,'review');
+      } else if (isLegendary&&p.slots.length===0) {
+        p.decision='protected'; p.reason='Legendary — keep until better found';
+        p.nickname=buildNickname(p,'review');
+      } else if (qualifiesAny) {
+        p.decision='review'; p.reason='≥90% but not best in family — review';
+        p.nickname=buildNickname(p,'review');
+      } else if (p.isLucky) {
+        // Lucky can never be traded — always keep as Master/Raid candidate
+        p.decision='keep';
+        p.reason='Lucky — always keep (Master/Raid candidate)';
+        p.nickname=buildNickname(p,'lucky');
+        if(!p.slots.includes('lucky')) p.slots.push('lucky');
+      } else {
+        p.decision='trade';
+        p.reason=`IV ${Math.round(p.ivAvg)}% — not best in any slot`;
+        p.nickname=buildNickname(p,'trade');
+      }
+
+      // Apply manual decision override from Supabase
+      const ov = overridesCache[p.stableKey];
+      if (ov && ov.manual_decision) p.decision = ov.manual_decision;
+      if (ov && ov.is_shiny) p.isShiny = true;
+      if (ov && ov.is_dynamax) p.isDynamax = true;
+      if (ov && ov.is_gigantamax) p.isGigantamax = true;
+      if (ov && ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
+      if (ov && ov.notes) p.notes = ov.notes;
+
+      // Suggest star: only confirmed best, lucky, best shiny, protected, nundo
+      const isBestShiny = p.slots.includes('shiny'); // only TOP shiny, not shiny_lower
+      // For protected (legendary), only star if it's the best IV in the family
+      const isProtectedBest = p.decision==='protected' &&
+        members.every(m => m===p || (m.ivAvg||0) <= (p.ivAvg||0));
+
+      p.suggestStar = (
+        (p.decision==='keep' && (
+          p.slots.some(s=>RULES.leagues.includes(s)) || // league slot
+          p.slots.includes('lucky') ||
+          isBestShiny ||
+          p.slots.includes('nundo') ||
+          p.slots.includes('shadow') ||
+          p.slots.includes('purified')
+        )) ||
+        isProtectedBest ||
+        (p.isLucky) // lucky always starred
+      );
+    });
+    // Fix dustCostBest to use the dust for the assigned league slot
+    members.forEach(p=>{
+      const leagueSlot = p.slots.find(s=>['L','G','U','M'].includes(s));
+      if (leagueSlot === 'L' && p.dustL > 0) p.dustCostBest = p.dustL;
+      else if (leagueSlot === 'G' && p.dustG > 0) p.dustCostBest = p.dustG;
+      else if (leagueSlot === 'U' && p.dustU > 0) p.dustCostBest = p.dustU;
+      else if (leagueSlot === 'M') p.dustCostBest = 0; // Master = power to max, not league specific
+      else p.dustCostBest = p.dustMin; // fallback for non-league slots
+    });
+
+    const allN=new Set(parsed.map(p=>p.name));
+    members.forEach(p=>{
+      if(p.suggestStar&&p.targetEvo){
+        // Check if ANY member of the evo chain exists in collection
+        // e.g. if targeting Kadabra but we have Alakazam, not "never evolved"
+        const famMemNames = new Set(members.map(m=>m.name));
+        // Get all evo targets for this pokemon's family
+        const evoChain = new Set();
+        members.forEach(m=>{
+          if(m.evolvedNameG) evoChain.add(m.evolvedNameG);
+          if(m.evolvedNameU) evoChain.add(m.evolvedNameU);
+          if(m.evolvedNameL) evoChain.add(m.evolvedNameL);
+        });
+        // Never evolved = none of the evo targets exist in the full collection
+        const nv = [...evoChain].every(evo => !allN.has(evo));
+        p.evoIndicator=nv?'<span class="evo-ind evo-gold" title="First one!">&#x24BA;</span> ':'<span class="evo-ind evo-grey" title="Evolve">&#x24BA;</span> ';
+        p.canEvolve=true; p.neverEvolved=nv;
+      }
+      if(p.atkIV===15&&p.defIV===15&&p.staIV===15){
+        p.isHundo=true;
+        p.dustToL40=(p.level||0)<40?dustToMax(p.level||1,40):0;
+        const ls=p.slots.find(s=>['L','G','U'].includes(s));
+        const cap=ls==='L'?500:ls==='G'?1500:ls==='U'?2500:null;
+        if(cap&&(p.cp||0)<cap) p.belowCapNote='Max CP below '+RULES.leagueNames[ls]+' cap ('+p.cp+' max) - hundo is optimal';
+      }
+    });
+  });
+
+  // Build family list
+  const famList=Object.entries(byFamily).map(([key,members])=>{
+    members.sort((a,b)=>{
+      const o={keep:0,protected:1,review:2,trade:3};
+      return (o[a.decision]||3)-(o[b.decision]||3);
+    });
+    // Use most evolved / most common name as family label
+    // Most evolved = the name that appears most as an evo target, or just most common
+    const nameCounts = {};
+    members.forEach(m=>nameCounts[m.name]=(nameCounts[m.name]||0)+1);
+    // Prefer names that are NOT evo targets (i.e. final evolutions)
+    const evoTargets = new Set();
+    members.forEach(m=>{
+      if(m.evolvedNameG) evoTargets.add(m.evolvedNameG);
+      if(m.evolvedNameU) evoTargets.add(m.evolvedNameU);
+      if(m.evolvedNameL) evoTargets.add(m.evolvedNameL);
+    });
+    const finalEvos = Object.keys(nameCounts).filter(n=>!evoTargets.has(n)||nameCounts[n]>5);
+    const primaryName = finalEvos.length
+      ? finalEvos.sort((a,b)=>nameCounts[b]-nameCounts[a])[0]
+      : (members[0]?.name||key);
+    return {
+      key, members,
+      primaryName,
+      keepCount:members.filter(p=>p.decision==='keep').length,
+      tradeCount:members.filter(p=>p.decision==='trade').length,
+      reviewCount:members.filter(p=>p.decision==='review'||p.decision==='protected').length,
+    };
+  }).sort((a,b)=>a.primaryName.localeCompare(b.primaryName));
+
+  return {pokemon:parsed, families:famList};
+}
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let allPokemon=[], families=[], filteredFamilies=[];
+let decFilter='all', leagueFilters=new Set(), searchTerm='', page=1, sortByCount=false;
+const PER_PAGE=40;
+const familySortState={};
+
+// ═══════════════════════════════════════════════
+// RENDER HELPERS
+// ═══════════════════════════════════════════════
+function lrHTML(pct,num){
+  if(!pct) return '<span class="lr-low">—</span>';
+  const cls=pct>=90?'lr-90':pct>=70?'lr-70':'lr-low';
+  return `<span class="lrank"><span class="${cls}">${pct.toFixed(1)}%</span>${num?`<span class="lr-num">#${num}</span>`:''}</span>`;
+}
+
+function dustHTML(dust,iv){
+  if(!dust) return '<span style="color:var(--dim)">—</span>';
+  const thr=iv>=99?RULES.dustWarnPerfect:RULES.dustWarnNormal;
+  const cls=dust<=thr?'dust-ok':dust<=thr*1.5?'dust-warn':'dust-over';
+  const d=dust>=RULES.dustTier3?'$$$':dust>=RULES.dustTier2?'$$':dust>=RULES.dustTier1?'$':'';
+  return `<span class="${cls}">${(dust/1000).toFixed(0)}k${d}</span>`;
+}
+
+function moveHTML(p){
+  if(!p.quickMove&&!p.chargeMove1) return '<span class="move-unknown">Not scanned</span>';
+  const f=p.quickMove||'—',c1=p.chargeMove1||'—',c2=p.chargeMove2||'';
+  const fc=p.bestFast?(f===p.bestFast?'move-good':'move-bad'):'';
+  const c1c=p.bestC1?((c1===p.bestC1||c1===p.bestC2)?'move-good':'move-bad'):'';
+  const c2c=p.bestC2?((c2===p.bestC2||c2===p.bestC1)?'move-good':'move-bad'):'';
+  let h=`<div class="${fc}">${f}</div><div class="${c1c}">${c1}</div>`;
+  if(c2) h+=`<div class="${c2c}">${c2}</div>`;
+  (p.moveNotes||[]).forEach(n=>h+=`<div class="move-tm">⚡ ${n}</div>`);
+  return h;
+}
+
+function slotBadges(p){
+  const slots = p.slots || [];
+  const m={L:['sl-L','Little'],G:['sl-G','Great'],U:['sl-U','Ultra'],M:['sl-M','Master'],
+    L_backup:['sl-L','Little (backup)'],G_backup:['sl-G','Great (backup)'],
+    U_backup:['sl-U','Ultra (backup)'],M_backup:['sl-M','Master (backup)'],
+    shiny:['sl-shiny','Best Shiny'],shiny_lower:['sl-shiny','Shiny'],
+    shadow:['sl-shadow','Best Shadow'],purified:['sl-purified','Best Purified'],
+    lucky:['sl-lucky','Lucky'],nundo:['sl-nundo','Nundo']};
+  let html = slots.map(s=>`<span class="slot ${(m[s]||['sl-G',s])[0]}">${(m[s]||['',s])[1]}</span>`).join('');
+  if (p.overBudget100) html += '<span class="slot" style="background:rgba(248,81,73,.15);color:var(--red)">$$$⚠</span>';
+  return html;
+}
+
+function decBadge(d){
+  const m={keep:'dec-keep',trade:'dec-trade',review:'dec-review',protected:'dec-protected'};
+  const l={keep:'✓ Keep',trade:'↗ Trade',review:'⚠ Review',protected:'🛡 Protected'};
+  return `<span class="dec ${m[d]||'dec-review'}">${l[d]||d}</span>`;
+}
+
+function starCell(p){
+  const type=p.pokeType||'';
+  const tc={Legendary:'st-legendary',Mythical:'st-mythical','Ultra Beast':'st-ub',Mega:'st-mega'}[type]||'';
+  let si;
+  if(p.suggestStar&&p.isFavorite) si='<span class="star-yellow" title="Starred correctly ✓">★</span>';
+  else if(p.suggestStar&&!p.isFavorite) si='<span class="star-green" title="Should be starred — action needed">★</span>';
+  else if(!p.suggestStar&&p.isFavorite) si='<span class="star-red" title="Currently starred — may not be needed">★</span>';
+  else si='<span class="star-none">·</span>';
+  return `<div class="star-cell">
+    <div class="star-icon">${si}</div>
+    ${p.isHundo&&p.level?`<div style="font-size:9px;color:var(--gold);margin-top:2px">${p.dustToL40===0?'L40 done':'to L40: '+formatDust(p.dustToL40)}</div>`:''}
+    ${type?`<div class="star-type ${tc}">${type}</div>`:''}
+  </div>`;
+}
+
+function variantTags(p){
+  let t='';
+  if(p.isShiny) t+='<span class="vtag vt-shiny">✨ Shiny</span>';
+  if(p.isLucky) t+='<span class="vtag vt-lucky">★ Lucky</span>';
+  if(p.isShadow) t+='<span class="vtag vt-shadow">Shadow</span>';
+  if(p.isPurified) t+='<span class="vtag vt-purified">Purified</span>';
+  if(p.isDynamax) t+='<span class="vtag" style="background:rgba(88,166,255,.2);color:var(--great)">Dmax</span>';
+  if(p.isGigantamax) t+='<span class="vtag" style="background:rgba(168,85,247,.2);color:var(--ultra)">Gmax</span>';
+  if(p.vivillonPattern) t+='<span class="vtag" style="background:rgba(255,166,87,.2);color:var(--master)">'+p.vivillonPattern+'</span>';
+  if(p.manualDecision) t+='<span class="vtag" style="background:rgba(255,215,0,.15);color:var(--gold)">Manual</span>';
+  if(p.isFavorite) t+='<span class="vt-fav">★</span>';
+  return t;
+}
+
+// ═══════════════════════════════════════════════
+// BUILD ROW (top-level so sortFamilyBy can use it)
+// ═══════════════════════════════════════════════
+function buildRow(p){
+  if(p.hidden) return `<tr class="row-hidden" data-idx="${p.idx}"></tr>`;
+  const iv=Math.round(p.ivAvg||0);
+  const ivc=iv>=90?'var(--green)':iv>=70?'var(--cyan)':'var(--muted)';
+  const tevo=p.targetEvo?`<div class="target-evo">${p.targetEvo}</div>`:'<div class="target-evo-none">—</div>';
+  return `<tr class="row-${p.decision}${p.isHundo?' row-hundo':''}" data-idx="${p.idx}">
+    <td>${starCell(p)}</td>
+    <td class="poke-name-cell">
+      <div class="poke-variants">${variantTags(p)}</div>
+      <div class="poke-name">${p.name}${p.form?` <span class="poke-form">(${p.form})</span>`:''}</div>
+      ${p.targetEvo?`<div class="target-evo">${p.evoIndicator||''  }${p.targetEvo}</div>`:''}
+    </td>
+    <td style="font-size:11px;color:var(--muted)">${p.cp||'--'}</td>
+    <td class="${p.suggestStar?'nick-starred':'nick-suggested'}" onclick="copyNick(this,'${p.nickname}')" title="Click to copy nickname" style="cursor:pointer">${p.nickname}</td>
+    <td>
+      <div class="iv-bar"><div class="iv-fill" style="width:${Math.max(2,iv*0.45)}px;background:${ivc}"></div><span class="iv-num" style="color:${ivc}">${iv}%</span></div>
+      <div class="iv-ivs">${p.atkIV}/${p.defIV}/${p.staIV}</div>
+    </td>
+    <td>${lrHTML(p.rankPctL||null,p.rankNumL)}</td>
+    <td>${lrHTML(p.rankPctG||null,p.rankNumG)}</td>
+    <td>${lrHTML(p.rankPctU||null,p.rankNumU)}</td>
+    <td><span style="color:${iv>=90?'var(--green)':iv>=70?'var(--cyan)':'var(--muted)'};font-size:11px">${Math.round(p.rankPctM||0)}%</span></td>
+    <td style="font-size:11px;color:var(--muted);white-space:nowrap">${p.catchDate||'--'}</td>
+    <td>${dustHTML(p.dustCostBest,p.ivAvg)}</td>
+    <td>${moveHTML(p)}</td>
+    <td>${slotBadges(p)}</td>
+    <td>${decBadge(p.decision)}</td>
+    <td style="font-size:11px;color:var(--muted);max-width:130px">${p.reason}${p.belowCapNote?`<br><span style="font-size:10px;color:var(--cyan)">${p.belowCapNote}</span>`:''}</td>
+    <td style="white-space:nowrap">
+      <button class="hide-btn" onclick="hideRow('${p.idx}')" title="Hide this row">&#10005;</button>
+      <button class="edit-btn" onclick="toggleOverride('${p.stableKey}')" title="Manual overrides">✎</button>
+    </td>
+    <tr class="override-row" id="ov-${p.stableKey}" style="display:none">
+      <td colspan="16" style="padding:8px 12px;background:var(--surf2)">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px">
+          <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_shiny',this.checked)" ${p.isShiny?'checked':''}> ✨ Shiny</label>
+          <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_dynamax',this.checked)" ${p.isDynamax?'checked':''}> Dynamax</label>
+          <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_gigantamax',this.checked)" ${p.isGigantamax?'checked':''}> Gigantamax</label>
+          <label style="display:flex;align-items:center;gap:4px">Vivillon:
+            <input type="text" value="${p.vivillonPattern||''}" placeholder="e.g. Polar" style="width:80px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','vivillon_pattern',this.value)">
+          </label>
+          <label style="display:flex;align-items:center;gap:4px">Override:
+            <select onchange="setOverride('${p.stableKey}','manual_decision',this.value)" style="background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px">
+              <option value="" ${!p.manualDecision?'selected':''}>Auto</option>
+              <option value="keep" ${p.manualDecision==='keep'?'selected':''}>Keep</option>
+              <option value="trade" ${p.manualDecision==='trade'?'selected':''}>Trade</option>
+              <option value="review" ${p.manualDecision==='review'?'selected':''}>Review</option>
+            </select>
+          </label>
+          <label style="display:flex;align-items:center;gap:4px">Notes:
+            <input type="text" value="${p.notes||''}" placeholder="Optional notes" style="width:140px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','notes',this.value)">
+          </label>
+          <button class="btn" style="padding:2px 8px;font-size:10px" onclick="clearOverride('${p.stableKey}')">Clear overrides</button>
+          ${!p.catchDate?'<span style="color:var(--gold);font-size:10px">⚠ No catch date — override may not survive re-export</span>':''}
+        </div>
+      </td>
+    </tr>
+  </tr>`;
+}
+
+// ═══════════════════════════════════════════════
+// PER-FAMILY SORTING
+// ═══════════════════════════════════════════════
+function sortFamilyBy(thEl,col){
+  const card=thEl.closest('.family-card');
+  if(!card) return;
+  const famKey=card.id.replace(/^fam-/,'');
+  const cur=familySortState[famKey]||{col:null,dir:1};
+  const dir=cur.col===col?-cur.dir:-1;
+  familySortState[famKey]={col,dir};
+
+  const fam=families.find(f=>f.key===famKey);
+  if(!fam) return;
+
+  fam.members.sort((a,b)=>{
+    let va,vb;
+    if(col==='ivAvg'){va=a.ivAvg||0;vb=b.ivAvg||0;}
+    else if(col==='rankPctL'){va=a.rankPctL||0;vb=b.rankPctL||0;}
+    else if(col==='rankPctG'){va=a.rankPctG||0;vb=b.rankPctG||0;}
+    else if(col==='rankPctU'){va=a.rankPctU||0;vb=b.rankPctU||0;}
+    else if(col==='rankPctM'){va=a.rankPctM||0;vb=b.rankPctM||0;}
+    else if(col==='dust'){va=a.dustCostBest||999999;vb=b.dustCostBest||999999;}
+    else if(col==='cp'){va=a.cp||0;vb=b.cp||0;}
+    else if(col==='catchDate'){va=a.catchDateMs||0;vb=b.catchDateMs||0;}
+    else if(col==='nick'){va=(a.nickname||'').toLowerCase();vb=(b.nickname||'').toLowerCase();}
+    else if(col==='star'){va=a.suggestStar?0:1;vb=b.suggestStar?0:1;}
+    else if(col==='name'){va=a.name.toLowerCase();vb=b.name.toLowerCase();}
+    else if(col==='decision'){const o={keep:0,protected:1,review:2,trade:3};va=o[a.decision]||3;vb=o[b.decision]||3;}
+    else{va=0;vb=0;}
+    return typeof va==='string'?va.localeCompare(vb)*dir:(va-vb)*dir;
+  });
+
+  // Update header indicators
+  card.querySelectorAll('th[data-col]').forEach(th=>{
+    th.classList.remove('sort-asc','sort-desc');
+    if(th.dataset.col===col) th.classList.add(dir===1?'sort-asc':'sort-desc');
+  });
+
+  const tbody=card.querySelector('tbody');
+  if(tbody) tbody.innerHTML=fam.members.map(p=>buildRow(p)).join('');
+}
+
+// ═══════════════════════════════════════════════
+// HIDE ROW
+// ═══════════════════════════════════════════════
+function hideRow(idx){
+  const p=allPokemon.find(x=>x.idx===idx);
+  if(!p) return;
+  p.hidden=true;
+  const tr=document.querySelector(`tr[data-idx="${idx}"]`);
+  if(tr) tr.classList.add('row-hidden');
+  // Show "show hidden" button in this family
+  const card=tr?.closest('.family-card');
+  if(card){
+    let wrap=card.querySelector('.show-hidden-wrap');
+    if(!wrap){
+      wrap=document.createElement('div');
+      wrap.className='show-hidden-wrap';
+      card.querySelector('.family-body').appendChild(wrap);
+    }
+    const hiddenCount=families.find(f=>f.key===card.id.replace(/^fam-/,''))?.members.filter(p=>p.hidden).length||0;
+    wrap.innerHTML=`<button class="show-hidden-btn" onclick="showHidden('${card.id}')">Show ${hiddenCount} hidden row${hiddenCount!==1?'s':''}</button>`;
+  }
+}
+
+function showHidden(cardId){
+  const card=document.getElementById(cardId);
+  if(!card) return;
+  const famKey=cardId.replace(/^fam-/,'');
+  const fam=families.find(f=>f.key===famKey);
+  if(!fam) return;
+  fam.members.forEach(p=>p.hidden=false);
+  const tbody=card.querySelector('tbody');
+  if(tbody) tbody.innerHTML=fam.members.map(p=>buildRow(p)).join('');
+  const wrap=card.querySelector('.show-hidden-wrap');
+  if(wrap) wrap.remove();
+}
+
+// ═══════════════════════════════════════════════
+// RENDER FAMILY
+// ═══════════════════════════════════════════════
+function renderFamily(fam,isOpen){
+  const {key,members,keepCount,tradeCount,reviewCount,primaryName}=fam;
+  const isEevee=members.some(p=>p.name==='Eevee');
+  const eeveeTip=isEevee?`<div class="eevee-tip">💡 Eevee family: best evolutions for Great = Umbreon / Sylveon, Ultra = Glaceon / Espeon. Check existing eeveelutions below.</div>`:'';
+
+  const badges=`
+    ${keepCount?`<span class="fam-badge fb-keep">${keepCount} keep</span>`:''}
+    ${reviewCount?`<span class="fam-badge fb-review">${reviewCount} review</span>`:''}
+    ${tradeCount?`<span class="fam-badge fb-trade">${tradeCount} trade</span>`:''}
+    <span class="fam-count ${members.length>100?'fam-count-large':''}">${primaryName} (${members.length})</span>`;
+
+  const rows=members.map(p=>buildRow(p)).join('');
+
+  const thead=`<thead><tr>
+    <th data-col="star" onclick="sortFamilyBy(this,'star')">&#9733;</th>
+    <th data-col="name" onclick="sortFamilyBy(this,'name')">Pok&#233;mon</th>
+    <th data-col="cp" onclick="sortFamilyBy(this,'cp')">CP</th>
+    <th data-col="nick" onclick="sortFamilyBy(this,'nick')">Suggested Nick</th>
+    <th data-col="ivAvg" onclick="sortFamilyBy(this,'ivAvg')">IV%</th>
+    <th data-col="rankPctL" onclick="sortFamilyBy(this,'rankPctL')" style="color:var(--little)">Little</th>
+    <th data-col="rankPctG" onclick="sortFamilyBy(this,'rankPctG')" style="color:var(--great)">Great</th>
+    <th data-col="rankPctU" onclick="sortFamilyBy(this,'rankPctU')" style="color:var(--ultra)">Ultra</th>
+    <th data-col="rankPctM" onclick="sortFamilyBy(this,'rankPctM')" style="color:var(--master)">Master</th>
+    <th data-col="catchDate" onclick="sortFamilyBy(this,'catchDate')">Catch Date</th>
+    <th data-col="dust" onclick="sortFamilyBy(this,'dust')">Dust</th>
+    <th>Moves / TM</th>
+    <th data-col="decision" onclick="sortFamilyBy(this,'decision')">Slot</th>
+    <th>Decision</th>
+    <th>Reason</th>
+    <th></th>
+  </tr></thead>`;
+
+  return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
+    <div class="family-header" onclick="toggleFamily('fam-${key}')">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${badges}</div>
+      <button class="copy-nicks-btn" onclick="event.stopPropagation();copyNicks('${key}',this)" title="Copy starred nicknames to clipboard">⎘ Copy nicks</button>
+      <span class="fam-chevron">▶</span>
+    </div>
+    ${eeveeTip}
+    <div class="family-body">
+      <table class="poke-table">${thead}<tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
+// SUMMARY + FILTERS
+// ═══════════════════════════════════════════════
+function renderSummary(pokemon){
+  const t=pokemon.length, k=pokemon.filter(p=>p.decision==='keep').length,
+    tr=pokemon.filter(p=>p.decision==='trade').length,
+    r=pokemon.filter(p=>p.decision==='review').length,
+    pr=pokemon.filter(p=>p.decision==='protected').length;
+  document.getElementById('hdr-stats').innerHTML=
+    `<span>Total <strong>${t.toLocaleString()}</strong></span>
+     <span style="color:var(--green)">Keep <strong>${k.toLocaleString()}</strong></span>
+     <span style="color:var(--red)">Trade <strong>${tr.toLocaleString()}</strong></span>
+     <span style="color:var(--great)">Review <strong>${r.toLocaleString()}</strong></span>`;
+  document.getElementById('summary-strip').innerHTML=`
+    <div class="sum-card s-total" onclick="setDecFilter('all',null)"><div class="sum-label">Total</div><div class="sum-val">${t.toLocaleString()}</div></div>
+    <div class="sum-card s-keep" onclick="setDecFilter('keep',null)"><div class="sum-label">Keep</div><div class="sum-val">${k.toLocaleString()}</div></div>
+    <div class="sum-card s-trade" onclick="setDecFilter('trade',null)"><div class="sum-label">Trade</div><div class="sum-val">${tr.toLocaleString()}</div></div>
+    <div class="sum-card s-review" onclick="setDecFilter('review',null)"><div class="sum-label">Review</div><div class="sum-val">${r.toLocaleString()}</div></div>
+    <div class="sum-card s-protected" onclick="setDecFilter('protected',null)"><div class="sum-label">Protected</div><div class="sum-val">${pr.toLocaleString()}</div></div>`;
+}
+
+function applyFilters(){
+  page=1;
+  const term=searchTerm.toLowerCase();
+  const incEvos=document.getElementById('evoToggle')?.checked;
+  const rankMap={L:'rankPctL',G:'rankPctG',U:'rankPctU',M:'rankPctM'};
+
+  filteredFamilies=families.filter(fam=>{
+    if(term){
+      const nm=fam.primaryName.toLowerCase().includes(term);
+      const em=incEvos&&fam.members.some(p=>
+        p.name.toLowerCase().includes(term)||
+        (p.evolvedNameG||'').toLowerCase().includes(term)||
+        (p.evolvedNameU||'').toLowerCase().includes(term)||
+        (p.evolvedNameL||'').toLowerCase().includes(term));
+      if(!nm&&!em) return false;
+    }
+    if(decFilter==='hundo'&&!fam.members.some(p=>p.isHundo)) return false;
+    else if(decFilter==='canEvolve'&&!fam.members.some(p=>p.canEvolve)) return false;
+    else if(decFilter==='neverEvolved'&&!fam.members.some(p=>p.neverEvolved)) return false;
+    else if(!['all','hundo','canEvolve','neverEvolved'].includes(decFilter)&&!fam.members.some(p=>p.decision===decFilter)) return false;
+    if(leagueFilters.size>0){
+      // Row-level: does any member qualify for ALL selected leagues
+      const ok=[...leagueFilters].some(lg=>fam.members.some(p=>(p[rankMap[lg]]||0)>=RULES.keepThreshold));
+      if(!ok) return false;
+    }
+    return true;
+  });
+
+  if(sortByCount){filteredFamilies.sort((a,b)=>b.members.length-a.members.length);}
+  else{filteredFamilies.sort((a,b)=>a.primaryName.localeCompare(b.primaryName));}
+  renderPage();
+}
+
+function renderPage(){
+  const total=filteredFamilies.length;
+  const totalPages=Math.ceil(total/PER_PAGE);
+  const pageFams=filteredFamilies.slice((page-1)*PER_PAGE,page*PER_PAGE);
+  const autoOpen=filteredFamilies.length<=3;
+
+  // When league filter active, filter rows within families too
+  const activeLeagueArr=[...leagueFilters];
+  const rankMap={L:'rankPctL',G:'rankPctG',U:'rankPctU',M:'rankPctM'};
+
+  let html='';
+  if(!pageFams.length){
+    html=`<div style="text-align:center;padding:60px;color:var(--muted)"><div style="font-size:36px;margin-bottom:10px">🔍</div><div style="font-size:14px;font-weight:600">No Pokémon found</div><div style="font-size:12px;margin-top:5px">Try adjusting your filters</div></div>`;
+  } else {
+    html=pageFams.map((f,i)=>{
+      // Filter rows if league active
+      if(activeLeagueArr.length>0){
+        f.members.forEach(p=>{
+          let qualifies=!p.hidden&&activeLeagueArr.some(lg=>(p[rankMap[lg]]||0)>=RULES.keepThreshold);
+          if(decFilter==='hundo') qualifies=qualifies&&p.isHundo;
+          if(decFilter==='canEvolve') qualifies=qualifies&&p.canEvolve;
+          if(decFilter==='neverEvolved') qualifies=qualifies&&p.neverEvolved;
+          p._leagueFiltered=!qualifies;
+        });
+      } else {
+        f.members.forEach(p=>p._leagueFiltered=false);
+      }
+      // Auto-open if league filter active and family has qualifying rows
+      const hasQualifying=activeLeagueArr.length===0||f.members.some(p=>!p._leagueFiltered&&!p.hidden);
+      const open=(autoOpen&&i===0)||activeLeagueArr.length>0;
+      return renderFamilyFiltered(f,open&&hasQualifying,activeLeagueArr,rankMap);
+    }).join('');
+  }
+
+  let pagHtml='';
+  if(totalPages>1){
+    const s=Math.max(1,Math.min(page-3,totalPages-6));
+    const e=Math.min(totalPages,s+6);
+    pagHtml=`<div class="pagination"><span class="page-info">${total} families</span>
+      ${page>1?`<button class="page-btn" onclick="goPage(${page-1})">← Prev</button>`:''}
+      ${Array.from({length:e-s+1},(_,i)=>`<button class="page-btn ${s+i===page?'active':''}" onclick="goPage(${s+i})">${s+i}</button>`).join('')}
+      ${page<totalPages?`<button class="page-btn" onclick="goPage(${page+1})">Next →</button>`:''}
+    </div>`;
+  }
+  document.getElementById('main-content').innerHTML=html+pagHtml;
+}
+
+function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
+  const {key,members,keepCount,tradeCount,reviewCount,primaryName}=fam;
+  const isEevee=members.some(p=>p.name==='Eevee');
+  const eeveeTip=isEevee?`<div class="eevee-tip">💡 Eevee: best for Great = Umbreon / Sylveon, Ultra = Glaceon / Espeon</div>`:'';
+
+  const visible=members.filter(p=>!p._leagueFiltered&&!p.hidden);
+  const hidden=members.filter(p=>p._leagueFiltered||p.hidden);
+  const filteredNote=activeLeagues.length>0&&hidden.length>0?
+    `<div style="padding:5px 12px;font-size:10px;color:var(--dim)">${hidden.length} row${hidden.length!==1?'s':''} hidden by league filter</div>`:'';
+
+  const badges=`
+    ${keepCount?`<span class="fam-badge fb-keep">${keepCount} keep</span>`:''}
+    ${reviewCount?`<span class="fam-badge fb-review">${reviewCount} review</span>`:''}
+    ${tradeCount?`<span class="fam-badge fb-trade">${tradeCount} trade</span>`:''}
+    <span class="fam-count ${members.length>100?'fam-count-large':''}">${primaryName} (${members.length})${activeLeagues.length>0?` · ${visible.length} shown`:''}</span>`;
+
+  const rows=visible.map(p=>buildRow(p)).join('');
+
+  const thead=`<thead><tr>
+    <th data-col="star" onclick="sortFamilyBy(this,'star')" title="Sort">★</th>
+    <th data-col="name" onclick="sortFamilyBy(this,'name')">Pokémon</th>
+    <th data-col="cp" onclick="sortFamilyBy(this,'cp')">CP</th>
+    <th data-col="nick" onclick="sortFamilyBy(this,'nick')">Suggested Nick</th>
+    <th data-col="ivAvg" onclick="sortFamilyBy(this,'ivAvg')">IV%</th>
+    <th data-col="rankPctL" onclick="sortFamilyBy(this,'rankPctL')" style="color:var(--little)">Little</th>
+    <th data-col="rankPctG" onclick="sortFamilyBy(this,'rankPctG')" style="color:var(--great)">Great</th>
+    <th data-col="rankPctU" onclick="sortFamilyBy(this,'rankPctU')" style="color:var(--ultra)">Ultra</th>
+    <th data-col="rankPctM" onclick="sortFamilyBy(this,'rankPctM')" style="color:var(--master)">Master</th>
+    <th data-col="catchDate" onclick="sortFamilyBy(this,'catchDate')">Catch Date</th>
+    <th data-col="dust" onclick="sortFamilyBy(this,'dust')">Dust</th>
+    <th>Moves / TM</th>
+    <th data-col="decision" onclick="sortFamilyBy(this,'decision')">Slot</th>
+    <th>Decision</th>
+    <th>Reason</th>
+    <th>PvP Tag</th>
+    <th></th>
+  </tr></thead>`;
+
+  return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
+    <div class="family-header" onclick="toggleFamily('fam-${key}')">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${badges}</div>
+      <button class="copy-nicks-btn" onclick="event.stopPropagation();copyNicks('${key}',this)" title="Copy starred nicknames to clipboard">⎘ Copy nicks</button>
+      <span class="fam-chevron">▶</span>
+    </div>
+    ${eeveeTip}
+    <div class="family-body">
+      <table class="poke-table">${thead}<tbody>${rows}</tbody></table>
+      ${filteredNote}
+    </div>
+  </div>`;
+}
+
+function toggleFamily(id){const el=document.getElementById(id);if(el)el.classList.toggle('open');}
+function goPage(p){page=p;renderPage();window.scrollTo(0,180);}
+
+function toggleSortByCount(btn){
+  sortByCount=!sortByCount; btn.classList.toggle('active',sortByCount); applyFilters();
+}
+function setDecFilter(f,btn){
+  // Toggle off if clicking the already-active filter
+  if(decFilter===f){ decFilter='all'; document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected')); applyFilters(); return; }
+  decFilter=f;
+  document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected'));
+  document.querySelectorAll('.sum-card').forEach(c=>c.classList.remove('active'));
+  if(btn){const cls=f==='trade'?'act-trade':f==='review'?'act-review':f==='protected'?'act-protected':'active';btn.classList.add(cls);}
+  applyFilters();
+}
+
+function toggleLeague(l,btn){
+  if(leagueFilters.has(l)){leagueFilters.delete(l);btn.classList.remove('active');}
+  else{leagueFilters.add(l);btn.classList.add('active');}
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════════
+// COPY SUGGESTED NICKS
+// ═══════════════════════════════════════════════
+
+async function handleCloudLoad() {
+  const btn = document.getElementById('cloudLoadBtn');
+  const status = document.getElementById('cloud-load-status');
+  if (btn) { btn.disabled=true; btn.textContent='Loading...'; }
+  const rows = await loadCollectionFromCloud();
+  if (!rows) {
+    if (status) status.textContent = 'No cloud data found. Import a CSV first.';
+    if (btn) { btn.disabled=false; btn.textContent='☁ Load last collection from cloud'; }
+    return;
+  }
+  // Convert cloud rows back to CSV-like format for analyse()
+  const csvRows = rows.map(r => ({
+    'Index': r.pokemon_index,
+    'Name': r.name,
+    'Form': r.form||'',
+    'Pokemon Number': r.pokemon_num||'',
+    'CP': String(r.cp||0),
+    'HP': '0',
+    'Atk IV': String(r.atk_iv||0),
+    'Def IV': String(r.def_iv||0),
+    'Sta IV': String(r.sta_iv||0),
+    'IV Avg': String(r.iv_avg||0),
+    'Level Min': String(r.level||0),
+    'Level Max': String(r.level||0),
+    'Quick Move': r.quick_move||'',
+    'Charge Move': r.charge_move1||'',
+    'Charge Move 2': r.charge_move2||'',
+    'Lucky': r.is_lucky?'1':'0',
+    'Shadow/Purified': r.is_shadow?'1':r.is_purified?'2':'0',
+    'Favorite': r.is_favorite?'1':'0',
+    'Catch Date': r.catch_date||'',
+    'Marked for PvP use': r.pvp_tag||'',
+    'Rank % (G)': r.rank_pct_g?r.rank_pct_g+'%':'',
+    'Rank % (U)': r.rank_pct_u?r.rank_pct_u+'%':'',
+    'Rank % (L)': r.rank_pct_l?r.rank_pct_l+'%':'',
+    'Rank # (G)': String(r.rank_num_g||''),
+    'Rank # (U)': String(r.rank_num_u||''),
+    'Rank # (L)': String(r.rank_num_l||''),
+    'Dust Cost (G)': String(r.dust_g||''),
+    'Dust Cost (U)': String(r.dust_u||''),
+    'Dust Cost (L)': String(r.dust_l||''),
+    'Name (G)': r.evolved_name_g||'',
+    'Name (U)': r.evolved_name_u||'',
+    'Name (L)': r.evolved_name_l||'',
+    'Form (G)':'','Form (U)':'','Form (L)':'',
+    'Sha/Pur (G)':'0','Sha/Pur (U)':'0','Sha/Pur (L)':'0',
+    'Stat Prod (G)':'','Stat Prod (U)':'','Stat Prod (L)':'',
+    'Rank # (L)': String(r.rank_num_l||''),
+    'Dust Cost (L)': String(r.dust_l||''),
+    'Candy Cost (G)':'','Candy Cost (U)':'','Candy Cost (L)':'',
+    'Original Scan Date':'','Scan Date':'','Catch Date':r.catch_date||'',
+    'Weight':'','Height':'','Dust':'0','Gender':'',
+    'Pokemon Number': r.pokemon_num||''
+  }));
+  document.getElementById('upload-section').style.display='none';
+  document.getElementById('loading-section').style.display='block';
+  setProgress('ANALYSING CLOUD DATA...', 45);
+  setTimeout(()=>{
+    try {
+      const result = analyse(csvRows);
+      allPokemon = result.pokemon;
+      families = result.families;
+      filteredFamilies = families.slice();
+      setProgress('BUILDING DISPLAY...', 88);
+      setTimeout(()=>{
+        document.getElementById('loading-section').style.display='none';
+        document.getElementById('dashboard').style.display='block';
+        renderSummary(allPokemon); applyFilters();
+        document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();});
+        document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
+        loadOverrides();
+      },50);
+    } catch(err) {
+      showError('Cloud load failed', err.message);
+    }
+  },80);
+}
+
+function toggleOverride(idx) {
+  const row = document.getElementById('ov-'+idx);
+  if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function setOverride(idx, field, value) {
+  const p = allPokemon.find(x => x.idx === idx);
+  if (!p) return;
+  // Update local
+  const fieldMap = {is_shiny:'isShiny',is_dynamax:'isDynamax',is_gigantamax:'isGigantamax',
+    vivillon_pattern:'vivillonPattern',manual_decision:'manualDecision',notes:'notes'};
+  if (fieldMap[field]) p[fieldMap[field]] = value;
+  // If manual decision, update display
+  if (field === 'manual_decision' && value) {
+    p.decision = value;
+    const tr = document.querySelector(`tr[data-idx="${idx}"]`);
+    if (tr) { tr.className = `row-${value}${p.isHundo?' row-hundo':''}`; }
+  }
+  // If shiny, update star
+  if (field === 'is_shiny') {
+    p.suggestStar = p.suggestStar || value;
+  }
+  // Save to Supabase
+  saveOverride(idx, {[field]: value});
+  updateSyncStatus('Saving...', 'ok');
+}
+
+async function clearOverride(idx) {
+  const p = allPokemon.find(x => x.idx === idx);
+  if (!p) return;
+  p.isShiny = false; p.isDynamax = false; p.isGigantamax = false;
+  p.vivillonPattern = ''; p.manualDecision = ''; p.notes = '';
+  await deleteOverride(idx);
+  updateSyncStatus('✓ Cleared', 'ok');
+}
+
+function copyNick(el, text) {
+  navigator.clipboard.writeText(text).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+  const orig = el.textContent;
+  el.textContent = '✓ Copied!';
+  el.style.color = 'var(--green)';
+  setTimeout(()=>{ el.textContent=orig; el.style.color=''; }, 1500);
+}
+
+function copyNicks(famKey, btnEl) {
+  const fam = families.find(f => f.key === famKey);
+  if (!fam) return;
+  const starred = fam.members.filter(p => p.suggestStar && !p.hidden);
+  if (!starred.length) { btnEl.textContent = 'None starred'; return; }
+  const lines = starred.map(p => p.name+' '+(p.cp||'?')+'\n'+p.nickname).join('\n\n');
+  navigator.clipboard.writeText(lines).then(() => {
+    btnEl.textContent = '✓ Copied!';
+    btnEl.classList.add('copied');
+    setTimeout(() => { btnEl.textContent = '⎘ Copy nicks'; btnEl.classList.remove('copied'); }, 2000);
+  }).catch(() => {
+    // Fallback for browsers that block clipboard
+    const ta = document.createElement('textarea');
+    ta.value = lines; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    btnEl.textContent = '✓ Copied!'; btnEl.classList.add('copied');
+    setTimeout(() => { btnEl.textContent = '⎘ Copy nicks'; btnEl.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════
+function exportCSV(){
+  const h=['Family','Name','Form','CP','SuggestedNickname','Decision','Reason','Slots','TargetEvo',
+    'IV%','Atk/Def/Sta','Level','LittleRank%','GreatRank%','UltraRank%','MasterIV%',
+    'DustCost','QuickMove','ChargeMove1','ChargeMove2','TMNotes',
+    'Lucky','Shadow','Purified','Shiny','Favorite','PvPTag','CatchDate','PokeType'];
+  const rows=[];
+  filteredFamilies.forEach(fam=>fam.members.forEach(p=>rows.push([
+    fam.primaryName,p.name,p.form,p.cp,p.nickname,p.decision,p.reason,p.slots.join('|'),p.targetEvo,
+    Math.round(p.ivAvg||0),`${p.atkIV}/${p.defIV}/${p.staIV}`,p.level,
+    p.rankPctL||'',p.rankPctG||'',p.rankPctU||'',Math.round(p.rankPctM||0),
+    p.dustCostBest||'',p.quickMove,p.chargeMove1,p.chargeMove2,
+    (p.moveNotes||[]).join(' | '),
+    p.isLucky?1:0,p.isShadow?1:0,p.isPurified?1:0,p.isShiny?1:0,p.isFavorite?1:0,
+    p.pvpTag,p.catchDate,p.pokeType||''
+  ])));
+  const csv=[h,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='pokevault_v3_analysis.csv';a.click();
+}
+
+// ═══════════════════════════════════════════════
+// CSV PARSER
+// ═══════════════════════════════════════════════
+function parseCSV(text){
+  const lines=text.split(/\r?\n/);
+  const headers=parseLine(lines[0]);
+  const out=[];
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
+    const vals=parseLine(lines[i]);
+    const obj={};
+    headers.forEach((h,idx)=>obj[h.trim()]=(vals[idx]||'').trim());
+    out.push(obj);
+  }
+  return out;
+}
+function parseLine(line){
+  const r=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    if(line[i]==='"')inQ=!inQ;
+    else if(line[i]===','&&!inQ){r.push(cur);cur='';}
+    else cur+=line[i];
+  }
+  r.push(cur);return r;
+}
+
+// ═══════════════════════════════════════════════
+// FILE HANDLING
+// ═══════════════════════════════════════════════
+function showError(msg,detail){
+  document.getElementById('loading-section').style.display='none';
+  document.getElementById('error-section').style.display='block';
+  document.getElementById('error-msg').textContent=msg;
+  document.getElementById('error-detail').textContent=detail||'';
+}
+function setProgress(msg,pct){
+  const m=document.getElementById('loading-msg'),b=document.getElementById('progress-fill');
+  if(m)m.textContent=msg;if(b)b.style.width=pct+'%';
+}
+
+function handleFile(file){
+  if(!file.name.toLowerCase().endsWith('.csv')){showError('Wrong file type',`Expected .csv, got: ${file.name}`);return;}
+  document.getElementById('upload-section').style.display='none';
+  document.getElementById('loading-section').style.display='block';
+  const watchdog=setTimeout(()=>showError('Timed out after 60s','The file may be too large for this device. Try cleaning up Pokégenie first and re-exporting a smaller file.'),60000);
+  const reader=new FileReader();
+  reader.onerror=()=>showError('Could not read file','FileReader error');
+  reader.onload=e=>{
+    setProgress('PARSING CSV...',20);
+    setTimeout(()=>{
+      try{
+        const text=e.target.result;
+        if(!text?.trim()) throw new Error('File is empty');
+        const rows=parseCSV(text);
+        if(!rows.length) throw new Error('No rows found');
+        if(!rows[0].hasOwnProperty('IV Avg')) throw new Error('Not a Pokégenie export — missing expected columns');
+        setProgress(`ANALYSING ${rows.length.toLocaleString()} POKÉMON...`,45);
+        setTimeout(()=>{
+          try{
+            console.time('analyse'); const result=analyse(rows); console.timeEnd('analyse');
+            allPokemon=result.pokemon;families=result.families;filteredFamilies=families.slice();
+            setProgress('BUILDING DISPLAY...',88);
+            setTimeout(()=>{
+              clearTimeout(watchdog);
+              document.getElementById('loading-section').style.display='none';
+              document.getElementById('dashboard').style.display='block';
+              renderSummary(allPokemon);applyFilters();
+              loadOverrides();
+              // Save to cloud after successful import
+              if (supabaseConnected) saveCollectionToCloud(allPokemon);
+              document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();});
+              document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
+            },50);
+          }catch(err){clearTimeout(watchdog);showError('Analysis failed',err.message+'\n'+(err.stack||'').split('\n').slice(0,3).join('\n'));}
+        },80);
+      }catch(err){clearTimeout(watchdog);showError('Could not parse CSV',err.message);}
+    },120);
+  };
+  reader.readAsText(file);
+}
+
+// Load overrides + check for cloud data on page load
+window.addEventListener('load', () => { loadOverrides(); });
+
+document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+const dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+</script>
+</body>
+</html>
