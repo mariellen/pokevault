@@ -1,0 +1,13 @@
+# Personal collection data — never commit
+*.csv
+
+# Screenshots and local working images
+*.png
+
+# Legacy notes
+*.txt
+RULES_original.md
+
+# OS / editor
+.DS_Store
+Thumbs.db

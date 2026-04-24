@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PokéVault v3.5.19</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+</head>
+<body>
+<header>
+  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.19</span></div>
+  <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
+  <div id="sync-status" style="font-size:11px;color:var(--muted)">Connecting to cloud...</div>
+</header>
+
+<div id="upload-section">
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div style="font-size:36px;margin-bottom:10px">📦</div>
+    <h2>Import Pokégenie Export</h2>
+    <p>Drop your CSV here or click to browse</p>
+    <p style="margin-top:6px;font-size:11px;color:var(--great)">Supports full Pokégenie CSV export format</p>
+  </div>
+  <div style="text-align:center;margin-top:16px">
+    <button class="btn" id="cloudLoadBtn" onclick="handleCloudLoad()" style="padding:10px 24px;font-size:13px;display:none">
+      ☁ Load last collection from cloud
+    </button>
+    <div id="cloud-load-status" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+  </div>
+  <input type="file" id="fileInput" accept=".csv">
+</div>
+
+<div id="loading-section">
+  <div id="loading-msg">READING FILE...</div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  <div id="loading-sub">Large collections (40,000+) may take 5–15 seconds</div>
+</div>
+
+<div id="error-section">
+  <div class="error-box">
+    <h3>⚠ Import Failed</h3>
+    <div id="error-msg"></div>
+    <div class="error-detail" id="error-detail"></div>
+    <button class="btn" onclick="location.reload()">↺ Try Again</button>
+  </div>
+</div>
+
+<!-- Set Forms modal -->
+<div class="pv-modal-overlay" id="cleanup-modal" onclick="if(event.target===this)closeCleanupModal()">
+  <div class="pv-modal">
+    <div class="pv-modal-header">
+      <div>
+        <div class="pv-modal-title">🎨 Set Forms &amp; Patterns</div>
+        <div class="pv-modal-sub" id="cleanup-modal-sub">Loading...</div>
+      </div>
+      <button class="pv-modal-close" onclick="closeCleanupModal()">✕</button>
+    </div>
+    <div class="pv-modal-body" id="cleanup-modal-body">
+      <div class="pv-modal-empty">Load your collection first</div>
+    </div>
+  </div>
+</div>
+
+<!-- Mark Special modal -->
+<div class="pv-modal-overlay" id="special-modal" onclick="if(event.target===this)closeSpecialModal()">
+  <div class="pv-modal">
+    <div class="pv-modal-header">
+      <div>
+        <div class="pv-modal-title">✨ Mark Special Pokémon</div>
+        <div class="pv-modal-sub" id="special-modal-sub">New Pokémon that may need flags set</div>
+      </div>
+      <button class="pv-modal-close" onclick="closeSpecialModal()">✕</button>
+    </div>
+    <div class="pv-modal-body" id="special-modal-body">
+      <div class="pv-modal-empty">Load your collection first</div>
+    </div>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="summary-strip" id="summary-strip"></div>
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchBox" placeholder="Search Pokémon...">
+    </div>
+    <label class="evo-toggle"><input type="checkbox" id="evoToggle"> Include evolutions</label>
+    <button class="btn active" data-f="all" onclick="setDecFilter('all',this)">All</button>
+    <button class="btn" data-f="keep" onclick="setDecFilter('keep',this)">✓ Keep</button>
+    <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)">↗ Trade</button>
+    <button class="btn" data-f="review" onclick="setDecFilter('review',this)">⚠ Review</button>
+    <button class="btn" data-f="protected" onclick="setDecFilter('protected',this)">🛡 Protected</button>
+    <button class="league-btn btn lb-L" data-l="L" onclick="toggleLeague('L',this)">Little</button>
+    <button class="league-btn btn lb-G" data-l="G" onclick="toggleLeague('G',this)">Great</button>
+    <button class="league-btn btn lb-U" data-l="U" onclick="toggleLeague('U',this)">Ultra</button>
+    <button class="league-btn btn lb-M" data-l="M" onclick="toggleLeague('M',this)">Master</button>
+    <button class="btn" id="sortCountBtn" onclick="toggleSortByCount(this)">Sort by Count</button>
+    <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)">
+      Red: <input type="number" id="countThresholdInput" value="100" min="1" max="9999"
+        style="width:44px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);font-size:11px;text-align:center"
+        onchange="countThreshold=Math.max(1,parseInt(this.value)||100);applyFilters()"
+        title="Families with more members than this show in red">
+    </label>
+    <button class="btn" data-f="hundo" onclick="setDecFilter('hundo',this)">✚ Hundos</button>
+    <button class="btn" id="bestLeagueBtn" onclick="filterBestInLeague(this)" title="Show only families with new unstarred league winners">🏆 Best in League</button>
+    <button class="btn" id="costlyBtn" onclick="filterCostlyWinners(this)" title="Show only costly (blue star) recommendations">💰 Costly</button>
+    <button class="btn" data-f="canEvolve" onclick="setDecFilter('canEvolve',this)">Can Evolve</button>
+    <button class="btn" data-f="neverEvolved" onclick="setDecFilter('neverEvolved',this)">Never Evolved</button>
+    <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc">🎨 Set Forms</button>
+    <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax">✨ Mark Special</button>
+    <button class="btn export-btn" onclick="exportCSV()">⬇ Export</button>
+  </div>
+  <div id="main-content"></div>
+</div>
+
+<!-- Load order matters: config → data → supabase → analyse → render → app -->
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/analyse.js"></script>
+<script src="js/render.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
