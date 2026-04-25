@@ -10,7 +10,7 @@ PokéVault is a Pokémon GO collection manager. It parses a Pokégenie CSV expor
 
 | Path | Role |
 |---|---|
-| `pokevault_v3_130.html` | **Source of truth.** Single-file, most evolved logic. |
+| `pokevault_v3_133.html` (or latest) | **Source of truth.** Single-file, most evolved logic. |
 | `pokevault-refactor/` | Multi-file refactor. Being brought up to date with the HTML. |
 
 **Changes flow HTML → refactor, never the other way.** When porting, read the HTML first and port exactly — don't invent improvements unless asked.
@@ -34,6 +34,15 @@ pokevault-refactor/
 
 ---
 
+## Rules & documentation
+
+- **`/RULES.md`** (repo root) — single source of truth for all business logic and pending changes
+- `pokevault-refactor/RULES.md` has been removed — do not recreate it
+- When logic changes are made in the HTML, RULES.md at the root is updated to match
+- When porting to the refactor, read `/RULES.md` first, then read the HTML for exact implementation
+
+---
+
 ## Infrastructure
 
 - **Hosted:** AWS S3 + CloudFront → `pokevault.mariellen.com.au`
@@ -45,28 +54,33 @@ pokevault-refactor/
 
 ## Key conventions
 
-- **Star colours:** Gold=already starred ✓, Green=should star, Blue=best but expensive dust, Cyan=cheaper alt at same rank, Red=starred but shouldn't be
+- **Star colours:** Gold=already starred ✓, Green=should star, Cyan=cheaper alt at same rank (check before acting), Blue=best but expensive dust, Red=starred but shouldn't be
+- **Star sort order:** Gold(0) → Green(1) → Cyan(2) → Blue(3) → Red(4) → None(5)
 - **Slot suffixes:** `_affordable` = within dust budget. Never use `_backup`.
-- **Nickname format:** circled letters (Ⓖ Ⓤ Ⓛ) for ≥90% rank; plain letters below. Lucky = Ⓡ prefix when no league slot.
-- **evolvedNameG/U/L** — comes from Pokégenie CSV columns `Name (G)`, `Name (U)`, `Name (L)`. These are the per-Pokémon recommended evolutions for each league based on IVs.
-- **primaryName** — the family display name; computed from member counts, preferring non-evo-target species.
-- **termMatchesViaEvo** — true when a search term matches via evolvedNameG/U/L rather than the family's primaryName (e.g. searching "Umbreon" finds the Eevee family).
+- **Nickname format:** circled letters (Ⓖ Ⓤ Ⓛ) for ≥90% rank; plain letters below. Lucky/Shadow/Master = Ⓡ prefix (intentionally shared — all mean "Raid/Master candidate").
+- **evolvedNameG/U/L** — from Pokégenie CSV columns `Name (G)`, `Name (U)`, `Name (L)`. Per-Pokémon recommended evolutions for each league based on IVs.
+- **primaryName** — family display name; computed from member counts, preferring non-evo-target species.
+- **termMatchesViaEvo** — true when search matches via evolvedNameG/U/L (e.g. "Umbreon" finds Eevee family).
+- **🔍 Me** — copies filtered GO search string for this form only
+- **🔍 + Fam** — copies all family species names comma-joined (e.g. `Geodude,Graveler,Golem`)
 
 ---
 
-## Known issues / pending work
+## Known gaps in refactor (port from HTML)
 
-See `pending_changes.md` for the full list. Key items:
+See `/RULES.md` pending section for full list. Priority items in `analyse.js`:
 
-- **Evo-search sort order:** Searching "Umbreon" correctly filters to Umbreon-candidate Eevees, but rows with `targetEvo='Umbreon'` (PokéVault's actual picks) should float to the top. Currently mixed in with `evolvedNameG='Umbreon'` secondaries. Hard to get right — study `_130.html` carefully.
-- **Shiny nickname bug:** `isShiny` is set via Supabase override AFTER nickname is built — needs a post-override re-pass.
-- **COLLECTION_SETS** (Vivillon/Furfrou keep-N logic): not yet ported to refactor.
+1. **`FORM_SPLIT_FORMS`** — Deoxys/Castform/Oricorio etc. incorrectly grouped; copy set from HTML `buildFamilyMap`
+2. **`STANDALONE_SPECIES`** (Kleavor, Galarian Weezing) — always own family; copy from HTML
+3. **`isFinalEvoStage` guard on blue/cyan stars** — remove from expensive winner and cyan checks; fires at any evo stage
+4. **Stable key includes CP** — remove `p.cp` from `makeStableKey` array
+5. **`COLLECTION_SETS`** (Vivillon/Furfrou/Flabébé) — not ported; see HTML for full implementation
 
 ---
 
 ## Rules for this project
 
-See `RULES.md` for full decision rules. Short version:
-- Always update `pending_changes.md` when a new feature, bug, or change is discussed.
+- Always update `/RULES.md` (root) when a new feature, bug, or change is discussed or implemented
 - Port from HTML → refactor exactly. Don't guess at intent.
 - Test against the user's real Pokégenie CSV data — many edge cases only surface there.
+- Auth/RLS/Stripe work stays in Claude Code; logic/UI fixes happen in claude.ai sessions with the HTML
