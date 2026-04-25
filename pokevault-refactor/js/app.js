@@ -425,6 +425,13 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
 function toggleFamily(id){const el=document.getElementById(id);if(el)el.classList.toggle('open');}
 function goPage(p){page=p;renderPage();window.scrollTo(0,180);}
 
+function clearSearch(){
+  const box=document.getElementById('searchBox');
+  if(box){box.value='';box.focus();}
+  document.getElementById('searchClear')?.classList.remove('visible');
+  searchTerm='';applyFilters();
+}
+
 function toggleSortByCount(btn){
   sortByCount=!sortByCount; btn.classList.toggle('active',sortByCount); applyFilters();
 }
@@ -648,7 +655,7 @@ async function handleCloudLoad() {
         document.getElementById('loading-section').style.display='none';
         document.getElementById('dashboard').style.display='block';
         renderSummary(allPokemon); applyFilters();
-        document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();});
+        document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
         document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
         loadOverrides();
       },50);
@@ -880,7 +887,7 @@ function handleFile(file){
               loadOverrides();
               // Save to cloud after successful import
               if (supabaseConnected) saveCollectionToCloud(allPokemon);
-              document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();});
+              document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
               document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
             },50);
           }catch(err){clearTimeout(watchdog);showError('Analysis failed',err.message+'\n'+(err.stack||'').split('\n').slice(0,3).join('\n'));}
