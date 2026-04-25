@@ -30,7 +30,17 @@ function sortFamilyBy(thEl,col){
     else if(col==='cp'){va=a.cp||0;vb=b.cp||0;}
     else if(col==='catchDate'){va=a.catchDateMs||0;vb=b.catchDateMs||0;}
     else if(col==='nick'){va=(a.nickname||'').toLowerCase();vb=(b.nickname||'').toLowerCase();}
-    else if(col==='star'){va=a.suggestStar?0:1;vb=b.suggestStar?0:1;}
+    else if(col==='star'){
+      const starRank = p => {
+        if (p.suggestStar && p.isFavorite) return 0;           // gold ★ correct
+        if (p.suggestStar && !p.isFavorite) return 1;          // green ★ action needed
+        if (p.suggestStarCheaper) return 2;                    // cyan ★ cheaper alt
+        if (p.suggestStarExpensive) return 3;                  // blue ★ costly
+        if (p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper) return 4; // red ★ unstar
+        return 5;                                               // · none
+      };
+      va=starRank(a);vb=starRank(b);
+    }
     else if(col==='name'){va=a.name.toLowerCase();vb=b.name.toLowerCase();}
     else if(col==='decision'){const o={keep:0,protected:1,review:2,trade:3};va=o[a.decision]||3;vb=o[b.decision]||3;}
     else{va=0;vb=0;}
@@ -156,8 +166,8 @@ function renderFamily(fam,isOpen){
   const famForms=[...new Set(members.map(p=>p.form).filter(x=>x&&x!=='Normal'))];
   const famFormStr=famForms.length===1?`<span style="color:var(--cyan);font-size:11px">${famForms[0]}</span>`:'';
   const goSearchStr=buildGoSearchStr(primaryName,members);
-  const familySearchStr=buildFamilySearchStr(members);
-
+  const famAllNames=[...new Set(members.map(p=>p.name))];
+  const familySearchStr=famAllNames.join(',');
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
@@ -182,8 +192,8 @@ function renderFamily(fam,isOpen){
     <div class="family-header" onclick="toggleFamily('fam-${key}')">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;min-width:0">
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''} <span style="color:var(--dim);font-size:11px">(${members.length})</span></span>
-        <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search string">🔍 ${goSearchStr}</button>
-        <button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Pokégenie evo-line search">⎘ ${familySearchStr}</button>
+        <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
+        ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
         ${keepCount?`<span class="fam-badge fb-keep">${keepCount} keep</span>`:''}
         ${reviewCount?`<span class="fam-badge fb-review">${reviewCount} review</span>`:''}
         ${tradeCount?`<span class="fam-badge fb-trade">${tradeCount} trade</span>`:''}
@@ -367,8 +377,8 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const famForms=[...new Set(members.map(p=>p.form).filter(x=>x&&x!=='Normal'))];
   const famFormStr=famForms.length===1?`<span style="color:var(--cyan);font-size:11px">${famForms[0]}</span>`:'';
   const goSearchStr=buildGoSearchStr(primaryName,members);
-  const familySearchStr=buildFamilySearchStr(members);
-
+  const famAllNames=[...new Set(members.map(p=>p.name))];
+  const familySearchStr=famAllNames.join(',');
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
@@ -393,8 +403,8 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
     <div class="family-header" onclick="toggleFamily('fam-${key}')">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;min-width:0">
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''} <span style="color:var(--dim);font-size:11px">(${members.length})${activeLeagues.length>0?' · '+visible.length+' shown':''}</span></span>
-        <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search string">🔍 ${goSearchStr}</button>
-        <button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Pokégenie evo-line search">⎘ ${familySearchStr}</button>
+        <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
+        ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
         ${keepCount?`<span class="fam-badge fb-keep">${keepCount} keep</span>`:''}
         ${reviewCount?`<span class="fam-badge fb-review">${reviewCount} review</span>`:''}
         ${tradeCount?`<span class="fam-badge fb-trade">${tradeCount} trade</span>`:''}
@@ -659,7 +669,7 @@ function setOverride(idx, field, value) {
   if (!p) { console.warn('setOverride: no pokemon found for stableKey', idx); return; }
   // Update local
   const fieldMap = {is_shiny:'isShiny',is_dynamax:'isDynamax',is_gigantamax:'isGigantamax',
-    vivillon_pattern:'vivillonPattern',manual_decision:'manualDecision',notes:'notes'};
+    is_costumed:'isCostumed',vivillon_pattern:'vivillonPattern',manual_decision:'manualDecision',notes:'notes'};
   if (fieldMap[field]) p[fieldMap[field]] = value;
   // If manual decision, update display
   if (field === 'manual_decision' && value) {
@@ -724,15 +734,22 @@ async function clearOverride(idx) {
 }
 
 function copyGoSearch(search, btn) {
-  navigator.clipboard.writeText(search).catch(()=>{
-    const ta=document.createElement('textarea');
-    ta.value=search; ta.style.position='fixed'; ta.style.opacity='0';
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-    document.body.removeChild(ta);
-  });
-  const orig=btn.textContent;
-  btn.textContent='✓ Copied!';
-  setTimeout(()=>{ btn.textContent=orig; }, 1500);
+  const orig=btn.innerHTML;
+  const done=()=>{ btn.innerHTML='✓'; btn.style.color='var(--green)'; setTimeout(()=>{ btn.innerHTML=orig; btn.style.color=''; }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(search).then(done).catch(()=>fallbackCopy(search,done));
+  } else {
+    fallbackCopy(search, done);
+  }
+}
+function fallbackCopy(text, cb) {
+  const ta=document.createElement('textarea');
+  ta.value=text; ta.style.position='fixed'; ta.style.top='0'; ta.style.left='0';
+  ta.style.opacity='0'; ta.setAttribute('readonly','');
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+  if(cb) cb();
 }
 
 function copyNick(el, text) {

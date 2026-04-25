@@ -93,6 +93,7 @@ function variantTags(p){
   if(p.isLucky) t+='<span class="vtag vt-lucky">★ Lucky</span>';
   if(p.isShadow) t+='<span class="vtag vt-shadow">Shadow</span>';
   if(p.isPurified) t+='<span class="vtag vt-purified">Purified</span>';
+  if(p.isCostumed) t+='<span class="vtag" style="background:rgba(255,166,87,.2);color:var(--master)">🎭 Costume</span>';
   if(p.isDynamax) t+='<span class="vtag" style="background:rgba(88,166,255,.2);color:var(--great)">Dmax</span>';
   if(p.isGigantamax) t+='<span class="vtag" style="background:rgba(168,85,247,.2);color:var(--ultra)">Gmax</span>';
   if(p.vivillonPattern) t+='<span class="vtag" style="background:rgba(255,166,87,.2);color:var(--master)">'+p.vivillonPattern+'</span>';
@@ -173,6 +174,7 @@ function buildRow(p){
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_shiny',this.checked)" ${p.isShiny?'checked':''}> ✨ Shiny</label>
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_dynamax',this.checked)" ${p.isDynamax?'checked':''}> Dynamax</label>
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_gigantamax',this.checked)" ${p.isGigantamax?'checked':''}> Gigantamax</label>
+          <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_costumed',this.checked)" ${p.isCostumed?'checked':''}> 🎭 Costumed</label>
           <label style="display:flex;align-items:center;gap:4px">Vivillon:
             <input type="text" value="${p.vivillonPattern||''}" placeholder="e.g. Polar" style="width:80px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','vivillon_pattern',this.value)">
           </label>

@@ -12,14 +12,34 @@ function buildFamilyMap(rows) {
 
   // Step 1: Build name+form->familyKey map
   // Regional variants (Alolan/Galarian/Hisuian/Paldean) get separate family keys
+  // FORM_SPLIT_FORMS also get separate keys (Deoxys formes, Castform, Oricorio etc.)
   const REGIONAL_FORMS = new Set(['Alola','Galar','Hisui','Paldea']);
+  const FORM_SPLIT_FORMS = new Set(['Alola','Galar','Hisui','Paldea',
+    'Male','Female',
+    'Origin','Altered','Therian','Incarnate',
+    'Attack','Defense','Speed',
+    'Primal','Mega','Unbound',
+    'Normal','Rainy','Sunny','Snowy',
+    'Baile',"Pa'u",'Pom-Pom','Sensu',
+    'Small','Average','Large','Super',
+    'Combat','Blaze','Aqua',
+    'Plant','Sandy','Trash',
+    'Midnight','Dusk',
+    'Burn','Chill','Douse','Shock',
+    'Roaming','Hero',
+    'Aria','Pirouette',
+    'Land','Sky',
+    '10%','50%','Complete',
+  ]);
+  // Species that are always standalone families regardless of Pokégenie evo data
+  const STANDALONE_SPECIES = new Set(['Kleavor', 'Weezing|Galar']);
   const nameFormToKey = {}; // "Name|Form" -> familyKey (pokeNum|form or pokeNum)
   const nameToNum = {};
   rows.forEach(r => {
     const form = r['Form']||'';
     const isRegional = REGIONAL_FORMS.has(form);
-    // Family key includes form for regional variants
-    const famKey = isRegional ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
+    const needsSplit = FORM_SPLIT_FORMS.has(form);
+    const famKey = (isRegional || needsSplit) ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
     const nameKey = r['Name']+'|'+form;
     if (!nameFormToKey[nameKey]) nameFormToKey[nameKey] = famKey;
     if (!nameToNum[r['Name']]) nameToNum[r['Name']] = r['Pokemon Number'];
@@ -34,7 +54,8 @@ function buildFamilyMap(rows) {
   rows.forEach(r => {
     const form = r['Form']||'';
     const isRegional = REGIONAL_FORMS.has(form);
-    const baseFamKey = isRegional ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
+    const needsSplit = FORM_SPLIT_FORMS.has(form);
+    const baseFamKey = (isRegional || needsSplit) ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
     ['Name (G)','Name (U)','Name (L)'].forEach(col => {
       const evoName = (r[col]||'').trim();
       if (!evoName || evoName === r['Name']) return;
@@ -80,9 +101,13 @@ function buildFamilyMap(rows) {
   const famKeyCache = {};
   const getFamKey = (name, form) => {
     const isRegional = REGIONAL_FORMS.has(form||'');
+    const needsSplit = FORM_SPLIT_FORMS.has(form||'');
     const num = nameToNum[name];
     if (!num) return name;
-    const key = isRegional ? num+'|'+(form||'') : num;
+    // Standalone species always get their own family key regardless of evo data
+    const speciesKey = name + (form ? '|'+form : '');
+    if (STANDALONE_SPECIES.has(name) || STANDALONE_SPECIES.has(speciesKey)) return speciesKey;
+    const key = (isRegional || needsSplit) ? num+'|'+(form||'') : num;
     if (!famKeyCache[key]) famKeyCache[key] = getRoot(key);
     return famKeyCache[key];
   };
@@ -417,7 +442,7 @@ function analyse(rows) {
       suggestStarExpensive:false, suggestStarCheaper:false,
       isExpensiveWinner:false, isAffordableWinner:false, isCheaperAlternative:false,
       targetEvo:'', hidden:false, evoIndicator:'', canEvolve:false, neverEvolved:false, isHundo:false, dustToL40:0, belowCapNote:'',
-      isDynamax:false, isGigantamax:false, vivillonPattern:'', manualDecision:'', notes:'', stableKey:'',
+      isDynamax:false, isGigantamax:false, isCostumed:false, vivillonPattern:'', manualDecision:'', notes:'', stableKey:'',
       overBudget100:false, cheaperAvailable:false,
       purifyHundo:false, purifyLeague:'', purifyRankPct:0,
     };
@@ -771,6 +796,7 @@ function analyse(rows) {
       if (ov && ov.is_shiny) p.isShiny = true;
       if (ov && ov.is_dynamax) p.isDynamax = true;
       if (ov && ov.is_gigantamax) p.isGigantamax = true;
+      if (ov && ov.is_costumed) p.isCostumed = true;
       if (ov && ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
       if (ov && ov.notes) p.notes = ov.notes;
 
@@ -795,7 +821,8 @@ function analyse(rows) {
             p.slots.includes('purified')
           )) ||
           isProtectedBest ||
-          (p.isLucky)
+          (p.isLucky) ||
+          (p.isCostumed)
         )
       );
       p.suggestStarCheaper = (p.isCheaperAlternative === true) && !p.suggestStar && !p.suggestStarExpensive;
