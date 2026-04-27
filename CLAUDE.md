@@ -6,14 +6,17 @@ PokéVault is a Pokémon GO collection manager. It parses a Pokégenie CSV expor
 
 ---
 
-## Two codebases — understand the relationship
+## Source of truth
 
-| Path | Role |
-|---|---|
-| `pokevault_v3_133.html` (or latest) | **Source of truth.** Single-file, most evolved logic. |
-| `pokevault-refactor/` | Multi-file refactor. Being brought up to date with the HTML. |
+`pokevault-refactor/` is the canonical source of truth. All changes are made directly here.
 
-**Changes flow HTML → refactor, never the other way.** When porting, read the HTML first and port exactly — don't invent improvements unless asked.
+The single-file HTML files (`pokevault_v3_NNN.html`) are retired — the last committed one is stale. Ignore them.
+
+**Workflow between Claude Code and claude.ai sessions:**
+- Claude Code works directly in `pokevault-refactor/` and commits after each session
+- When starting a claude.ai session, Mariellen uploads the individual JS files that changed (analyse.js, app.js, etc.)
+- claude.ai ports those files into a working HTML for UI testing, then provides the modified JS back as download
+- Claude Code ports the claude.ai JS changes back into the refactor files and commits
 
 ---
 
@@ -66,21 +69,28 @@ pokevault-refactor/
 
 ---
 
-## Known gaps in refactor (port from HTML)
+## Test suite
 
-See `/RULES.md` pending section for full list. Priority items in `analyse.js`:
+- `pokevault-refactor/tests/analyse.test.js` — Phase 1 unit tests (keep count, slots, nicks, family grouping, purify)
+- `pokevault-refactor/tests/moves.test.js` — deterministic move data tests (5 species)
+- Fixture: `poke_genie_export 132.csv` (Mariellen's collection, April 2026)
+- Run: `cd pokevault-refactor && npm install && npx jest`
 
-1. **`FORM_SPLIT_FORMS`** — Deoxys/Castform/Oricorio etc. incorrectly grouped; copy set from HTML `buildFamilyMap`
-2. **`STANDALONE_SPECIES`** (Kleavor, Galarian Weezing) — always own family; copy from HTML
-3. **`isFinalEvoStage` guard on blue/cyan stars** — remove from expensive winner and cyan checks; fires at any evo stage
-4. **Stable key includes CP** — remove `p.cp` from `makeStableKey` array
-5. **`COLLECTION_SETS`** (Vivillon/Furfrou/Flabébé) — not ported; see HTML for full implementation
+---
+
+## Known pending work
+
+See `PENDING_CHANGES (2).md` (in handoff folder) for full list. Key items:
+
+- **Nuzleaf cyan bug** — CP:498 (100% Little) showing green instead of cyan when CP:499 (99.8% Little) is already starred
+- **Shadow slot displacement** — shadows competing for same slot as regular winner; should coexist
+- **Pikachu +Fam button** — Pichu/Raichu ending up in separate families; likely costume variant grouping issue
+- **Shiny nick** — should use league nick + ※ suffix; nick not regenerating when shiny override is ticked
+- **Cloud save resilience** — draft status on save, prompt to complete/discard on partial saves
 
 ---
 
 ## Rules for this project
 
-- Always update `/RULES.md` (root) when a new feature, bug, or change is discussed or implemented
-- Port from HTML → refactor exactly. Don't guess at intent.
-- Test against the user's real Pokégenie CSV data — many edge cases only surface there.
-- Auth/RLS/Stripe work stays in Claude Code; logic/UI fixes happen in claude.ai sessions with the HTML
+- Always test against the user's real Pokégenie CSV — many edge cases only surface with real data
+- Auth/RLS work tracked in SUPABASE_AUTH_PLAN.md
