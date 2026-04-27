@@ -669,15 +669,16 @@ function analyse(rows) {
             best2.affordableForLeague = lg;
           }
 
-          // Cyan star: cheaper unstarred winner vs a starred pokemon at same rank
+          // Cyan star: unstarred winner when a starred pokemon at same rounded rank already exists
           // Check full group (not just eligible) — starred one may have been claimed/excluded
+          // No dust comparison: dustL=0 on a maxed starred pokemon looks "free" but is already done.
+          // Rule: same rounded rank = equivalent from user's perspective → check before acting.
           const bestRounded2 = Math.round(bestRank2);
           if (isConfirmed) {
             const hasStarredAtSameRank = group.some(p =>
               p !== best2 &&
               p.isFavorite &&
-              Math.round(p[rankField]||0) === bestRounded2 &&
-              effectiveDust(p) > eDustCheck
+              Math.round(p[rankField]||0) === bestRounded2
             );
             if (hasStarredAtSameRank) {
               if (!best2.cheaperAlternativeLeagues) best2.cheaperAlternativeLeagues = [];

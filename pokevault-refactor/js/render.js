@@ -78,7 +78,7 @@ function starCell(p){
   else if(p.suggestStar&&!p.isFavorite) si='<span class="star-green" title="Should be starred — action needed">★</span>';
   else if(p.suggestStarExpensive&&p.isFavorite) si='<span class="star-yellow" title="Starred correctly ✓ (costly pick)">★</span>';
   else if(p.suggestStarExpensive&&!p.isFavorite) si='<span class="star-blue" title="Recommended but costly — over affordable threshold">★</span>';
-  else if(p.suggestStarCheaper&&!p.isFavorite) si='<span class="star-cyan" title="Cheaper alternative at same rank — check if your starred one is already levelled before acting">★</span>';
+  else if(p.suggestStarCheaper&&!p.isFavorite) si='<span class="star-cyan" title="Equivalent to your starred pick — check before acting">★</span>';
   else if(!p.suggestStar&&!p.suggestStarExpensive&&!p.suggestStarCheaper&&p.isFavorite) si='<span class="star-red" title="Currently starred — may not be needed">★</span>';
   else si='<span class="star-none">·</span>';
   return `<div class="star-cell">

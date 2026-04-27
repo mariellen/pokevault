@@ -172,8 +172,9 @@ describe('Nick generation', () => {
     // No slot, rank < 90% everywhere → Ⓡ (Master/Raid fallback via buildNickname 'M')
     // All paths produce one of the circled LC values — never a bare number.
     const CIRCLED = new Set(['ⓛ', 'Ⓖ', 'Ⓤ', 'Ⓜ', 'Ⓡ']);
+    // Nundos (0/0/0) always get '⓪' regardless of being lucky — exclude them.
     result.pokemon
-      .filter(p => p.isLucky && p.decision === 'keep')
+      .filter(p => p.isLucky && p.decision === 'keep' && !p.isNundo)
       .forEach(p => {
         const hasCircled = [...p.nickname].some(ch => CIRCLED.has(ch));
         expect(hasCircled).toBe(true);
