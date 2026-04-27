@@ -63,6 +63,34 @@
   </div>
 </div>
 
+<!-- Purify modal -->
+<div class="pv-modal-overlay" id="purify-modal" onclick="if(event.target===this)closePurifyModal()">
+  <div class="pv-modal" style="max-width:780px">
+    <div class="pv-modal-header">
+      <div>
+        <div class="pv-modal-title">🌟 Shadow Purify Candidates</div>
+        <div class="pv-modal-sub" id="purify-modal-sub">Loading...</div>
+      </div>
+      <button class="pv-modal-close" onclick="closePurifyModal()">✕</button>
+    </div>
+    <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <span style="color:var(--muted);font-size:11px">Sort:</span>
+      <button id="purify-sort-rank" onclick="purifySort='rank';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Rank ↓</button>
+      <button id="purify-sort-dust" onclick="purifySort='dust';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Dust ↑</button>
+      <button id="purify-sort-league" onclick="purifySort='league';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">League</button>
+      <span style="color:var(--muted);font-size:11px;margin-left:8px">Filter:</span>
+      <button id="purify-filter-all" onclick="purifyLeagueFilter='';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">All</button>
+      <button id="purify-filter-L" onclick="purifyLeagueFilter='L';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--little)">Little</button>
+      <button id="purify-filter-G" onclick="purifyLeagueFilter='G';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--great)">Great</button>
+      <button id="purify-filter-U" onclick="purifyLeagueFilter='U';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--ultra)">Ultra</button>
+      <button id="purify-filter-M" onclick="purifyLeagueFilter='M';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--master)">Master</button>
+    </div>
+    <div class="pv-modal-body" id="purify-modal-body">
+      <div class="pv-modal-empty">Load your collection first</div>
+    </div>
+  </div>
+</div>
+
 <!-- Mark Special modal -->
 <div class="pv-modal-overlay" id="special-modal" onclick="if(event.target===this)closeSpecialModal()">
   <div class="pv-modal">
@@ -90,8 +118,8 @@
     <label class="evo-toggle"><input type="checkbox" id="evoToggle"> Include evolutions</label>
     <button class="btn active" data-f="all" onclick="setDecFilter('all',this)">All</button>
     <button class="btn" data-f="keep" onclick="setDecFilter('keep',this)">✓ Keep</button>
-    <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)">↗ Trade</button>
-    <button class="btn" data-f="review" onclick="setDecFilter('review',this)">⚠ Review</button>
+    <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)" style="display:none">↗ Trade</button>
+    <button class="btn" data-f="review" onclick="setDecFilter('review',this)" style="display:none">⚠ Review</button>
     <button class="btn" data-f="protected" onclick="setDecFilter('protected',this)">🛡 Protected</button>
     <button class="league-btn btn lb-L" data-l="L" onclick="toggleLeague('L',this)">Little</button>
     <button class="league-btn btn lb-G" data-l="G" onclick="toggleLeague('G',this)">Great</button>
@@ -109,6 +137,7 @@
     <button class="btn" id="costlyBtn" onclick="filterCostlyWinners(this)" title="Show only costly (blue star) recommendations">💰 Costly</button>
     <button class="btn" data-f="canEvolve" onclick="setDecFilter('canEvolve',this)">Can Evolve</button>
     <button class="btn" data-f="neverEvolved" onclick="setDecFilter('neverEvolved',this)">Never Evolved</button>
+    <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates">🌟 Purify</button>
     <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc">🎨 Set Forms</button>
     <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax">✨ Mark Special</button>
     <button class="btn export-btn" onclick="exportCSV()">⬇ Export</button>

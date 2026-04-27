@@ -119,7 +119,8 @@ function buildGoSearchStr(primaryName, members) {
       knownVariants.filter(v=>allPokemon.some(p=>p.name===primaryName&&(formToGoSearch[p.form]||'')===v))
         .forEach(v=>parts.push('!'+v));
     } else {
-      parts.push(formToGoSearch[form]||form.toLowerCase());
+      const mapped=formToGoSearch[form];
+      if(mapped) parts.push(mapped);
     }
   }
   return parts.join('&');
@@ -151,11 +152,12 @@ function buildFamilySearchStr(members) {
     if(formOverride&&FORM_SEARCH&&FORM_SEARCH[formOverride.vivillonPattern]){
       sp.push(FORM_SEARCH[formOverride.vivillonPattern]);
     } else if(form&&form!=='Normal'){
-      sp.push(formToGoSearch[form]||form.toLowerCase());
+      const mapped=formToGoSearch[form];
+      if(mapped) sp.push(mapped);
     }
     parts.push(sp.join('&'));
   });
-  return parts.join(',');
+  return parts.join(',')+'&!variant';
 }
 
 function renderFamily(fam,isOpen){
@@ -167,7 +169,16 @@ function renderFamily(fam,isOpen){
   const famFormStr=famForms.length===1?`<span style="color:var(--cyan);font-size:11px">${famForms[0]}</span>`:'';
   const goSearchStr=buildGoSearchStr(primaryName,members);
   const famAllNames=[...new Set(members.map(p=>p.name))];
-  const familySearchStr=famAllNames.join(',');
+  const REGIONAL_TAGS=['Alola','Galar','Hisui','Paldea'];
+  const famRegionalForm=members[0]?.form||'';
+  const isRegionalFamily=REGIONAL_TAGS.includes(famRegionalForm);
+  let familySearchStr;
+  if(isRegionalFamily){
+    familySearchStr=famAllNames.join(',')+'&'+famRegionalForm.toLowerCase();
+  }else{
+    const exclusions=REGIONAL_TAGS.filter(tag=>allPokemon.some(p=>famAllNames.includes(p.name)&&p.form===tag));
+    familySearchStr=famAllNames.join(',')+(exclusions.length?'&!'+exclusions.map(e=>e.toLowerCase()).join('&!'):'');
+  }
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
@@ -378,11 +389,46 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const famFormStr=famForms.length===1?`<span style="color:var(--cyan);font-size:11px">${famForms[0]}</span>`:'';
   const goSearchStr=buildGoSearchStr(primaryName,members);
   const famAllNames=[...new Set(members.map(p=>p.name))];
-  const familySearchStr=famAllNames.join(',');
+  const REGIONAL_TAGS=['Alola','Galar','Hisui','Paldea'];
+  const famRegionalForm=members[0]?.form||'';
+  const isRegionalFamily=REGIONAL_TAGS.includes(famRegionalForm);
+  let familySearchStr;
+  if(isRegionalFamily){
+    familySearchStr=famAllNames.join(',')+'&'+famRegionalForm.toLowerCase();
+  }else{
+    const exclusions=REGIONAL_TAGS.filter(tag=>allPokemon.some(p=>famAllNames.includes(p.name)&&p.form===tag));
+    familySearchStr=famAllNames.join(',')+(exclusions.length?'&!'+exclusions.map(e=>e.toLowerCase()).join('&!'):'');
+  }
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
+  // Evo-target reason tags: show G→Umbreon in league colour in nick cell
+  // when the row is visible because of an evo-target search match (not a name match)
+  if (termMatchesViaEvo && term) {
+    visible.forEach(p => {
+      if (p.name.toLowerCase().includes(term)) { p._evoSearchTag = ''; return; }
+      const tags = [];
+      if ((p.evolvedNameG||'').toLowerCase().includes(term))
+        tags.push(`<span style="color:var(--great);font-size:9px">G→${p.evolvedNameG}</span>`);
+      if ((p.evolvedNameU||'').toLowerCase().includes(term))
+        tags.push(`<span style="color:var(--ultra);font-size:9px">U→${p.evolvedNameU}</span>`);
+      if ((p.evolvedNameL||'').toLowerCase().includes(term))
+        tags.push(`<span style="color:var(--little);font-size:9px">L→${p.evolvedNameL}</span>`);
+      p._evoSearchTag = tags.join(' ');
+    });
+  } else {
+    visible.forEach(p => { p._evoSearchTag = ''; });
+  }
+
   const rows=visible.map(p=>buildRow(p)).join('');
+  const collSet = COLLECTION_SETS && COLLECTION_SETS[primaryName];
+  const collBadge = collSet ? (() => {
+    const havePatterns = new Set(members.map(p=>p.specialForm||p.vivillonPattern).filter(Boolean));
+    const totalPatterns = collSet.forms.length;
+    const col = havePatterns.size >= totalPatterns ? 'var(--green)'
+               : havePatterns.size >= totalPatterns * 0.7 ? 'var(--gold)' : 'var(--muted)';
+    return `<span style="color:${col};font-size:10px;margin-left:4px" title="${havePatterns.size}/${totalPatterns} ${collSet.label} identified (${members.length} total)">[${havePatterns.size}/${totalPatterns} patterns${members.length>havePatterns.size?' · '+members.length+' total':''}]</span>`;
+  })() : '';
 
   const thead=`<thead><tr>
     <th data-col="star" onclick="sortFamilyBy(this,'star')" title="Sort">★</th>
@@ -402,7 +448,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
     <div class="family-header" onclick="toggleFamily('fam-${key}')">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;min-width:0">
-        <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''} <span style="color:var(--dim);font-size:11px">(${members.length})${activeLeagues.length>0?' · '+visible.length+' shown':''}</span></span>
+        <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''}${collBadge} <span style="color:var(--dim);font-size:11px">(${members.length})${activeLeagues.length>0?' · '+visible.length+' shown':''}</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
         ${keepCount?`<span class="fam-badge fb-keep">${keepCount} keep</span>`:''}
@@ -472,6 +518,102 @@ function filterCostlyWinners(btn){
 // ═══════════════════════════════════════════════
 // MODALS
 // ═══════════════════════════════════════════════
+
+// ── Purify modal ──────────────────────────────
+let purifySort='rank';       // 'rank' | 'dust' | 'league'
+let purifyLeagueFilter='';   // '' | 'L' | 'G' | 'U' | 'M'
+
+const LEAGUE_NAMES_P={L:'Little',G:'Great',U:'Ultra',M:'Master'};
+const LEAGUE_COLORS_P={L:'var(--little)',G:'var(--great)',U:'var(--ultra)',M:'var(--master)'};
+const LEAGUE_SYMS_P={L:'ⓛ',G:'Ⓖ',U:'Ⓤ',M:'Ⓡ'};
+
+function openPurifyModal(){
+  if(!allPokemon.length){alert('Load your collection first');return;}
+  const modal=document.getElementById('purify-modal');
+  const body=document.getElementById('purify-modal-body');
+  const sub=document.getElementById('purify-modal-sub');
+
+  // 92% threshold (not keepThreshold) to buffer for heuristic approximation
+  let candidates=allPokemon.filter(p=>p.isShadow&&p.purifyLeague&&p.purifyRankPct>=92);
+
+  if(purifyLeagueFilter) candidates=candidates.filter(p=>p.purifyLeague===purifyLeagueFilter);
+
+  candidates.sort((a,b)=>{
+    if(purifySort==='dust'){
+      const da=a['dust'+a.purifyLeague]||0, db=b['dust'+b.purifyLeague]||0;
+      return da-db;
+    }
+    if(purifySort==='league'){
+      const order={L:0,G:1,U:2,M:3};
+      const lo=(order[a.purifyLeague]||0)-(order[b.purifyLeague]||0);
+      if(lo!==0) return lo;
+    }
+    return (b.purifyRankPct||0)-(a.purifyRankPct||0);
+  });
+
+  sub.textContent=candidates.length+' shadow'+(candidates.length===1?'':'s')+' qualify when purified';
+
+  ['rank','dust','league'].forEach(s=>{
+    const btn=document.getElementById('purify-sort-'+s);
+    if(btn){btn.style.background=purifySort===s?'var(--cyan)':'none';btn.style.color=purifySort===s?'#000':'var(--muted)';}
+  });
+  ['all','L','G','U','M'].forEach(f=>{
+    const btn=document.getElementById('purify-filter-'+f);
+    if(!btn) return;
+    const active=purifyLeagueFilter===(f==='all'?'':f);
+    btn.style.background=active?'var(--cyan)':'none';
+    btn.style.color=active?'#000':(f==='all'?'var(--muted)':LEAGUE_COLORS_P[f]||'var(--muted)');
+  });
+
+  if(!candidates.length){
+    body.innerHTML='<div class="pv-modal-empty">No shadow purify candidates found'
+      +(purifyLeagueFilter?' for '+LEAGUE_NAMES_P[purifyLeagueFilter]+' league':'')+'</div>';
+    modal.style.display='flex';
+    return;
+  }
+
+  const rows=candidates.map(p=>{
+    const lg=p.purifyLeague;
+    const lgName=LEAGUE_NAMES_P[lg]||lg;
+    const lgColor=LEAGUE_COLORS_P[lg]||'var(--muted)';
+    const lgSym=LEAGUE_SYMS_P[lg]||lg;
+    const shadowDust=p['dust'+lg]||0;
+    const purifyDust=Math.round(shadowDust/2);
+    const purifyBaseName=p.purifyEvo||p.name;
+    const purifyNick=fitName(purifyBaseName,lgSym+p.purifyRankPct+(p.purifyHundo?'✪':''),'p',12);
+    const ivStr=p.atkIV+'/'+p.defIV+'/'+p.staIV;
+    const pAtk=Math.min(15,(p.atkIV||0)+2);
+    const pDef=Math.min(15,(p.defIV||0)+2);
+    const pSta=Math.min(15,(p.staIV||0)+2);
+    const purifiedIvStr=pAtk+'/'+pDef+'/'+pSta;
+
+    return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
+        padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px">
+      <div>
+        <div style="font-weight:700;color:var(--text)">${p.name}${p.purifyEvo&&p.purifyEvo!==p.name?' <span style="color:var(--muted);font-size:11px;font-weight:400">→ '+p.purifyEvo+'</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
+          ${p.purifyHundo?'<span style="color:var(--gold);font-size:10px"> ★ Hundo after purify</span>':''}
+        </div>
+        <div style="color:var(--muted);font-size:11px">IVs: ${ivStr} → ${purifiedIvStr} · <span style="color:${lgColor};font-weight:700">${lgName}</span> est. <span style="font-weight:700;color:var(--green)">${p.purifyRankPct}%</span> · dust: <span style="color:var(--cyan)">${purifyDust>0?purifyDust.toLocaleString():'at cap'}</span></div>
+      </div>
+      <button class="copy-search-btn" onclick="copyGoSearch('${p.name}&cp${p.cp}&shadow',this)" title="Copy name+CP+shadow to find in GO/Pokégenie">🔍</button>
+      <button class="copy-search-btn" onclick="copyGoSearch('${ivStr}',this)" title="Copy IVs to search in Pokégenie">IV</button>
+      <span onclick="copyGoSearch('${purifyNick}',this)" style="font-family:monospace;color:var(--gold);cursor:pointer;font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;white-space:nowrap" title="Click to copy purified nick">${purifyNick}</span>
+    </div>`;
+  }).join('');
+
+  body.innerHTML=`<div style="font-size:11px;color:var(--amber,#f59e0b);padding:8px 12px;border-bottom:1px solid var(--border)">
+    ⚠ Check whether each Pokémon is more valuable as a shadow before purifying.
+  </div><div style="font-size:11px;color:var(--muted);padding:6px 12px;border-bottom:1px solid var(--border)">
+    Rank estimates are approximate (heuristic). Rescan in Pokégenie after purifying for accurate ranks.
+  </div>${rows}`;
+  modal.style.display='flex';
+}
+
+function closePurifyModal(){
+  document.getElementById('purify-modal').style.display='none';
+}
+
+// ── Cleanup / Special modals ──────────────────
 let cleanupSortMode='stable';
 let specialSortMode='date';
 let specialFilterSpecies='';
@@ -676,7 +818,7 @@ function setOverride(idx, field, value) {
   if (!p) { console.warn('setOverride: no pokemon found for stableKey', idx); return; }
   // Update local
   const fieldMap = {is_shiny:'isShiny',is_dynamax:'isDynamax',is_gigantamax:'isGigantamax',
-    is_costumed:'isCostumed',vivillon_pattern:'vivillonPattern',manual_decision:'manualDecision',notes:'notes'};
+    is_costumed:'isCostumed',vivillon_pattern:'vivillonPattern',special_form:'specialForm',manual_decision:'manualDecision',notes:'notes'};
   if (fieldMap[field]) p[fieldMap[field]] = value;
   // If manual decision, update display
   if (field === 'manual_decision' && value) {

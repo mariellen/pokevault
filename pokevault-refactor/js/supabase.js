@@ -14,6 +14,8 @@ create table if not exists pokemon_overrides (
   is_dynamax boolean default false,
   is_gigantamax boolean default false,
   vivillon_pattern text default '',
+  special_form text default '',
+  is_costumed boolean default false,
   manual_decision text default '',
   notes text default '',
   updated_at timestamptz default now()
@@ -196,7 +198,9 @@ function applyOverridesToPokemon() {
     if (ov.is_shiny) p.isShiny = true;
     if (ov.is_dynamax) p.isDynamax = true;
     if (ov.is_gigantamax) p.isGigantamax = true;
+    if (ov.is_costumed) p.isCostumed = true;
     if (ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
+    if (ov.special_form) p.specialForm = ov.special_form;
     if (ov.manual_decision) p.manualDecision = ov.manual_decision;
     if (ov.notes) p.notes = ov.notes;
   });

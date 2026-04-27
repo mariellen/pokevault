@@ -56,95 +56,6 @@ function getPokeType(name) {
   return null;
 }
 
-// ═══════════════════════════════════════════════
-// EVOLUTION FAMILY MAP (Pokémon Number based)
-// Groups pokemon number -> canonical family root number
-// This prevents bad Pokégenie scan data from merging unrelated families
-// ═══════════════════════════════════════════════
-function buildFamilyMap(rows) {
-  // Fast O(n) approach: group by Pokemon Number using a single pass
-  // Then merge families using majority-vote on evolution targets
-  // Uses a simple name->number lookup built in one pass
-
-  // Step 1: Build name+form->familyKey map
-  // Regional variants (Alolan/Galarian/Hisuian/Paldean) get separate family keys
-  const REGIONAL_FORMS = new Set(['Alola','Galar','Hisui','Paldea']);
-  const nameFormToKey = {}; // "Name|Form" -> familyKey (pokeNum|form or pokeNum)
-  const nameToNum = {};
-  rows.forEach(r => {
-    const form = r['Form']||'';
-    const isRegional = REGIONAL_FORMS.has(form);
-    // Family key includes form for regional variants
-    const famKey = isRegional ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
-    const nameKey = r['Name']+'|'+form;
-    if (!nameFormToKey[nameKey]) nameFormToKey[nameKey] = famKey;
-    if (!nameToNum[r['Name']]) nameToNum[r['Name']] = r['Pokemon Number'];
-  });
-
-  // Step 2: Count how many rows per pokeNum
-  const numCount = {};
-  rows.forEach(r => { numCount[r['Pokemon Number']] = (numCount[r['Pokemon Number']]||0)+1; });
-
-  // Step 3: Count evo target votes per (baseFamKey -> targetFamKey) pair
-  const voteCount = {};
-  rows.forEach(r => {
-    const form = r['Form']||'';
-    const isRegional = REGIONAL_FORMS.has(form);
-    const baseFamKey = isRegional ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
-    ['Name (G)','Name (U)','Name (L)'].forEach(col => {
-      const evoName = (r[col]||'').trim();
-      if (!evoName || evoName === r['Name']) return;
-      const evoNum = nameToNum[evoName];
-      if (!evoNum) return;
-      // Evo inherits same regional form
-      const evoFamKey = isRegional ? evoNum+'|'+form : evoNum;
-      if (evoFamKey === baseFamKey) return;
-      const key = baseFamKey + '>' + evoFamKey;
-      voteCount[key] = (voteCount[key]||0) + 1;
-    });
-  });
-
-  // Step 4: Union-Find on family keys
-  const parent = {};
-  const getRoot = n => {
-    if (parent[n] === undefined) parent[n] = n;
-    if (parent[n] === n) return n;
-    parent[n] = getRoot(parent[n]);
-    return parent[n];
-  };
-  const unite = (a, b) => {
-    const ra = getRoot(a), rb = getRoot(b);
-    if (ra !== rb) parent[rb] = ra;
-  };
-
-  // Step 5: Merge if majority agree (>40% of base entries point to that evo)
-  Object.entries(voteCount).forEach(([key, count]) => {
-    const [baseFamKey, evoFamKey] = key.split('>');
-    const baseNum = baseFamKey.split('|')[0];
-    const total = numCount[baseNum] || 1;
-    if (count / total > 0.4) unite(baseFamKey, evoFamKey);
-  });
-
-  // Step 6: Manually unite Eevee family
-  const eeveeNames = ['Eevee','Vaporeon','Jolteon','Flareon','Espeon',
-    'Umbreon','Leafeon','Glaceon','Sylveon'];
-  const eeveeKeys = eeveeNames.map(n => nameToNum[n]).filter(Boolean);
-  if (eeveeKeys.length > 1) eeveeKeys.slice(1).forEach(n => unite(eeveeKeys[0], n));
-
-  // Step 7: Build result map for each row: index -> familyKey
-  // Returns a function to get family key for a given row
-  const famKeyCache = {};
-  const getFamKey = (name, form) => {
-    const isRegional = REGIONAL_FORMS.has(form||'');
-    const num = nameToNum[name];
-    if (!num) return name;
-    const key = isRegional ? num+'|'+(form||'') : num;
-    if (!famKeyCache[key]) famKeyCache[key] = getRoot(key);
-    return famKeyCache[key];
-  };
-  return getFamKey;
-}
-
 // ── Best moves database ──────────────────────────────
 const BEST_MOVES = {
   Feraligatr:{G:['Waterfall','Hydro Cannon','Ice Beam'],U:['Waterfall','Hydro Cannon','Ice Beam'],M:['Waterfall','Hydro Cannon','Crunch']},
@@ -255,3 +166,221 @@ const COSTUME_SPECIES = new Set([
   'Charmander','Charmeleon','Charizard','Bulbasaur','Ivysaur','Venusaur',
   'Eevee','Snorlax'
 ]);
+
+// ═══════════════════════════════════════════════
+// VALID EVOLUTIONS — hardcoded from Pokégenie data
+// Used to validate evolution targets and reject scan errors
+// ═══════════════════════════════════════════════
+const VALID_EVOLUTIONS = {
+  'Abra':['Kadabra','Alakazam'],'Aipom':['Ambipom'],'Amaura':['Aurorus'],
+  'Anorith':['Armaldo'],'Applin':['Flapple','Appletun','Dipplin','Hydrapple'],
+  'Archen':['Archeops'],'Aron':['Lairon','Aggron'],'Axew':['Fraxure','Haxorus'],
+  'Azurill':['Marill','Azumarill'],'Bagon':['Shelgon','Salamence'],
+  'Baltoy':['Claydol'],'Barboach':['Whiscash'],'Bayleef':['Meganium'],
+  'Beldum':['Metang','Metagross'],'Bellsprout':['Weepinbell','Victreebel'],
+  'Bergmite':['Avalugg'],'Bidoof':['Bibarel'],'Binacle':['Barbaracle'],
+  'Bisharp':['Kingambit'],'Blipbug':['Dottler','Orbeetle'],'Blitzle':['Zebstrika'],
+  'Boldore':['Gigalith'],'Bonsly':['Sudowoodo'],
+  'Bounsweet':['Steenee','Tsareena'],'Braixen':['Delphox'],
+  'Brionne':['Primarina'],'Bronzor':['Bronzong'],'Buizel':['Floatzel'],
+  'Bulbasaur':['Ivysaur','Venusaur'],'Buneary':['Lopunny'],
+  'Bunnelby':['Diggersby'],'Burmy':['Wormadam','Mothim'],
+  'Cacnea':['Cacturne'],'Carvanha':['Sharpedo'],'Cascoon':['Dustox'],
+  'Caterpie':['Metapod','Butterfree'],'Cetoddle':['Cetitan'],
+  'Chansey':['Blissey'],'Charcadet':['Armarouge','Ceruledge'],
+  'Charjabug':['Vikavolt'],'Charmander':['Charmeleon','Charizard'],
+  'Charmeleon':['Charizard'],'Cherubi':['Cherrim'],
+  'Chespin':['Quilladin','Chesnaught'],'Chikorita':['Bayleef','Meganium'],
+  'Chimchar':['Monferno','Infernape'],'Chinchou':['Lanturn'],
+  'Chingling':['Chimecho'],'Clamperl':['Huntail','Gorebyss'],
+  'Clauncher':['Clawitzer'],'Clefairy':['Clefable'],'Cleffa':['Clefairy','Clefable'],
+  'Clobbopus':['Grapploct'],'Combee':['Vespiquen'],'Corphish':['Crawdaunt'],
+  'Corsola':['Cursola'],'Cosmoem':['Solgaleo','Lunala'],
+  'Cottonee':['Whimsicott'],'Crabrawler':['Crabominable'],
+  'Cranidos':['Rampardos'],'Croagunk':['Toxicroak'],'Crocalor':['Skeledirge'],
+  'Cubchoo':['Beartic'],'Cubone':['Marowak'],'Cutiefly':['Ribombee'],
+  'Cyndaquil':['Quilava','Typhlosion'],'Dartrix':['Decidueye'],
+  'Darumaka':['Darmanitan'],'Deerling':['Sawsbuck'],
+  'Deino':['Zweilous','Hydreigon'],'Dewott':['Samurott'],'Dewpider':['Araquanid'],
+  'Diglett':['Dugtrio'],'Doduo':['Dodrio'],'Dolliv':['Arboliva'],
+  'Dottler':['Orbeetle'],'Dragonair':['Dragonite'],'Dratini':['Dragonair','Dragonite'],
+  'Dreepy':['Drakloak','Dragapult'],'Drifloon':['Drifblim'],'Drilbur':['Excadrill'],
+  'Drizzile':['Inteleon'],'Drowzee':['Hypno'],'Ducklett':['Swanna'],
+  'Dunsparce':['Dudunsparce'],'Dusclops':['Dusknoir'],
+  'Duskull':['Dusclops','Dusknoir'],'Dwebble':['Crustle'],
+  'Eelektrik':['Eelektross'],
+  'Eevee':['Vaporeon','Jolteon','Flareon','Espeon','Umbreon','Leafeon','Glaceon','Sylveon'],
+  'Ekans':['Arbok'],'Electabuzz':['Electivire'],'Electrike':['Manectric'],
+  'Elekid':['Electabuzz','Electivire'],'Elgyem':['Beheeyem'],
+  'Espurr':['Meowstic'],'Exeggcute':['Exeggutor'],
+  'Farfetch’d':['Sirfetch’d'],'Feebas':['Milotic'],
+  'Fennekin':['Braixen','Delphox'],'Ferroseed':['Ferrothorn'],
+  'Fidough':['Dachsbun'],'Finneon':['Lumineon'],
+  'Flabébé':['Floette','Florges'],'Fletchling':['Fletchinder','Talonflame'],
+  'Floette':['Florges'],'Fomantis':['Lurantis'],'Foongus':['Amoonguss'],
+  'Fraxure':['Haxorus'],'Frigibax':['Arctibax','Baxcalibur'],
+  'Frillish':['Jellicent'],'Froakie':['Frogadier','Greninja'],
+  'Frogadier':['Greninja'],'Fuecoco':['Crocalor','Skeledirge'],
+  'Gastly':['Haunter','Gengar'],'Geodude':['Graveler','Golem'],
+  'Gible':['Gabite','Garchomp'],'Gimmighoul':['Gholdengo'],
+  'Girafarig':['Farigiraf'],'Glameow':['Purugly'],'Gligar':['Gliscor'],
+  'Glimmet':['Glimmora'],'Gloom':['Vileplume','Bellossom'],
+  'Golbat':['Crobat'],'Goldeen':['Seaking'],'Golett':['Golurk'],
+  'Goomy':['Sliggoo','Goodra'],'Gossifleur':['Eldegoss'],
+  'Gothita':['Gothorita','Gothitelle'],'Gothorita':['Gothitelle'],
+  'Greavard':['Houndstone'],'Grimer':['Muk'],'Grookey':['Thwackey','Rillaboom'],
+  'Grotle':['Torterra'],'Grovyle':['Sceptile'],'Growlithe':['Arcanine'],
+  'Grubbin':['Charjabug','Vikavolt'],'Gulpin':['Swalot'],
+  'Gurdurr':['Conkeldurr'],'Happiny':['Chansey','Blissey'],
+  'Hatenna':['Hattrem','Hatterene'],'Haunter':['Gengar'],
+  'Helioptile':['Heliolisk'],'Herdier':['Stoutland'],
+  'Hippopotas':['Hippowdon'],'Honedge':['Doublade','Aegislash'],
+  'Hoothoot':['Noctowl'],'Hoppip':['Skiploom','Jumpluff'],
+  'Horsea':['Seadra','Kingdra'],'Houndour':['Houndoom'],
+  'Igglybuff':['Jigglypuff','Wigglytuff'],'Impidimp':['Morgrem','Grimmsnarl'],
+  'Inkay':['Malamar'],'Ivysaur':['Venusaur'],
+  'Jangmo-o':['Hakamo-o','Kommo-o'],'Jigglypuff':['Wigglytuff'],
+  'Joltik':['Galvantula'],'Kabuto':['Kabutops'],
+  'Kadabra':['Alakazam'],'Kakuna':['Beedrill'],
+  'Karrablast':['Escavalier'],'Kirlia':['Gardevoir','Gallade'],
+  'Klang':['Klinklang'],'Klink':['Klang','Klinklang'],'Koffing':['Weezing'],
+  'Krabby':['Kingler'],'Kricketot':['Kricketune'],'Kubfu':['Urshifu'],
+  'Lampent':['Chandelure'],'Larvesta':['Volcarona'],
+  'Larvitar':['Pupitar','Tyranitar'],'Lechonk':['Oinkologne'],
+  'Ledyba':['Ledian'],'Lickitung':['Lickilicky'],'Lileep':['Cradily'],
+  'Lillipup':['Herdier','Stoutland'],'Linoone':['Obstagoon'],
+  'Litleo':['Pyroar'],'Litten':['Torracat','Incineroar'],
+  'Litwick':['Lampent','Chandelure'],'Lombre':['Ludicolo'],
+  'Lotad':['Lombre','Ludicolo'],'Loudred':['Exploud'],
+  'Luxio':['Luxray'],'Machop':['Machoke','Machamp'],
+  'Magby':['Magmar','Magmortar'],'Magikarp':['Gyarados'],
+  'Magmar':['Magmortar'],'Magnemite':['Magneton','Magnezone'],
+  'Magneton':['Magnezone'],'Makuhita':['Hariyama'],
+  'Mankey':['Primeape','Annihilape'],'Mantyke':['Mantine'],
+  'Mareanie':['Toxapex'],'Mareep':['Flaaffy','Ampharos'],
+  'Marill':['Azumarill'],'Meditite':['Medicham'],'Meltan':['Melmetal'],
+  'Meowth':['Persian','Perrserker'],'Metapod':['Butterfree'],
+  'Mienfoo':['Mienshao'],'Mime Jr.':['Mr. Mime'],'Minccino':['Cinccino'],
+  'Misdreavus':['Mismagius'],'Monferno':['Infernape'],
+  'Morelull':['Shiinotic'],'Mr. Mime':['Mr. Rime'],
+  'Mudkip':['Marshtomp','Swampert'],'Munchlax':['Snorlax'],
+  'Munna':['Musharna'],'Murkrow':['Honchkrow'],
+  'Nacli':['Naclstack','Garganacl'],'Natu':['Xatu'],'Nickit':['Thievul'],
+  'Nidoran♀':['Nidorina','Nidoqueen'],
+  'Nidoran♂':['Nidorino','Nidoking'],
+  'Nidorino':['Nidoking'],'Nincada':['Ninjask','Shedinja'],
+  'Noibat':['Noivern'],'Nosepass':['Probopass'],'Numel':['Camerupt'],
+  'Nuzleaf':['Shiftry'],'Nymble':['Lokix'],
+  'Oddish':['Gloom','Vileplume','Bellossom'],'Omanyte':['Omastar'],
+  'Onix':['Steelix'],'Oshawott':['Dewott','Samurott'],
+  'Palpitoad':['Seismitoad'],'Pancham':['Pangoro'],
+  'Panpour':['Simipour'],'Pansage':['Simisage'],'Pansear':['Simisear'],
+  'Paras':['Parasect'],'Patrat':['Watchog'],
+  'Pawmi':['Pawmo','Pawmot'],'Pawmo':['Pawmot'],
+  'Pawniard':['Bisharp','Kingambit'],'Petilil':['Lilligant'],
+  'Phanpy':['Donphan'],'Phantump':['Trevenant'],
+  'Pichu':['Pikachu','Raichu'],'Pidgeotto':['Pidgeot'],
+  'Pidgey':['Pidgeotto','Pidgeot'],'Pidove':['Tranquill','Unfezant'],
+  'Pignite':['Emboar'],'Pikachu':['Raichu'],
+  'Pikipek':['Trumbeak','Toucannon'],'Piloswine':['Mamoswine'],
+  'Pineco':['Forretress'],'Piplup':['Prinplup','Empoleon'],
+  'Poliwag':['Poliwhirl','Poliwrath','Politoed'],
+  'Ponyta':['Rapidash'],'Poochyena':['Mightyena'],
+  'Popplio':['Brionne','Primarina'],'Porygon':['Porygon2','Porygon-Z'],
+  'Porygon2':['Porygon-Z'],'Primeape':['Annihilape'],
+  'Psyduck':['Golduck'],'Pumpkaboo':['Gourgeist'],
+  'Purrloin':['Liepard'],'Quaxly':['Quaxwell','Quaquaval'],
+  'Quaxwell':['Quaquaval'],'Qwilfish':['Overqwil'],
+  'Raboot':['Cinderace'],'Ralts':['Kirlia','Gardevoir','Gallade'],
+  'Rattata':['Raticate'],'Remoraid':['Octillery'],
+  'Rhydon':['Rhyperior'],'Rhyhorn':['Rhydon','Rhyperior'],
+  'Riolu':['Lucario'],'Rockruff':['Lycanroc'],
+  'Roggenrola':['Boldore','Gigalith'],'Rolycoly':['Carkol','Coalossal'],
+  'Rookidee':['Corvisquire','Corviknight'],'Roselia':['Roserade'],
+  'Rowlet':['Dartrix','Decidueye'],'Rufflet':['Braviary'],
+  'Salandit':['Salazzle'],'Sandile':['Krokorok','Krookodile'],
+  'Sandshrew':['Sandslash'],'Sandygast':['Palossand'],
+  'Scatterbug':['Spewpa','Vivillon'],'Scorbunny':['Raboot','Cinderace'],
+  'Scraggy':['Scrafty'],'Scyther':['Scizor','Kleavor'],
+  'Seadra':['Kingdra'],'Sealeo':['Walrein'],
+  'Seedot':['Nuzleaf','Shiftry'],'Seel':['Dewgong'],
+  'Sentret':['Furret'],'Servine':['Serperior'],
+  'Sewaddle':['Swadloon','Leavanny'],'Shelgon':['Salamence'],
+  'Shellder':['Cloyster'],'Shellos':['Gastrodon'],
+  'Shelmet':['Accelgor'],'Shieldon':['Bastiodon'],
+  'Shinx':['Luxio','Luxray'],'Shroodle':['Grafaiai'],
+  'Shroomish':['Breloom'],'Shuppet':['Banette'],
+  'Silcoon':['Beautifly'],'Sinistea':['Polteageist'],
+  'Sizzlipede':['Centiskorch'],'Skiddo':['Gogoat'],
+  'Skiploom':['Jumpluff'],'Skitty':['Delcatty'],
+  'Skorupi':['Drapion'],'Skrelp':['Dragalge'],'Skwovet':['Greedent'],
+  'Slakoth':['Vigoroth','Slaking'],'Sliggoo':['Goodra'],
+  'Slowpoke':['Slowbro','Slowking'],'Slugma':['Magcargo'],
+  'Smoliv':['Dolliv','Arboliva'],'Smoochum':['Jynx'],
+  'Sneasel':['Weavile','Sneasler'],'Snivy':['Servine','Serperior'],
+  'Snom':['Frosmoth'],'Snorunt':['Glalie','Froslass'],
+  'Snover':['Abomasnow'],'Snubbull':['Granbull'],
+  'Sobble':['Drizzile','Inteleon'],'Solosis':['Duosion','Reuniclus'],
+  'Spearow':['Fearow'],'Spewpa':['Vivillon'],
+  'Spheal':['Sealeo','Walrein'],'Spinarak':['Ariados'],
+  'Spoink':['Grumpig'],'Sprigatito':['Floragato','Meowscarada'],
+  'Spritzee':['Aromatisse'],'Squirtle':['Wartortle','Blastoise'],
+  'Stantler':['Wyrdeer'],'Staravia':['Staraptor'],
+  'Starly':['Staravia','Staraptor'],'Staryu':['Starmie'],
+  'Steenee':['Tsareena'],'Stufful':['Bewear'],
+  'Stunky':['Skuntank'],'Sunkern':['Sunflora'],
+  'Surskit':['Masquerain'],'Swablu':['Altaria'],
+  'Swadloon':['Leavanny'],'Swinub':['Piloswine','Mamoswine'],
+  'Swirlix':['Slurpuff'],'Tadbulb':['Bellibolt'],
+  'Taillow':['Swellow'],'Tandemaus':['Maushold'],
+  'Tangela':['Tangrowth'],'Tarountula':['Spidops'],
+  'Teddiursa':['Ursaring','Ursaluna'],'Tentacool':['Tentacruel'],
+  'Tepig':['Pignite','Emboar'],'Thwackey':['Rillaboom'],
+  'Timburr':['Gurdurr','Conkeldurr'],'Tinkatink':['Tinkatuff','Tinkaton'],
+  'Tirtouga':['Carracosta'],'Toedscool':['Toedscruel'],
+  'Togepi':['Togetic','Togekiss'],'Togetic':['Togekiss'],
+  'Torchic':['Combusken','Blaziken'],'Torracat':['Incineroar'],
+  'Totodile':['Croconaw','Feraligatr'],'Toxel':['Toxtricity'],
+  'Tranquill':['Unfezant'],'Trapinch':['Vibrava','Flygon'],
+  'Treecko':['Grovyle','Sceptile'],'Trubbish':['Garbodor'],
+  'Trumbeak':['Toucannon'],'Turtwig':['Grotle','Torterra'],
+  'Tympole':['Palpitoad','Seismitoad'],'Tynamo':['Eelektrik','Eelektross'],
+  'Tyrogue':['Hitmonlee','Hitmonchan','Hitmontop'],
+  'Tyrunt':['Tyrantrum'],'Ursaring':['Ursaluna'],
+  'Vanillish':['Vanilluxe'],'Vanillite':['Vanillish','Vanilluxe'],
+  'Varoom':['Revavroom'],'Venipede':['Whirlipede','Scolipede'],
+  'Venonat':['Venomoth'],'Vigoroth':['Slaking'],
+  'Voltorb':['Electrode'],'Vullaby':['Mandibuzz'],'Vulpix':['Ninetales'],
+  'Wailmer':['Wailord'],'Wartortle':['Blastoise'],'Wattrel':['Kilowattrel'],
+  'Weedle':['Kakuna','Beedrill'],'Weepinbell':['Victreebel'],
+  'Whirlipede':['Scolipede'],'Whismur':['Loudred','Exploud'],
+  'Wiglett':['Wugtrio'],'Wimpod':['Golisopod'],'Wingull':['Pelipper'],
+  'Woobat':['Swoobat'],'Wooloo':['Dubwool'],
+  'Wooper':['Quagsire','Clodsire'],'Wurmple':['Silcoon','Cascoon'],
+  'Wynaut':['Wobbuffet'],'Yamask':['Cofagrigus','Runerigus'],
+  'Yamper':['Boltund'],'Yanma':['Yanmega'],'Yungoos':['Gumshoos'],
+  'Zigzagoon':['Linoone','Obstagoon'],'Zorua':['Zoroark'],
+  'Zubat':['Golbat','Crobat'],'Zweilous':['Hydreigon'],
+};
+
+// ═══════════════════════════════════════════════
+// COLLECTION COMPLETION CONFIG
+// Species where you want to collect all forms/patterns
+// target: how many to keep (one per pattern/trim + spares)
+// ═══════════════════════════════════════════════
+const COLLECTION_SETS = {
+  'Vivillon':   { forms: ['Archipelago','Continental','Elegant','Fancy','Garden','High Plains',
+                          'Icy Snow','Jungle','Marine','Meadow','Modern','Monsoon','Ocean',
+                          'Polar','River','Sandstorm','Savanna','Sun','Tundra','Poké Ball'],
+                  target: 20, label: 'Vivillon patterns' },
+  'Scatterbug': { forms: ['Archipelago','Continental','Elegant','Fancy','Garden','High Plains',
+                          'Icy Snow','Jungle','Marine','Meadow','Modern','Monsoon','Ocean',
+                          'Polar','River','Sandstorm','Savanna','Sun','Tundra','Poké Ball'],
+                  target: 20, label: 'Scatterbug patterns' },
+  'Furfrou':    { forms: ['Natural','Heart','Star','Diamond','Debutante','Matron',
+                          'Dandy','La Reine','Kabuki','Pharaoh'],
+                  target: 10, label: 'Furfrou trims' },
+  'Flabébé':    { forms: ['Red','Yellow','Orange','Blue','White'], target: 5, label: 'Flabébé colours' },
+  'Floette':    { forms: ['Red','Yellow','Orange','Blue','White'], target: 5, label: 'Floette colours' },
+  'Florges':    { forms: ['Red','Yellow','Orange','Blue','White'], target: 5, label: 'Florges colours' },
+};

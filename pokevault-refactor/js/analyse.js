@@ -19,7 +19,8 @@ function buildFamilyMap(rows) {
     'Origin','Altered','Therian','Incarnate',
     'Attack','Defense','Speed',
     'Primal','Mega','Unbound',
-    'Normal','Rainy','Sunny','Snowy',
+    // 'Normal' excluded — normalised to '' so Growlithe/Arcanine etc. group correctly
+    'Rainy','Sunny','Snowy',
     'Baile',"Pa'u",'Pom-Pom','Sensu',
     'Small','Average','Large','Super',
     'Combat','Blaze','Aqua',
@@ -33,14 +34,23 @@ function buildFamilyMap(rows) {
   ]);
   // Species that are always standalone families regardless of Pokégenie evo data
   const STANDALONE_SPECIES = new Set(['Kleavor', 'Weezing|Galar']);
-  const nameFormToKey = {}; // "Name|Form" -> familyKey (pokeNum|form or pokeNum)
+  // Species where gender determines appearance — split into separate families
+  const GENDER_SPLIT_SPECIES = new Set([
+    'Frillish', 'Jellicent',  // blue=male, pink=female
+    'Pyroar',                  // male/female look very different
+  ]);
+  const nameFormToKey = {}; // "Name|Form|Gender" -> familyKey
   const nameToNum = {};
   rows.forEach(r => {
-    const form = r['Form']||'';
+    const rawForm = r['Form']||'';
+    const form = rawForm === 'Normal' ? '' : rawForm;
+    const gender = r['Gender']||'';
     const isRegional = REGIONAL_FORMS.has(form);
     const needsSplit = FORM_SPLIT_FORMS.has(form);
-    const famKey = (isRegional || needsSplit) ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
-    const nameKey = r['Name']+'|'+form;
+    const needsGenderSplit = GENDER_SPLIT_SPECIES.has(r['Name']);
+    let famKey = (isRegional || needsSplit) ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
+    if (needsGenderSplit && gender) famKey = famKey + '|' + gender;
+    const nameKey = r['Name']+'|'+form+'|'+(needsGenderSplit ? gender : '');
     if (!nameFormToKey[nameKey]) nameFormToKey[nameKey] = famKey;
     if (!nameToNum[r['Name']]) nameToNum[r['Name']] = r['Pokemon Number'];
   });
@@ -99,15 +109,17 @@ function buildFamilyMap(rows) {
   // Step 7: Build result map for each row: index -> familyKey
   // Returns a function to get family key for a given row
   const famKeyCache = {};
-  const getFamKey = (name, form) => {
-    const isRegional = REGIONAL_FORMS.has(form||'');
-    const needsSplit = FORM_SPLIT_FORMS.has(form||'');
+  const getFamKey = (name, form, gender='') => {
+    const normForm = (form||'') === 'Normal' ? '' : (form||'');
+    const isRegional = REGIONAL_FORMS.has(normForm);
+    const needsSplit = FORM_SPLIT_FORMS.has(normForm);
+    const needsGenderSplit = GENDER_SPLIT_SPECIES.has(name);
     const num = nameToNum[name];
     if (!num) return name;
-    // Standalone species always get their own family key regardless of evo data
-    const speciesKey = name + (form ? '|'+form : '');
+    const speciesKey = name + (normForm ? '|'+normForm : '');
     if (STANDALONE_SPECIES.has(name) || STANDALONE_SPECIES.has(speciesKey)) return speciesKey;
-    const key = (isRegional || needsSplit) ? num+'|'+(form||'') : num;
+    let key = (isRegional || needsSplit) ? num+'|'+normForm : num;
+    if (needsGenderSplit && gender) key = key + '|' + gender;
     if (!famKeyCache[key]) famKeyCache[key] = getRoot(key);
     return famKeyCache[key];
   };
@@ -300,9 +312,8 @@ function parseCatchDate(s) {
 // Format: familyKey|form|gender|atkIV|defIV|staIV|catchDate
 // ═══════════════════════════════════════════════
 function makeStableKey(p) {
-  // Key: PokemonNumber|Form|Gender|AtkIV|DefIV|StaIV|CatchDate|CP
-  // PokemonNumber stable through evolution; CP tiebreaker for same-day catches
-  // No catch date falls back to _idx (won't survive re-export)
+  // Key: PokemonNumber|Form|Gender|AtkIV|DefIV|StaIV|CatchDate
+  // CP excluded: it changes when the pokemon is powered up, which would lose overrides
   const date = p.catchDate || ('_idx' + (p.idx||''));
   return [
     p.pokeNum || '',
@@ -311,8 +322,7 @@ function makeStableKey(p) {
     p.atkIV !== undefined ? p.atkIV : '',
     p.defIV !== undefined ? p.defIV : '',
     p.staIV !== undefined ? p.staIV : '',
-    date,
-    p.cp || ''
+    date
   ].join('|');
 }
 
@@ -404,22 +414,17 @@ function analyse(rows) {
     const dustMin=dusts.length?Math.min(...dusts):0;
     const mv=evalMoves(r['Name'],r['Quick Move'],r['Charge Move'],r['Charge Move 2'],(Number(r['Shadow/Purified'])||0)===1,(Number(r['Shadow/Purified'])||0)===2);
 
-    // Validate evo names — only trust them if same Pokémon Number family
     const baseNum=r['Pokemon Number'];
-    const form = r['Form']||'';
-    const myFamKey = getFamKey(r['Name'], form);
     const validateEvo = name => {
       if (!name||name===r['Name']) return '';
-      // Trust evo name if it's in same family
-      const evoRow = rows.find(x=>x['Name']===name);
-      if (!evoRow) return name;
-      const evoFamKey = getFamKey(name, form); // use same form for regional
-      return evoFamKey===myFamKey ? name : '';
+      const validEvos = VALID_EVOLUTIONS[r['Name']];
+      if (!validEvos) return '';
+      return validEvos.includes(name) ? name : '';
     };
 
     return {
       idx:r['Index'], name:r['Name'], form:r['Form']||'',
-      pokeNum:baseNum, familyKey:getFamKey(r['Name'], r['Form']||''),
+      pokeNum:baseNum, familyKey:getFamKey(r['Name'], r['Form']||'', r['Gender']||''),
       gender:r['Gender']||'',
       cp:Number(r['CP'])||0, hp:Number(r['HP'])||0,
       atkIV,defIV,staIV, ivAvg:iv,
@@ -442,7 +447,7 @@ function analyse(rows) {
       suggestStarExpensive:false, suggestStarCheaper:false,
       isExpensiveWinner:false, isAffordableWinner:false, isCheaperAlternative:false,
       targetEvo:'', hidden:false, evoIndicator:'', canEvolve:false, neverEvolved:false, isHundo:false, dustToL40:0, belowCapNote:'',
-      isDynamax:false, isGigantamax:false, isCostumed:false, vivillonPattern:'', manualDecision:'', notes:'', stableKey:'',
+      isDynamax:false, isGigantamax:false, isCostumed:false, vivillonPattern:'', specialForm:'', manualDecision:'', notes:'', stableKey:'',
       overBudget100:false, cheaperAvailable:false,
       purifyHundo:false, purifyLeague:'', purifyRankPct:0,
     };
@@ -575,13 +580,15 @@ function analyse(rows) {
           return 3;
         };
 
-        eligible.sort((a,b) => {
-          // Sort by rounded rank% first (99.5+ rounds to 100, 98.5+ rounds to 99 etc)
-          // Within same rounded value, cheaper effective dust wins
+        eligible.sort((a, b) => {
           const ra = a[rankField]||0, rb = b[rankField]||0;
           const roundedA = Math.round(ra), roundedB = Math.round(rb);
-          if (roundedA !== roundedB) return roundedB - roundedA;  // higher rounded rank first
-          return effectiveDust(a) - effectiveDust(b);  // cheaper dust within same rounded rank
+          if (roundedA !== roundedB) return roundedB - roundedA;
+          // Prefer already-evolved (p.name === stageName) over pre-evos at same rounded rank
+          const aIsEvolved = (a.name === stageName) ? 0 : 1;
+          const bIsEvolved = (b.name === stageName) ? 0 : 1;
+          if (aIsEvolved !== bIsEvolved) return aIsEvolved - bIsEvolved;
+          return effectiveDust(a) - effectiveDust(b);
         });
 
         const best = eligible[0];
@@ -590,7 +597,7 @@ function analyse(rows) {
         // Before assigning: check if best rounds to 100% in a lower league
         // with a different evo target — if so, protect it for that lower league
         // and try the next candidate for this league
-        const lowerLeagues = ['G','U'].includes(lg) ? ['G','L'] :
+        const lowerLeagues = lg==='G' ? ['L'] :
                              lg==='U' ? ['G','L'] :
                              lg==='M' ? ['U','G','L'] : [];
         const shouldProtect = lowerLeagues.some(ll => {
@@ -628,10 +635,10 @@ function analyse(rows) {
         const isConfirmed = bestRank2 >= RULES.keepThreshold;
         if (bestRank2 >= 70 || isLegendary) { // Only skip truly weak candidates
           if (!best2.slots.includes(lg)) best2.slots.push(lg);
-          best.targetEvo = stageName !== best.name ? stageName : '';
+          best2.targetEvo = stageName !== best2.name ? stageName : '';
           best2.slotConfirmed = isConfirmed; // true = circled letter, false = review name
           if (!isConfirmed) best.slots.push(lg+'_tentative');
-          const eDustCheck = effectiveDust(best2);
+          const eDustCheck = effectiveDust(best);
           // Use league-specific evo key so a stage final for Little isn't blocked by a Great evo
           const leagueEvoKey = lg==='L'?'evolvedNameL':lg==='G'?'evolvedNameG':'evolvedNameU';
           const isFinalEvoStage = !members.some(m =>
@@ -641,7 +648,7 @@ function analyse(rows) {
 
           // Claim only affordable final-evo winners (prevents them blocking lower leagues)
           if (isConfirmed && eDustCheck <= lgAffordable && (isFinalEvoStage || lg==='M')) {
-            claimed.add(best2.idx);
+            claimed.add(best.idx);
           }
 
           // Dual recommendation: expensive winner + affordable backup
@@ -673,8 +680,8 @@ function analyse(rows) {
               effectiveDust(p) > eDustCheck
             );
             if (hasStarredAtSameRank) {
-              best2.isCheaperAlternative = true;
-              best2.cheaperForLeague = lg;
+              if (!best2.cheaperAlternativeLeagues) best2.cheaperAlternativeLeagues = [];
+              best2.cheaperAlternativeLeagues.push(lg);
             }
           }
 
@@ -726,6 +733,15 @@ function analyse(rows) {
       const hasProtectedSlot=isLegendary&&p.slots.length>0;
       const qualifiesAny=RULES.leagues.some(l=>(p[`rankPct${l}`]||0)>=RULES.keepThreshold);
 
+      // Collection species: slot top N by IV%
+      if (COLLECTION_SETS && COLLECTION_SETS[p.name]) {
+        const cset = COLLECTION_SETS[p.name];
+        const sorted = [...members].sort((a,b) => (b.ivAvg||0)-(a.ivAvg||0));
+        if (sorted.indexOf(p) < cset.target && !p.slots.includes('collection')) {
+          p.slots.push('collection');
+        }
+      }
+
       if (p.slots.includes('nundo')) {
         p.decision='keep'; p.reason='Nundo — 0/0/0';
         p.nickname=buildNickname(p,'nundo');
@@ -771,6 +787,13 @@ function analyse(rows) {
       } else if (qualifiesAny) {
         p.decision='review'; p.reason='≥90% but not best in family — review';
         p.nickname=buildNickname(p,'review');
+      } else if (p.slots.includes('collection')) {
+        p.decision='keep';
+        const cset = COLLECTION_SETS && COLLECTION_SETS[p.name];
+        p.reason = cset ? `Collection — keeping ${cset.target} for full set` : 'Collection species';
+        const pv = Math.round(p.rankPctM||p.ivAvg||0);
+        p.nickname = fitName(p.name, LC.R+(pv>=100?PERFECT:String(pv)), '', 12);
+        if (!p.slots.includes('collection_keep')) p.slots.push('collection_keep');
       } else if (p.isLucky) {
         // Lucky can never be traded — always keep as Master/Raid candidate
         p.decision='keep';
@@ -787,6 +810,10 @@ function analyse(rows) {
       } else {
         p.decision='trade';
         p.reason=`IV ${Math.round(p.ivAvg)}% — not best in any slot`;
+        if (COLLECTION_SETS && COLLECTION_SETS[p.name] && !p.specialForm && !p.vivillonPattern) {
+          p.decision='review';
+          p.reason='Collection species — set pattern in override panel';
+        }
         p.nickname=buildNickname(p,'trade');
       }
 
@@ -798,6 +825,7 @@ function analyse(rows) {
       if (ov && ov.is_gigantamax) p.isGigantamax = true;
       if (ov && ov.is_costumed) p.isCostumed = true;
       if (ov && ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
+      if (ov && ov.special_form) p.specialForm = ov.special_form;
       if (ov && ov.notes) p.notes = ov.notes;
 
       // Suggest star: only confirmed best, lucky, best shiny, protected, nundo
@@ -825,7 +853,10 @@ function analyse(rows) {
           (p.isCostumed)
         )
       );
-      p.suggestStarCheaper = (p.isCheaperAlternative === true) && !p.suggestStar && !p.suggestStarExpensive;
+      const cyanLeagues = p.cheaperAlternativeLeagues || [];
+      const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
+      p.isCheaperAlternative = cyanLeagues.some(cl => leagueSlots.includes(cl));
+      p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStar && !p.suggestStarExpensive;
     });
     // Fix dustCostBest to use the dust for the assigned league slot
     members.forEach(p=>{
@@ -963,7 +994,18 @@ function analyse(rows) {
       // If more than one winner for same stage, remove the weaker ones
       Object.values(byEvo).forEach(group => {
         if (group.length <= 1) return;
-        group.sort((a,b) => (b[rf]||0)-(a[rf]||0));
+        group.sort((a, b) => {
+          const ra = Math.round(a[rf]||0), rb = Math.round(b[rf]||0);
+          if (ra !== rb) return rb - ra;
+          const aEvo = lg==='L'?(a.evolvedNameL||a.name):lg==='G'?(a.evolvedNameG||a.name):(a.evolvedNameU||a.name);
+          const bEvo = lg==='L'?(b.evolvedNameL||b.name):lg==='G'?(b.evolvedNameG||b.name):(b.evolvedNameU||b.name);
+          const aEvolved = a.name === aEvo ? 0 : 1;
+          const bEvolved = b.name === bEvo ? 0 : 1;
+          if (aEvolved !== bEvolved) return aEvolved - bEvolved;
+          const da = a.isLucky ? (a['dust'+lg]||0)/2 : (a['dust'+lg]||0);
+          const db = b.isLucky ? (b['dust'+lg]||0)/2 : (b['dust'+lg]||0);
+          return da - db;
+        });
         group.slice(1).forEach(p => {
           p.slots = p.slots.filter(s => s !== lg);
           p.slotConfirmed = p.slots.some(s => RULES.leagues.includes(s));
@@ -971,6 +1013,18 @@ function analyse(rows) {
       });
     });
     // ─────────────────────────────────────────────────────────────────────────
+
+    // Recompute cyan/expensive star flags — conflict resolution above may have
+    // removed slots from p.slots, leaving cheaperAlternativeLeagues stale.
+    members.forEach(p => {
+      const cyanLeagues = (p.cheaperAlternativeLeagues || []).filter(cl =>
+        p.slots.includes(cl)
+      );
+      p.cheaperAlternativeLeagues = cyanLeagues;
+      const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
+      p.isCheaperAlternative = cyanLeagues.some(cl => leagueSlots.includes(cl));
+      p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStar && !p.suggestStarExpensive;
+    });
 
     const allN=new Set(parsed.map(p=>p.name));
     members.forEach(p=>{

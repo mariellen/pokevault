@@ -1,6 +1,9 @@
 # Personal collection data — never commit
 *.csv
 
+# Node.js dependencies
+node_modules/
+
 # Screenshots and local working images
 *.png
 

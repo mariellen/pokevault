@@ -57,7 +57,8 @@ function slotBadges(p){
     U_affordable:['sl-U','Ultra (affordable)'],M_affordable:['sl-M','Master (affordable)'],
     shiny:['sl-shiny','Best Shiny'],shiny_lower:['sl-shiny','Shiny'],
     shadow:['sl-shadow','Best Shadow'],purified:['sl-purified','Best Purified'],
-    lucky:['sl-lucky','Lucky'],nundo:['sl-nundo','Nundo']};
+    lucky:['sl-lucky','Lucky'],nundo:['sl-nundo','Nundo'],
+    collection_keep:['sl-lucky','Collection']};
   let html = slots.map(s=>`<span class="slot ${(m[s]||['sl-G',s])[0]}">${(m[s]||['',s])[1]}</span>`).join('');
   if (p.overBudget100) html += '<span class="slot" style="background:rgba(248,81,73,.15);color:var(--red)">$$$⚠</span>';
   return html;
@@ -143,12 +144,14 @@ function buildRow(p){
   })();
 
   const genderStr=p.gender==='♂'?' <span style="color:#6fa8dc;font-size:10px">♂</span>':p.gender==='♀'?' <span style="color:#ea9999;font-size:10px">♀</span>':'';
+  const rowSearchEsc=(p.name.toLowerCase()+'&cp'+(p.cp||0)).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const evoSearchTag=p._evoSearchTag||'';
 
   return `<tr class="row-${p.decision}${p.isHundo?' row-hundo':''}" data-idx="${p.idx}">
     <td style="min-width:44px;white-space:nowrap">${starCell(p)}<button class="edit-btn" onclick="toggleOverride('${p.stableKey}')" title="Overrides">✎</button></td>
     <td class="poke-name-cell">
       <div class="poke-variants">${variantTags(p)}</div>
-      <div class="poke-name">${p.name}${p.form?` <span class="poke-form">(${p.form})</span>`:''}${genderStr}</div>
+      <div class="poke-name">${p.name}${p.form?` <span class="poke-form">(${p.form})</span>`:''}${genderStr}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button></div>
       ${evoIndicators}
     </td>
     <td style="font-size:11px;color:var(--muted)">${p.cp||'--'}</td>
@@ -156,6 +159,7 @@ function buildRow(p){
         data-nick="${(p.nickname||'').replace(/"/g,'&quot;')}"
         onclick="copyNick(this,this.dataset.nick)" title="Click to copy nickname">
       ${p.nickname}${altNicks}
+      ${evoSearchTag?`<div style="margin-top:2px">${evoSearchTag}</div>`:''}
     </td>
     <td>
       <div class="iv-bar"><div class="iv-fill" style="width:${Math.max(2,iv*0.45)}px;background:${ivc}"></div><span class="iv-num" style="color:${ivc}">${iv}%</span></div>
