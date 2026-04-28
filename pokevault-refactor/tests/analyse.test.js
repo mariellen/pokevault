@@ -280,3 +280,84 @@ describe('Purify logic', () => {
     });
   });
 });
+
+// ─── 1g. STANDALONE_SPECIES evo vote filtering ───────────────────────────────
+
+describe('Family grouping — STANDALONE_SPECIES evo vote filtering', () => {
+  it('Scyther and Scizor are in the same family (Kleavor votes ignored)', () => {
+    const scytherFam = result.families.find(f =>
+      f.members.some(p => p.name === 'Scyther')
+    );
+    const scizorFam = result.families.find(f =>
+      f.members.some(p => p.name === 'Scizor')
+    );
+    expect(scytherFam).toBeDefined();
+    expect(scizorFam).toBeDefined();
+    expect(scytherFam.key).toBe(scizorFam.key);
+  });
+
+  it('Kleavor is in its own standalone family (not merged with Scyther/Scizor)', () => {
+    const kleavorFam = result.families.find(f =>
+      f.members.some(p => p.name === 'Kleavor')
+    );
+    const scytherFam = result.families.find(f =>
+      f.members.some(p => p.name === 'Scyther')
+    );
+    if (!kleavorFam || !scytherFam) return;
+    expect(kleavorFam.key).not.toBe(scytherFam.key);
+  });
+});
+
+// ─── 1h. Cyan star — Slowpoke regression (_136 CSV) ─────────────────────────
+
+const CSV_PATH_136 = path.join(
+  'C:', 'ClaudeCode', 'from Claude', '20260428-0754', 'poke_genie_export 136.csv'
+);
+
+describe('Cyan star regression — _136 CSV', () => {
+  // The PENDING_CHANGES description of Slowpoke CP:215 vs CP:207 had incorrect fav values
+  // and the two pokemon turned out to be in different families (Galarian vs regular Slowpoke).
+  // The actual verified cyan case in Little league is CP:441 (winner) vs CP:211 (starred, same rank).
+  let result136;
+
+  beforeAll(() => {
+    const csv136 = loadCSV(CSV_PATH_136);
+    result136 = analyse(csv136);
+  });
+
+  it('At least one Slowpoke wins a Little league slot with cyan (isCheaperAlternative)', () => {
+    // CP:441 (rankPctL=96.7%, fav=false, dust=7600) is cheaper winner vs CP:211 (96.56%, fav=true, dust=22600)
+    // Both round to 97 — cheaper unfavorited winner should show cyan
+    const cyanL = result136.pokemon.find(p =>
+      p.name === 'Slowpoke' &&
+      p.slots.includes('L') &&
+      p.isCheaperAlternative
+    );
+    expect(cyanL).toBeDefined();
+    expect(cyanL.isFavorite).toBe(false);
+    expect(cyanL.cheaperAlternativeLeagues).toContain('L');
+  });
+
+  it('Cyan winner has a favorited Slowpoke at the same rounded rank in the same species', () => {
+    const cyanL = result136.pokemon.find(p =>
+      p.name === 'Slowpoke' && p.slots.includes('L') && p.isCheaperAlternative
+    );
+    if (!cyanL) return;
+    const starredAtSameRank = result136.pokemon.find(p =>
+      p.name === 'Slowpoke' &&
+      p.isFavorite &&
+      Math.round(p.rankPctL || 0) === Math.round(cyanL.rankPctL || 0) &&
+      p.cp !== cyanL.cp
+    );
+    expect(starredAtSameRank).toBeDefined();
+  });
+
+  it('Cyan check: cheaperAlternativeLeagues only contains leagues where slot is held (_136)', () => {
+    result136.pokemon.forEach(p => {
+      if (!p.cheaperAlternativeLeagues || !p.cheaperAlternativeLeagues.length) return;
+      p.cheaperAlternativeLeagues.forEach(cl => {
+        expect(p.slots).toContain(cl);
+      });
+    });
+  });
+});

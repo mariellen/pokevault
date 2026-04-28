@@ -71,6 +71,7 @@ function buildFamilyMap(rows) {
       if (!evoName || evoName === r['Name']) return;
       const evoNum = nameToNum[evoName];
       if (!evoNum) return;
+      if (STANDALONE_SPECIES.has(evoName)) return; // e.g. Kleavor — standalone, not part of Scyther family
       // Evo inherits same regional form
       const evoFamKey = isRegional ? evoNum+'|'+form : evoNum;
       if (evoFamKey === baseFamKey) return;
