@@ -670,16 +670,17 @@ function analyse(rows) {
             best2.affordableForLeague = lg;
           }
 
-          // Cyan star: unstarred winner when a starred pokemon at same rounded rank already exists
-          // Check full group (not just eligible) — starred one may have been claimed/excluded
-          // No dust comparison: dustL=0 on a maxed starred pokemon looks "free" but is already done.
-          // Rule: same rounded rank = equivalent from user's perspective → check before acting.
+          // Cyan star: winner is cheaper than an existing starred pokemon at the same rounded rank.
+          // Check full group (not just eligible) — starred one may have been claimed/excluded.
+          // Dust comparison: only fire when the starred alt costs MORE than the winner.
+          // Equal/zero dust means both picks are equivalent cost — no need to warn before acting.
           const bestRounded2 = Math.round(bestRank2);
           if (isConfirmed) {
             const hasStarredAtSameRank = group.some(p =>
               p !== best2 &&
               p.isFavorite &&
-              Math.round(p[rankField]||0) === bestRounded2
+              Math.round(p[rankField]||0) === bestRounded2 &&
+              effectiveDust(p) > eDustCheck
             );
             if (hasStarredAtSameRank) {
               if (!best2.cheaperAlternativeLeagues) best2.cheaperAlternativeLeagues = [];
@@ -858,7 +859,7 @@ function analyse(rows) {
       const cyanLeagues = p.cheaperAlternativeLeagues || [];
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
       p.isCheaperAlternative = cyanLeagues.some(cl => leagueSlots.includes(cl));
-      p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStar && !p.suggestStarExpensive;
+      p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStarExpensive;
     });
     // Fix dustCostBest to use the dust for the assigned league slot
     members.forEach(p=>{
@@ -1025,7 +1026,7 @@ function analyse(rows) {
       p.cheaperAlternativeLeagues = cyanLeagues;
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
       p.isCheaperAlternative = cyanLeagues.some(cl => leagueSlots.includes(cl));
-      p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStar && !p.suggestStarExpensive;
+      p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStarExpensive;
     });
 
     const allN=new Set(parsed.map(p=>p.name));
