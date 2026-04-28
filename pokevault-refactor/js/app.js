@@ -621,6 +621,95 @@ function closePurifyModal(){
   document.getElementById('purify-modal').style.display='none';
 }
 
+// ── Cull modal ──────────────────────────────────
+function openCullModal(){
+  if(!allPokemon.length){alert('Load your collection first');return;}
+  const modal=document.getElementById('cull-modal');
+  const body=document.getElementById('cull-modal-body');
+  const sub=document.getElementById('cull-modal-sub');
+
+  // Qualify: has ≥1 gold star, and no unresolved green/blue/cyan stars
+  const qualifying=families.filter(fam=>{
+    const m=fam.members;
+    return m.some(p=>p.isFavorite&&p.suggestStar)
+      &&!m.some(p=>!p.isFavorite&&p.suggestStar)
+      &&!m.some(p=>p.suggestStarExpensive)
+      &&!m.some(p=>p.suggestStarCheaper);
+  });
+
+  const countNonGold=fam=>fam.members.filter(p=>!(p.isFavorite&&p.suggestStar)).length;
+  qualifying.sort((a,b)=>countNonGold(b)-countNonGold(a));
+
+  const totalCull=qualifying.reduce((s,f)=>s+countNonGold(f),0);
+  sub.textContent=qualifying.length+' famil'+(qualifying.length===1?'y':'ies')+' settled · '+totalCull+' potential deletes/trades';
+
+  if(!qualifying.length){
+    body.innerHTML='<div class="pv-modal-empty">No fully-settled families yet — some families still have green, blue, or cyan stars to resolve</div>';
+    modal.style.display='flex';
+    return;
+  }
+
+  const SLOT_COLOR={L:'var(--little)',G:'var(--great)',U:'var(--ultra)',M:'var(--master)'};
+  const SLOT_NAME={L:'Little',G:'Great',U:'Ultra',M:'Master'};
+  const FAM_STANDALONE=new Set(['Kleavor']);
+
+  const rows=qualifying.map(fam=>{
+    const keepers=fam.members.filter(p=>p.isFavorite&&p.suggestStar);
+    const redCount=fam.members.filter(p=>p.isFavorite&&!p.suggestStar).length;
+    const unstarredCount=fam.members.filter(p=>!p.isFavorite).length;
+
+    const keeperChips=keepers.map(p=>{
+      const slot=['L','G','U','M'].find(s=>p.slots.includes(s));
+      return `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:11px">
+        <span style="color:var(--gold)">★</span>
+        <span style="font-weight:600">${p.name}</span>
+        <span style="color:var(--muted)">CP:${p.cp}</span>
+        ${slot?`<span style="color:${SLOT_COLOR[slot]};font-size:10px">${SLOT_NAME[slot]}</span>`:''}
+        ${p.nickname?`<span style="font-family:monospace;color:var(--green);font-size:10px">${p.nickname}</span>`:''}
+      </span>`;
+    }).join('');
+
+    const cullParts=[
+      redCount?`<span style="color:var(--red)">${redCount} red ★</span>`:'',
+      unstarredCount?`<span style="color:var(--muted)">${unstarredCount} unstarred</span>`:'',
+    ].filter(Boolean).join(' · ');
+
+    // Build +Fam search string (same logic as renderFamilyFiltered)
+    const ownedNames=fam.members.map(p=>p.name);
+    const evoTargetNames=fam.members.flatMap(p=>[p.evolvedNameG,p.evolvedNameU,p.evolvedNameL].filter(Boolean)).filter(n=>!FAM_STANDALONE.has(n));
+    const dbFamily=typeof getFullFamily==='function'?getFullFamily(fam.primaryName):null;
+    const allNames=dbFamily?[...new Set([...ownedNames,...dbFamily])]:[...new Set([...ownedNames,...evoTargetNames])];
+    const REGIONAL_TAGS=['Alola','Galar','Hisui','Paldea'];
+    const famRegionalForm=fam.members[0]?.form||'';
+    const isRegional=REGIONAL_TAGS.includes(famRegionalForm);
+    let searchStr;
+    if(isRegional){
+      searchStr=allNames.join(',')+'&'+famRegionalForm.toLowerCase();
+    }else{
+      const excl=REGIONAL_TAGS.filter(tag=>allPokemon.some(p=>allNames.includes(p.name)&&p.form===tag));
+      searchStr=allNames.join(',')+(excl.length?'&!'+excl.map(e=>e.toLowerCase()).join('&!'):'');
+    }
+    const searchEsc=searchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+
+    return `<div style="padding:10px 16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="font-weight:700;font-size:13px">${fam.primaryName}</span>
+        <span style="color:var(--muted);font-size:11px">${fam.members.length} total</span>
+        ${cullParts?`<span style="font-size:11px">${cullParts}</span>`:''}
+        <button class="copy-search-btn" data-copy="${searchEsc}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 Fam</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${keeperChips}</div>
+    </div>`;
+  }).join('');
+
+  body.innerHTML=rows;
+  modal.style.display='flex';
+}
+
+function closeCullModal(){
+  document.getElementById('cull-modal').style.display='none';
+}
+
 // ── Cleanup / Special modals ──────────────────
 let cleanupSortMode='stable';
 let specialSortMode='date';
