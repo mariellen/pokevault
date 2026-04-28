@@ -168,7 +168,11 @@ function renderFamily(fam,isOpen){
   const famForms=[...new Set(members.map(p=>p.form).filter(x=>x&&x!=='Normal'))];
   const famFormStr=famForms.length===1?`<span style="color:var(--cyan);font-size:11px">${famForms[0]}</span>`:'';
   const goSearchStr=buildGoSearchStr(primaryName,members);
-  const famAllNames=[...new Set(members.map(p=>p.name))];
+  const FAM_STANDALONE=new Set(['Kleavor']);
+  const ownedNames=members.map(p=>p.name);
+  const evoTargetNames=members.flatMap(p=>[p.evolvedNameG,p.evolvedNameU,p.evolvedNameL].filter(Boolean)).filter(n=>!FAM_STANDALONE.has(n));
+  const dbFamily=typeof getFullFamily==='function'?getFullFamily(primaryName):null;
+  const famAllNames=dbFamily?[...new Set([...ownedNames,...dbFamily])]:[...new Set([...ownedNames,...evoTargetNames])];
   const REGIONAL_TAGS=['Alola','Galar','Hisui','Paldea'];
   const famRegionalForm=members[0]?.form||'';
   const isRegionalFamily=REGIONAL_TAGS.includes(famRegionalForm);
@@ -388,7 +392,11 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const famForms=[...new Set(members.map(p=>p.form).filter(x=>x&&x!=='Normal'))];
   const famFormStr=famForms.length===1?`<span style="color:var(--cyan);font-size:11px">${famForms[0]}</span>`:'';
   const goSearchStr=buildGoSearchStr(primaryName,members);
-  const famAllNames=[...new Set(members.map(p=>p.name))];
+  const FAM_STANDALONE=new Set(['Kleavor']);
+  const ownedNames=members.map(p=>p.name);
+  const evoTargetNames=members.flatMap(p=>[p.evolvedNameG,p.evolvedNameU,p.evolvedNameL].filter(Boolean)).filter(n=>!FAM_STANDALONE.has(n));
+  const dbFamily=typeof getFullFamily==='function'?getFullFamily(primaryName):null;
+  const famAllNames=dbFamily?[...new Set([...ownedNames,...dbFamily])]:[...new Set([...ownedNames,...evoTargetNames])];
   const REGIONAL_TAGS=['Alola','Galar','Hisui','Paldea'];
   const famRegionalForm=members[0]?.form||'';
   const isRegionalFamily=REGIONAL_TAGS.includes(famRegionalForm);
@@ -1040,8 +1048,8 @@ function handleFile(file){
   reader.readAsText(file);
 }
 
-// Load overrides + check for cloud data on page load
-window.addEventListener('load', () => { loadOverrides(); });
+// Load overrides + evolution chains on page load
+window.addEventListener('load', () => { loadOverrides(); loadEvolutionChains(); });
 
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 const dz=document.getElementById('dropZone');

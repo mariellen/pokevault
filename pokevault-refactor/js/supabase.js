@@ -220,6 +220,44 @@ async function deleteOverride(pokemonIdx) {
   await supabaseFetch('DELETE', 'pokemon_overrides?pokemon_index=eq.' + encodeURIComponent(pokemonIdx));
 }
 
+// ═══════════════════════════════════════════════
+// EVOLUTION CHAINS
+// ═══════════════════════════════════════════════
+
+let evolutionChainsBySpecies = {}; // species_name → row
+let evolutionChainsByChainId = {}; // chain_id → [rows]
+let evolutionChainsLoaded = false;
+
+async function loadEvolutionChains() {
+  // Fetch all rows (table has ~1500 rows — one request is fine)
+  const data = await supabaseFetch('GET', 'evolution_chains?select=*&limit=2000&order=chain_id,stage');
+  if (!data || !data.length) return;
+  evolutionChainsBySpecies = {};
+  evolutionChainsByChainId = {};
+  for (const row of data) {
+    evolutionChainsBySpecies[row.species_name] = row;
+    if (!evolutionChainsByChainId[row.chain_id]) evolutionChainsByChainId[row.chain_id] = [];
+    evolutionChainsByChainId[row.chain_id].push(row);
+  }
+  evolutionChainsLoaded = true;
+  // Re-render families so +Fam buttons show full chains (e.g. Tyrunt → Tyrantrum)
+  if (typeof allPokemon !== 'undefined' && allPokemon.length && typeof applyFilters === 'function') {
+    applyFilters();
+  }
+}
+
+// Returns all species names in the same evolution chain as speciesName.
+// Standalone species (e.g. Kleavor) return only themselves.
+// Returns null if chain data not yet loaded or species not found.
+function getFullFamily(speciesName) {
+  if (!evolutionChainsLoaded) return null;
+  const row = evolutionChainsBySpecies[speciesName];
+  if (!row) return null;
+  if (row.is_standalone) return [speciesName];
+  const chain = evolutionChainsByChainId[row.chain_id] || [];
+  return chain.filter(r => !r.is_standalone).map(r => r.species_name);
+}
+
 function updateSyncStatus(msg, type) {
   const el = document.getElementById('sync-status');
   if (!el) return;
