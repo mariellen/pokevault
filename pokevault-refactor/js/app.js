@@ -649,30 +649,12 @@ function openCullModal(){
     return;
   }
 
-  const SLOT_COLOR={L:'var(--little)',G:'var(--great)',U:'var(--ultra)',M:'var(--master)'};
-  const SLOT_NAME={L:'Little',G:'Great',U:'Ultra',M:'Master'};
   const FAM_STANDALONE=new Set(['Kleavor']);
 
   const rows=qualifying.map(fam=>{
-    const keepers=fam.members.filter(p=>p.isFavorite&&p.suggestStar);
     const redCount=fam.members.filter(p=>p.isFavorite&&!p.suggestStar).length;
+    const luckyCount=fam.members.filter(p=>p.isLucky).length;
     const unstarredCount=fam.members.filter(p=>!p.isFavorite).length;
-
-    const keeperChips=keepers.map(p=>{
-      const slot=['L','G','U','M'].find(s=>p.slots.includes(s));
-      return `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:11px">
-        <span style="color:var(--gold)">★</span>
-        <span style="font-weight:600">${p.name}</span>
-        <span style="color:var(--muted)">CP:${p.cp}</span>
-        ${slot?`<span style="color:${SLOT_COLOR[slot]};font-size:10px">${SLOT_NAME[slot]}</span>`:''}
-        ${p.nickname?`<span style="font-family:monospace;color:var(--green);font-size:10px">${p.nickname}</span>`:''}
-      </span>`;
-    }).join('');
-
-    const cullParts=[
-      redCount?`<span style="color:var(--red)">${redCount} red ★</span>`:'',
-      unstarredCount?`<span style="color:var(--muted)">${unstarredCount} unstarred</span>`:'',
-    ].filter(Boolean).join(' · ');
 
     // Build +Fam search string (same logic as renderFamilyFiltered)
     const ownedNames=fam.members.map(p=>p.name);
@@ -690,20 +672,24 @@ function openCullModal(){
       searchStr=allNames.join(',')+(excl.length?'&!'+excl.map(e=>e.toLowerCase()).join('&!'):'');
     }
     const searchEsc=searchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    const nameEsc=fam.primaryName.replace(/"/g,'&quot;');
 
-    return `<div style="padding:10px 16px;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
-        <span style="font-weight:700;font-size:13px">${fam.primaryName}</span>
-        <span style="color:var(--muted);font-size:11px">${fam.members.length} total</span>
-        ${cullParts?`<span style="font-size:11px">${cullParts}</span>`:''}
-        <button class="copy-search-btn" data-copy="${searchEsc}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 Fam</button>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px">${keeperChips}</div>
+    return `<div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span data-name="${nameEsc}" onclick="navigateToFamily(this.dataset.name)" style="font-weight:700;font-size:13px;cursor:pointer;color:var(--cyan)" title="View family in main list">${fam.primaryName}</span>
+      <span style="color:var(--muted);font-size:11px">${fam.members.length}</span>
+      <span style="font-size:11px">: <span style="color:var(--red)">${redCount}★</span> &nbsp;${luckyCount}🍀&nbsp; <span style="color:var(--muted)">${unstarredCount}🗑</span></span>
+      <button class="copy-search-btn" data-copy="${searchEsc}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 Fam</button>
     </div>`;
   }).join('');
 
   body.innerHTML=rows;
   modal.style.display='flex';
+}
+
+function navigateToFamily(name){
+  closeCullModal();
+  const box=document.getElementById('searchBox');
+  if(box){box.value=name;box.dispatchEvent(new Event('input'));}
 }
 
 function closeCullModal(){
