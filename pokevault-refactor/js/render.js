@@ -9,7 +9,7 @@
 // STATE
 // ═══════════════════════════════════════════════
 let allPokemon=[], families=[], filteredFamilies=[];
-let decFilter='all', leagueFilters=new Set(), searchTerm='', page=1, sortByCount=false, countThreshold=100;
+let decFilter='all', leagueFilters=new Set(), searchTerm='', page=1, sortMode='star', countThreshold=100;
 const PER_PAGE=40;
 const familySortState={};
 

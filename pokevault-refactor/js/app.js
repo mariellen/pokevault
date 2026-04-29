@@ -276,8 +276,16 @@ function applyFilters(){
     return true;
   });
 
-  if(sortByCount){filteredFamilies.sort((a,b)=>b.members.length-a.members.length);}
-  else{filteredFamilies.sort((a,b)=>a.primaryName.localeCompare(b.primaryName));}
+  if(sortMode==='count'){
+    filteredFamilies.sort((a,b)=>b.members.length-a.members.length);
+  }else if(sortMode==='star'){
+    filteredFamilies.sort((a,b)=>{
+      const d=familyStarPriority(a)-familyStarPriority(b);
+      return d!==0?d:a.primaryName.localeCompare(b.primaryName);
+    });
+  }else{
+    filteredFamilies.sort((a,b)=>a.primaryName.localeCompare(b.primaryName));
+  }
   renderPage();
 }
 
@@ -486,8 +494,20 @@ function clearSearch(){
   searchTerm='';applyFilters();
 }
 
-function toggleSortByCount(btn){
-  sortByCount=!sortByCount; btn.classList.toggle('active',sortByCount); applyFilters();
+function familyStarPriority(fam){
+  const m=fam.members;
+  if(m.some(p=>p.isFavorite&&p.suggestStar))       return 0; // gold
+  if(m.some(p=>!p.isFavorite&&p.suggestStar))      return 1; // green
+  if(m.some(p=>p.suggestStarCheaper))              return 2; // cyan
+  if(m.some(p=>p.suggestStarExpensive))            return 3; // blue
+  if(m.some(p=>p.isFavorite&&!p.suggestStar))      return 4; // red
+  return 5;
+}
+function cycleSortMode(btn){
+  if(sortMode==='star'){sortMode='count';btn.textContent='Sort by Count';btn.classList.add('active');}
+  else if(sortMode==='count'){sortMode='name';btn.textContent='A-Z Name';btn.classList.remove('active');}
+  else{sortMode='star';btn.textContent='★ Stars';btn.classList.add('active');}
+  applyFilters();
 }
 function setDecFilter(f,btn){
   // Toggle off if clicking the already-active filter
@@ -652,6 +672,7 @@ function openCullModal(){
   const FAM_STANDALONE=new Set(['Kleavor']);
 
   const rows=qualifying.map(fam=>{
+    const keepers=fam.members.filter(p=>p.isFavorite&&p.suggestStar);
     const redCount=fam.members.filter(p=>p.isFavorite&&!p.suggestStar).length;
     const luckyCount=fam.members.filter(p=>p.isLucky).length;
     const unstarredCount=fam.members.filter(p=>!p.isFavorite).length;
@@ -674,11 +695,22 @@ function openCullModal(){
     const searchEsc=searchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     const nameEsc=fam.primaryName.replace(/"/g,'&quot;');
 
-    return `<div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span data-name="${nameEsc}" onclick="navigateToFamily(this.dataset.name)" style="font-weight:700;font-size:13px;cursor:pointer;color:var(--cyan)" title="View family in main list">${fam.primaryName}</span>
-      <span style="color:var(--muted);font-size:11px">${fam.members.length}</span>
-      <span style="font-size:11px">: <span style="color:var(--red)">${redCount}★</span> &nbsp;${luckyCount}🍀&nbsp; <span style="color:var(--muted)">${unstarredCount}🗑</span></span>
-      <button class="copy-search-btn" data-copy="${searchEsc}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 Fam</button>
+    const keeperLines=keepers.map(p=>
+      `<div style="font-size:11px;color:var(--muted);padding-left:4px;margin-top:2px">
+        <span style="color:var(--gold)">★</span>
+        ${p.name} CP:${p.cp}
+        ${p.nickname?`<span style="font-family:monospace;color:var(--green)">${p.nickname}</span>`:''}
+      </div>`
+    ).join('');
+
+    return `<div style="padding:8px 16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span data-name="${nameEsc}" onclick="navigateToFamily(this.dataset.name)" style="font-weight:700;font-size:13px;cursor:pointer;color:var(--cyan)" title="View family in main list">${fam.primaryName}</span>
+        <span style="color:var(--muted);font-size:11px">${fam.members.length}</span>
+        <span style="font-size:11px">: <span style="color:var(--red)">${redCount}★</span> &nbsp;<span style="color:var(--gold)">${luckyCount}🍀</span>&nbsp; <span style="color:var(--muted)">${unstarredCount}🗑</span></span>
+        <button class="copy-search-btn" data-copy="${searchEsc}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 Fam</button>
+      </div>
+      ${keeperLines}
     </div>`;
   }).join('');
 
