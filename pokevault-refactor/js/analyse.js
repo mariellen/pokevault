@@ -403,6 +403,8 @@ function simulatePurify(p, allRows) {
 function analyse(rows) {
   // Build family map (robust against bad scans, separates regional variants)
   const getFamKey = buildFamilyMap(rows);
+  // Evo targets that are standalone families — not valid evo paths for slot assignment
+  const STANDALONE_SPECIES = new Set(['Kleavor', 'Weezing|Galar']);
 
   // Parse all rows
   const parsed = rows.map(r => {
@@ -420,7 +422,9 @@ function analyse(rows) {
       if (!name||name===r['Name']) return '';
       const validEvos = VALID_EVOLUTIONS[r['Name']];
       if (!validEvos) return '';
-      return validEvos.includes(name) ? name : '';
+      if (!validEvos.includes(name)) return '';
+      if (STANDALONE_SPECIES.has(name)) return ''; // e.g. Kleavor — standalone, not a valid evo path
+      return name;
     };
 
     return {
@@ -483,8 +487,6 @@ function analyse(rows) {
     const isLegendary=members.some(p=>LEGENDARY.has(p.name)||MYTHICAL.has(p.name)||ULTRA_BEAST.has(p.name));
 
     // Evaluate leagues in priority order M>U>G>L so higher leagues get first pick
-    // Track which pokemon have been assigned to avoid double-assigning
-    const claimed = new Set();
     ['M','U','G','L'].forEach(lg=>{
       const rankField=`rankPct${lg}`;
       const byEvoStage={};
@@ -493,14 +495,18 @@ function analyse(rows) {
           :lg==='G'?(p.evolvedNameG||p.name)
           :lg==='U'?(p.evolvedNameU||p.name)
           :(p.evolvedNameU||p.evolvedNameG||p.name);
-        // Split by gender for dimorphic species
+        // Split by gender for dimorphic species; split shadow/purified/lucky into own sub-groups
+        // so each variant type gets an independent slot (shadow Great + regular Great can coexist)
         const isDimorphic = GENDER_DIMORPHIC.has(stageName)||GENDER_DIMORPHIC.has(p.name);
-        const groupKey = (isDimorphic && p.gender) ? stageName+'|'+p.gender : stageName;
+        const variantKey = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
+        const groupKey = (isDimorphic && p.gender) ? stageName+'|'+p.gender+variantKey : stageName+variantKey;
         if (!byEvoStage[groupKey]) byEvoStage[groupKey]=[];
         byEvoStage[groupKey].push(p);
       });
 
-      Object.entries(byEvoStage).forEach(([stageName,group])=>{
+      Object.entries(byEvoStage).forEach(([groupKey,group])=>{
+        // Strip gender/variant suffix to get the actual species name for comparisons
+        const stageName = groupKey.split('|')[0];
         // Master league: only final evolution
         if (lg==='M') {
           const hasHigherEvo = members.some(m =>
@@ -522,6 +528,9 @@ function analyse(rows) {
 
         const eligible = (lg==='M' ? group : group.filter(p => (p.cp||0) <= leagueCap * 1.05))
           .filter(p => {
+            // Master league: only the final evolution (must BE stageName, not just evolve to it)
+            if (lg === 'M' && p.name !== stageName) return false;
+
             // Dust exclusion: non-final, non-legendary over 300k excluded
             const d = leagueDust(p);
             const pIsFinalEvo = !members.some(m =>
@@ -532,31 +541,24 @@ function analyse(rows) {
             );
             if (d > DUST_EXCLUDE_THRESHOLD && !pIsFinalEvo && !isLegendary) return false;
 
+            // Pre-evo with no valid Ultra evo path — Kleavor-type filtering may leave
+            // evolvedNameU empty; don't assign a self-referencing Ultra slot for pre-evos
+            if (lg === 'U' && !p.evolvedNameU && !pIsFinalEvo && !isLegendary) return false;
+
             // Committed to a lower league: already powered to cap with 0 dust and favourited
-            // Exclude from higher leagues so lower league slot is respected
-            if (lg === 'U' && p.dustL === 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite) return false;
-            if (lg === 'G' && p.dustL === 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite) return false;
+            // Check rankPct to distinguish "powered up" (true 0 dust) from "no data" (empty CSV field → 0)
+            const littleQualifies = (p.rankPctL||0) >= RULES.keepThreshold;
+            const greatQualifies = (p.rankPctG||0) >= RULES.keepThreshold;
+            if ((lg === 'U' || lg === 'G') && p.dustL === 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite && littleQualifies) return false;
+            // Low-CP Pokémon committed to Great but not Ultra (dustG=0, dustU≠0) — exclude from Ultra
+            if (lg === 'U' && p.dustG === 0 && p.dustU !== 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite && greatQualifies) return false;
             if (lg === 'U' && p.dustG === 0 && (p.cp||0) <= 1500 * 1.05 && (p.cp||0) > 500 * 1.05 && p.isFavorite) return false;
 
             // Set isCommitted flag for display (pokemon at their cap with 0 dust)
             const leagueDustVal = lg==='L'?p.dustL:lg==='G'?p.dustG:lg==='U'?p.dustU:null;
             if (lg !== 'M' && (p.cp||0) >= leagueCap * 0.97 && leagueDustVal === 0) p.isCommitted = true;
 
-            if (!claimed.has(p.idx)) return true;
-            // Allow claimed pokemon if they're in a DIFFERENT evo stage group
-            const thisStage = lg==='L'?(p.evolvedNameL||p.name)
-              :lg==='G'?(p.evolvedNameG||p.name)
-              :lg==='U'?(p.evolvedNameU||p.name)
-              :(p.evolvedNameU||p.evolvedNameG||p.name);
-            const claimedForSameStage = p.slots.some(s => {
-              if (!RULES.leagues.includes(s)) return false;
-              const claimedStage = s==='L'?(p.evolvedNameL||p.name)
-                :s==='G'?(p.evolvedNameG||p.name)
-                :s==='U'?(p.evolvedNameU||p.name)
-                :(p.evolvedNameU||p.evolvedNameG||p.name);
-              return claimedStage === thisStage;
-            });
-            return !claimedForSameStage;
+            return true;
           });
         // Allow 5% over cap to account for rounding/display differences
         if (!eligible.length) return;
@@ -589,6 +591,8 @@ function analyse(rows) {
           const aIsEvolved = (a.name === stageName) ? 0 : 1;
           const bIsEvolved = (b.name === stageName) ? 0 : 1;
           if (aIsEvolved !== bIsEvolved) return aIsEvolved - bIsEvolved;
+          // Prefer higher actual rank when rounded ranks tie (avoids stable-sort bias)
+          if (Math.abs(ra - rb) > 0.01) return rb - ra;
           return effectiveDust(a) - effectiveDust(b);
         });
 
@@ -647,11 +651,6 @@ function analyse(rows) {
           );
           const lgAffordable = (DUST_THRESHOLDS[lg] || DUST_THRESHOLDS.G).affordable;
 
-          // Claim only affordable final-evo winners (prevents them blocking lower leagues)
-          if (isConfirmed && eDustCheck <= lgAffordable && (isFinalEvoStage || lg==='M')) {
-            claimed.add(best.idx);
-          }
-
           // Dual recommendation: expensive winner + affordable backup
           if (eDustCheck > lgAffordable && isConfirmed) {
             best2.isExpensiveWinner = true;
@@ -663,7 +662,6 @@ function analyse(rows) {
               if (!affordableWinner.slots.includes(lg+'_affordable')) affordableWinner.slots.push(lg+'_affordable');
               affordableWinner.isAffordableWinner = true;
               affordableWinner.affordableForLeague = lg;
-              if (isFinalEvoStage) claimed.add(affordableWinner.idx);
             }
           } else if (eDustCheck <= lgAffordable && isFinalEvoStage && isConfirmed) {
             best2.isAffordableWinner = true;
@@ -751,7 +749,10 @@ function analyse(rows) {
       } else if (hasLeagueSlot) {
         const lgSlots=p.slots.filter(s=>RULES.leagues.includes(s)||s.endsWith('_affordable')).map(s=>s.replace('_affordable',''));
         const lgNames=lgSlots.map(s=>RULES.leagueNames[s]);
-        const nickSlot=['M','U','G','L'].find(s=>lgSlots.includes(s))||lgSlots[0];
+        // If holding both Master and a capped league, prefer the capped league symbol (Ⓤ/Ⓖ/Ⓛ) over Ⓡ
+        const nickSlot = (lgSlots.includes('M') && lgSlots.some(s => s !== 'M'))
+          ? (['U','G','L'].find(s => lgSlots.includes(s)) || lgSlots[0])
+          : (['M','U','G','L'].find(s => lgSlots.includes(s)) || lgSlots[0]);
         if(nickSlot==='M') p.targetEvo=p.evolvedNameU||p.evolvedNameG||'';
         else if(nickSlot==='G') p.targetEvo=p.evolvedNameG||'';
         else if(nickSlot==='U') p.targetEvo=p.evolvedNameU||'';
@@ -907,27 +908,8 @@ function analyse(rows) {
 
       const priority = ['M','U','G','L'];
 
-      // Revised keep logic: highest league wins UNLESS a lower league rounds to 100%
-      // and the higher league does NOT also round to 100%
-      // e.g. Gurdurr 99.8% Great (rounds to 100%) vs 98.93% Ultra (rounds to 99%)
-      // -> protect Great, find another Ultra candidate
-      let keepSlot = priority.find(s => leagueSlots.includes(s)); // default: highest league
-      const roundedRank = s => Math.round(p['rankPct'+s]||0);
-
-      // Check if a lower slot should be protected
-      for (const higherSlot of priority) {
-        if (!leagueSlots.includes(higherSlot)) continue;
-        for (const lowerSlot of priority.slice(priority.indexOf(higherSlot)+1)) {
-          if (!leagueSlots.includes(lowerSlot)) continue;
-          if (slotEvo(higherSlot) === slotEvo(lowerSlot)) continue; // same evo, no conflict
-          const higherRounded = roundedRank(higherSlot);
-          const lowerRounded = roundedRank(lowerSlot);
-          // Protect lower slot if it rounds to 100 and higher does not
-          if (lowerRounded >= 100 && higherRounded < 100) {
-            keepSlot = lowerSlot; // protect the 100% lower league slot
-          }
-        }
-      }
+      // Keep highest league slot; remove conflicting lower slots (different evo stage)
+      const keepSlot = priority.find(s => leagueSlots.includes(s)); // always highest league
 
       const keepEvo = slotEvo(keepSlot);
       const conflicting = leagueSlots.filter(s => s !== keepSlot && slotEvo(s) !== keepEvo);
@@ -990,7 +972,8 @@ function analyse(rows) {
           :lg==='G'?(p.evolvedNameG||p.name)
           :lg==='U'?(p.evolvedNameU||p.name)
           :(p.evolvedNameU||p.evolvedNameG||p.name);
-        const key = lg+'|'+evo;
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
+        const key = lg+'|'+evo+vk;
         if (!byEvo[key]) byEvo[key] = [];
         byEvo[key].push(p);
       });

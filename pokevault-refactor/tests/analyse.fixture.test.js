@@ -154,11 +154,20 @@ describe('Group 5 — Flaaffy (lucky zero-dust committed)', () => {
 // ─── Group 6 — Totodile family ───────────────────────────────────────────────
 
 describe('Group 6 — Totodile/Croconaw/Feraligatr', () => {
-  it('Feraligatr CP:2400 (fav=1, dustU=0) wins Ultra slot — GOLD', () => {
-    const p = find('Feraligatr', 2400);
+  it('Feraligatr CP:2498 (hundo, fav=1, dustU=0) wins Ultra AND Master — GOLD', () => {
+    const p = find('Feraligatr', 2498);
+    expect(p).toBeDefined();
     expect(p.slots).toContain('U');
+    expect(p.slots).toContain('M');
     expect(p.isFavorite).toBe(true);
     expect(p.suggestStar).toBe(true);
+  });
+
+  it('Feraligatr CP:2400 (fav=1, dustU=0) LOSES Ultra to CP:2498 hundo — RED', () => {
+    const p = find('Feraligatr', 2400);
+    expect(p.isFavorite).toBe(true);
+    expect(p.slots).not.toContain('U');
+    expect(p.suggestStar).toBe(false);
   });
 
   it('Feraligatr CP:1200 (same IVs, fav=1, old scan) does NOT win Ultra slot — RED', () => {
@@ -272,7 +281,13 @@ describe('Group 10 — Nick format', () => {
     });
   });
 
-  test.todo('Feraligatr CP:2498 (hundo, Ultra winner) nick should contain Ⓤ but gets FeraligaⓇ100 — hundo nick uses Ⓡ (Master/Raid) format regardless of league slot; fix nick logic for hundo with league slot');
+  it('Feraligatr CP:2498 (hundo, wins Ultra + Master) nick contains Ⓤ not Ⓡ', () => {
+    const p = find('Feraligatr', 2498);
+    expect(p).toBeDefined();
+    expect(p.nickname).toBeDefined();
+    expect(p.nickname).toContain('Ⓤ');
+    expect(p.nickname).not.toContain('Ⓡ');
+  });
 
   it('Snorlax CP:2990 (lucky hundo) nick contains Ⓡ or Ⓤ (lucky circled letter)', () => {
     const p = find('Snorlax', 2990);
@@ -293,8 +308,8 @@ describe('Group 10 — Nick format', () => {
 // These tests document the desired behaviour BEFORE the feature is built.
 // They will fail until shadow/lucky slot coexistence is implemented in analyse.js.
 
-describe('Group 11 — Shadow coexistence (failing until feature built)', () => {
-  test.failing('Shadow Seedot CP:115 holds Great slot independently of normal winner CP:454', () => {
+describe('Group 11 — Shadow/Lucky coexistence', () => {
+  it('Shadow Seedot CP:115 holds Great slot independently of normal winner CP:454', () => {
     const shadow = find('Seedot', 115);
     const normal = find('Seedot', 454);
     expect(shadow).toBeDefined();
@@ -306,21 +321,21 @@ describe('Group 11 — Shadow coexistence (failing until feature built)', () => 
     expect(shadow.suggestStar).toBe(true);
   });
 
-  test.failing('Shadow Bulbasaur CP:497 holds Ultra slot; normal Bulbasaur CP:463 holds Great slot', () => {
+  it('Shadow Bulbasaur CP:497 holds Ultra slot; normal Bulbasaur CP:463 holds Great slot', () => {
     const shadow = find('Bulbasaur', 497);
     const normal = find('Bulbasaur', 463);
     expect(shadow.slots).toContain('U');
     expect(normal.slots).toContain('G');
   });
 
-  test.failing('Scyther shadow CP:950 and normal CP:35 both hold Great slot independently', () => {
+  it('Scyther shadow CP:950 and normal CP:35 both hold Great slot independently', () => {
     const shadow = find('Scyther', 950);
     const normal = find('Scyther', 35);
     expect(shadow.slots).toContain('G');
     expect(normal.slots).toContain('G');
   });
 
-  test.failing('Lucky Qwilfish CP:443 holds Ultra slot alongside normal CP:440', () => {
+  it('Lucky Qwilfish CP:443 holds Ultra slot alongside normal CP:440', () => {
     const lucky = find('Qwilfish', 443);
     const normal = find('Qwilfish', 440);
     expect(lucky.slots).toContain('U');
@@ -328,5 +343,33 @@ describe('Group 11 — Shadow coexistence (failing until feature built)', () => 
     expect(lucky.isLucky).toBe(true);
     expect(lucky.isFavorite).toBe(true);
     expect(lucky.suggestStar).toBe(true);
+  });
+});
+
+// ─── Group 12 — Nuzleaf cyan star ────────────────────────────────────────────
+// CP:498 (100% Little, dustL=800, fav=0) wins Little over CP:499 (99.8%, dustL=1600, fav=1).
+// CP:498 should show CYAN (suggestStarCheaper) because the starred CP:499 at the same
+// rounded rank costs more dust.
+
+describe('Group 12 — Nuzleaf cyan star', () => {
+  it('Nuzleaf CP:498 (100% Little, fav=0, dustL=800) wins Little slot', () => {
+    const p = find('Nuzleaf', 498);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('L');
+  });
+
+  it('Nuzleaf CP:498 shows CYAN — cheaper than starred CP:499 at same rounded rank', () => {
+    const p = find('Nuzleaf', 498);
+    expect(p.suggestStarCheaper).toBe(true);
+    expect(p.isCheaperAlternative).toBe(true);
+    expect(p.cheaperAlternativeLeagues).toContain('L');
+  });
+
+  it('Nuzleaf CP:499 (99.8% Little, fav=1, dustL=1600) loses Little slot — RED star', () => {
+    const p = find('Nuzleaf', 499);
+    expect(p).toBeDefined();
+    expect(p.isFavorite).toBe(true);
+    expect(p.slots).not.toContain('L');
+    expect(p.suggestStar).toBe(false);
   });
 });

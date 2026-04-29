@@ -89,7 +89,9 @@ describe('Slot assignment — Eevee family', () => {
           : lg === 'U' ? (p.evolvedNameU || p.name)
           : lg === 'L' ? (p.evolvedNameL || p.name)
           : (p.evolvedNameU || p.evolvedNameG || p.name);
-        evoGroups[evoTarget] = (evoGroups[evoTarget] || 0) + 1;
+        const variantKey = p.isShadow ? '|shadow' : p.isLucky ? '|lucky' : p.isPurified ? '|purified' : '';
+        const key = evoTarget + variantKey;
+        evoGroups[key] = (evoGroups[key] || 0) + 1;
       });
       Object.entries(evoGroups).forEach(([evo, count]) => {
         expect(count).toBeLessThanOrEqual(1);

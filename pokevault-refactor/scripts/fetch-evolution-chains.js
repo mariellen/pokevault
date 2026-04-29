@@ -141,8 +141,18 @@ async function main() {
 
   // Clear existing data first
   console.log('Clearing existing evolution_chains data...');
-  await supabaseReq('DELETE', 'evolution_chains?id=gte.0', null);
-  console.log('Cleared.\n');
+  try {
+    await supabaseReq('DELETE', 'evolution_chains?id=gte.0', null);
+    console.log('Cleared.\n');
+  } catch (e) {
+    if (e.message.includes('42501') || e.message.includes('permission denied')) {
+      console.error('\n⚠ Permission denied on evolution_chains table.');
+      console.error('Run this in your Supabase SQL editor, then re-run this script:');
+      console.error('  ALTER TABLE evolution_chains DISABLE ROW LEVEL SECURITY;\n');
+      process.exit(1);
+    }
+    throw e;
+  }
 
   const allRows = [];
   const MAX_CHAIN = 650; // PokéAPI has ~549 chains through Gen 9; 650 gives headroom

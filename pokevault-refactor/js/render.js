@@ -75,7 +75,7 @@ function starCell(p){
   const tc={Legendary:'st-legendary',Mythical:'st-mythical','Ultra Beast':'st-ub',Mega:'st-mega'}[type]||'';
   let si;
   if(p.suggestStar&&p.isFavorite) si='<span class="star-yellow" title="Starred correctly ✓">★</span>';
-  else if(p.suggestStar&&!p.isFavorite) si='<span class="star-green" title="Should be starred — action needed">★</span>';
+  else if(p.suggestStar&&!p.isFavorite&&!p.suggestStarCheaper) si='<span class="star-green" title="Should be starred — action needed">★</span>';
   else if(p.suggestStarExpensive&&p.isFavorite) si='<span class="star-yellow" title="Starred correctly ✓ (costly pick)">★</span>';
   else if(p.suggestStarExpensive&&!p.isFavorite) si='<span class="star-blue" title="Recommended but costly — over affordable threshold">★</span>';
   else if(p.suggestStarCheaper&&!p.isFavorite) si='<span class="star-cyan" title="Equivalent to your starred pick — check before acting">★</span>';
