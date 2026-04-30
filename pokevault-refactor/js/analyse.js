@@ -175,6 +175,7 @@ function buildNickname(p, slot) {
     const alreadyHasSlot = p.slots.some(s => ['L','G','U','M'].includes(s));
     if (!alreadyHasSlot) suf += p.purifyHundo ? 'p✪' : 'p';
   }
+  if (p.isPurified) suf += '✦';
 
   // Move flags
   if (p.hasAllBestMoves) suf+='☆';
@@ -310,12 +311,13 @@ function parseCatchDate(s) {
 // ═══════════════════════════════════════════════
 // STABLE POKEMON IDENTITY KEY
 // Survives evolution, power-ups, re-exports and purges
-// Format: familyKey|form|gender|atkIV|defIV|staIV|catchDate
+// Format: familyKey|form|gender|atkIV|defIV|staIV|catchDate||originalScanDate
 // ═══════════════════════════════════════════════
 function makeStableKey(p) {
-  // Key: PokemonNumber|Form|Gender|AtkIV|DefIV|StaIV|CatchDate
+  // Key: PokemonNumber|Form|Gender|AtkIV|DefIV|StaIV|CatchDate||OriginalScanDate
   // CP excluded: it changes when the pokemon is powered up, which would lose overrides
-  const date = p.catchDate || ('_idx' + (p.idx||''));
+  // originalScanDate used as fallback — set on first scan, never changes (100% coverage vs 33% catch dates)
+  const date = p.catchDate || p.originalScanDate || ('_idx' + (p.idx||''));
   return [
     p.pokeNum || '',
     p.form || '',
@@ -443,6 +445,7 @@ function analyse(rows) {
       evolvedNameG:validateEvo(r['Name (G)']), evolvedNameU:validateEvo(r['Name (U)']), evolvedNameL:validateEvo(r['Name (L)']),
       dustG,dustU,dustL,dustMin,dustCostBest:dustMin,
       catchDate:r['Catch Date']||'', catchDateMs:parseCatchDate(r['Catch Date']),
+      originalScanDate:r['Original Scan Date']||'',
       pvpTag:r['Marked for PvP use']||'',
       moveKnown:mv.known, hasAllBestMoves:mv.hasAllBestMoves, hasBestMoves:mv.hasBestMoves,
       hasTwoMoves:!!r['Charge Move 2'], moveNotes:mv.notes,
@@ -539,7 +542,7 @@ function analyse(rows) {
                 (m.evolvedNameU && m.evolvedNameU !== p.name)
               )
             );
-            if (d > DUST_EXCLUDE_THRESHOLD && !pIsFinalEvo && !isLegendary) return false;
+            if (d > DUST_EXCLUDE_THRESHOLD && !pIsFinalEvo && !isLegendary && (p[rankField]||0) < RULES.keepThreshold) return false;
 
             // Pre-evo with no valid Ultra evo path — Kleavor-type filtering may leave
             // evolvedNameU empty; don't assign a self-referencing Ultra slot for pre-evos
@@ -838,8 +841,7 @@ function analyse(rows) {
       const isProtectedBest = p.decision==='protected' &&
         members.every(m => m===p || (m.ivAvg||0) <= (p.ivAvg||0));
 
-      const hasAffordableSlot = p.slots.some(s => RULES.leagues.includes(s) || s.endsWith('_affordable'));
-      p.suggestStarExpensive = p.isExpensiveWinner === true && !hasAffordableSlot;
+      p.suggestStarExpensive = p.isExpensiveWinner === true;
       p.suggestStar = (
         !p.suggestStarExpensive &&
         (

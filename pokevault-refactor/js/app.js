@@ -161,7 +161,10 @@ function buildFamilySearchStr(members) {
 }
 
 function renderFamily(fam,isOpen){
-  const {key,members,keepCount,tradeCount,reviewCount,primaryName}=fam;
+  const {key,members,primaryName}=fam;
+  const goldCount=members.filter(p=>p.isFavorite&&p.suggestStar).length;
+  const luckyCount=members.filter(p=>p.isLucky).length;
+  const binCount=members.filter(p=>!p.isFavorite&&p.decision!=='keep').length;
   const isEevee=members.some(p=>p.name==='Eevee');
   const eeveeTip=isEevee?`<div class="eevee-tip">💡 Eevee family: best evolutions for Great = Umbreon / Sylveon, Ultra = Glaceon / Espeon. Check existing eeveelutions below.</div>`:'';
 
@@ -170,7 +173,9 @@ function renderFamily(fam,isOpen){
   const goSearchStr=buildGoSearchStr(primaryName,members);
   const FAM_STANDALONE=new Set(['Kleavor']);
   const ownedNames=members.map(p=>p.name);
-  const evoTargetNames=members.flatMap(p=>[p.evolvedNameG,p.evolvedNameU,p.evolvedNameL].filter(Boolean)).filter(n=>!FAM_STANDALONE.has(n));
+  const csvEvoNames=members.flatMap(p=>[p.evolvedNameG,p.evolvedNameU,p.evolvedNameL].filter(Boolean));
+  const validEvoNames=members.flatMap(p=>(VALID_EVOLUTIONS&&VALID_EVOLUTIONS[p.name])||[]);
+  const evoTargetNames=[...new Set([...csvEvoNames,...validEvoNames])].filter(n=>!FAM_STANDALONE.has(n));
   const dbFamily=typeof getFullFamily==='function'?getFullFamily(primaryName):null;
   const famAllNames=dbFamily?[...new Set([...ownedNames,...dbFamily])]:[...new Set([...ownedNames,...evoTargetNames])];
   const REGIONAL_TAGS=['Alola','Galar','Hisui','Paldea'];
@@ -209,9 +214,9 @@ function renderFamily(fam,isOpen){
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''} <span style="color:var(--dim);font-size:11px">(${members.length})</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
-        ${keepCount?`<span class="fam-badge fb-keep">${keepCount} keep</span>`:''}
-        ${reviewCount?`<span class="fam-badge fb-review">${reviewCount} review</span>`:''}
-        ${tradeCount?`<span class="fam-badge fb-trade">${tradeCount} trade</span>`:''}
+        ${goldCount?`<span class="fam-badge" style="color:var(--gold)">${goldCount}★</span>`:''}
+        ${luckyCount?`<span class="fam-badge" style="color:var(--gold)">${luckyCount}🍀</span>`:''}
+        ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
         <button class="copy-nicks-btn" onclick="event.stopPropagation();copyNicks('${key}',this)" title="Copy starred nicknames">⎘ nicks</button>
@@ -337,7 +342,10 @@ function renderPage(){
 }
 
 function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
-  const {key,members,keepCount,tradeCount,reviewCount,primaryName}=fam;
+  const {key,members,primaryName}=fam;
+  const goldCount=members.filter(p=>p.isFavorite&&p.suggestStar).length;
+  const luckyCount=members.filter(p=>p.isLucky).length;
+  const binCount=members.filter(p=>!p.isFavorite&&p.decision!=='keep').length;
   const isEevee=members.some(p=>p.name==='Eevee');
   const eeveeTip=isEevee?`<div class="eevee-tip">💡 Eevee: best for Great = Umbreon / Sylveon, Ultra = Glaceon / Espeon</div>`:'';
 
@@ -402,7 +410,9 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const goSearchStr=buildGoSearchStr(primaryName,members);
   const FAM_STANDALONE=new Set(['Kleavor']);
   const ownedNames=members.map(p=>p.name);
-  const evoTargetNames=members.flatMap(p=>[p.evolvedNameG,p.evolvedNameU,p.evolvedNameL].filter(Boolean)).filter(n=>!FAM_STANDALONE.has(n));
+  const csvEvoNames=members.flatMap(p=>[p.evolvedNameG,p.evolvedNameU,p.evolvedNameL].filter(Boolean));
+  const validEvoNames=members.flatMap(p=>(VALID_EVOLUTIONS&&VALID_EVOLUTIONS[p.name])||[]);
+  const evoTargetNames=[...new Set([...csvEvoNames,...validEvoNames])].filter(n=>!FAM_STANDALONE.has(n));
   const dbFamily=typeof getFullFamily==='function'?getFullFamily(primaryName):null;
   const famAllNames=dbFamily?[...new Set([...ownedNames,...dbFamily])]:[...new Set([...ownedNames,...evoTargetNames])];
   const REGIONAL_TAGS=['Alola','Galar','Hisui','Paldea'];
@@ -467,9 +477,9 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''}${collBadge} <span style="color:var(--dim);font-size:11px">(${members.length})${activeLeagues.length>0?' · '+visible.length+' shown':''}</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
-        ${keepCount?`<span class="fam-badge fb-keep">${keepCount} keep</span>`:''}
-        ${reviewCount?`<span class="fam-badge fb-review">${reviewCount} review</span>`:''}
-        ${tradeCount?`<span class="fam-badge fb-trade">${tradeCount} trade</span>`:''}
+        ${goldCount?`<span class="fam-badge" style="color:var(--gold)">${goldCount}★</span>`:''}
+        ${luckyCount?`<span class="fam-badge" style="color:var(--gold)">${luckyCount}🍀</span>`:''}
+        ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
         <button class="copy-nicks-btn" onclick="event.stopPropagation();copyNicks('${key}',this)" title="Copy starred nicknames">⎘ nicks</button>

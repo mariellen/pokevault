@@ -202,7 +202,13 @@ describe('Group 8 — Explicit star colours', () => {
     expect(p.suggestStar).toBe(false);
   });
 
-  test.todo('Eevee CP:478 should show BLUE star (suggestStarExpensive) — dustU=513600 exceeds affordable threshold but flag is not firing; investigate expensive winner logic');
+  it('Eevee CP:478 shows BLUE star (suggestStarExpensive) — dustU=513600 exceeds affordable threshold', () => {
+    const p = find('Eevee', 478);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('U');
+    expect(p.suggestStarExpensive).toBe(true);
+    expect(p.suggestStar).toBe(false);
+  });
 });
 
 // ─── Group 9 — Family grouping ───────────────────────────────────────────────
