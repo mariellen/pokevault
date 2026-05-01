@@ -1,6 +1,6 @@
 'use strict';
 // Fixture-based tests for the analysis engine.
-// Uses poke_genie_fixture.csv — 47 deterministic rows designed to exercise specific behaviours.
+// Uses poke_genie_fixture.csv — 50 deterministic rows designed to exercise specific behaviours.
 // See FIXTURE_CSV_SPEC.md for the full spec and expected outputs per row.
 //
 // Run with: npx jest tests/analyse.fixture.test.js
@@ -64,10 +64,16 @@ describe('Group 1 — Glaceon family (evolved preference + committed)', () => {
 // ─── Group 2 — Leafeon family ────────────────────────────────────────────────
 
 describe('Group 2 — Leafeon family (evolved preference)', () => {
-  test.todo('Leafeon CP:1177 should win Great slot but currently gets Ultra — slot assignment routing bug');
+  it('Leafeon CP:1177 wins Great slot (99.58% > Ultra 99.37%) — nick shows Ⓖ', () => {
+    const p = find('Leafeon', 1177);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.nickname).toContain('Ⓖ');
+    expect(p.isFavorite).toBe(true);
+    expect(p.suggestStar).toBe(true);
+  });
 
-  it('Leafeon CP:1177 wins a slot and is fav=1 (GOLD — exact league TBD)', () => {
-    // Known bug: gets ['U'] instead of ['G']. Assert it wins SOME league slot.
+  it('Leafeon CP:1177 wins a slot and is fav=1 (GOLD)', () => {
     const p = find('Leafeon', 1177);
     expect(p).toBeDefined();
     const hasLeagueSlot = p.slots.some(s => ['L', 'G', 'U', 'M'].includes(s));
@@ -148,7 +154,12 @@ describe('Group 5 — Flaaffy (lucky zero-dust committed)', () => {
     expect(p.suggestStar).toBe(true);
   });
 
-  test.todo('Mareep CP:120 should NOT win Little alongside Flaaffy — evo-stage grouping bug: Mareep and Flaaffy end up in separate evo-stage groups so each wins their own Little stage');
+  it('Mareep CP:120 does NOT win Little (Flaaffy CP:500 wins it) — correct evo-stage grouping', () => {
+    const mareep = find('Mareep', 120);
+    expect(mareep).toBeDefined();
+    expect(mareep.slots).not.toContain('L');
+    expect(mareep.slots).toContain('G');
+  });
 });
 
 // ─── Group 6 — Totodile family ───────────────────────────────────────────────
@@ -186,8 +197,20 @@ describe('Group 6 — Totodile/Croconaw/Feraligatr', () => {
 // ─── Group 8 — Star flags ────────────────────────────────────────────────────
 
 describe('Group 8 — Explicit star colours', () => {
-  test.todo('Machamp CP:2450 should win Ultra (dustU=0, 99.5%) but currently gets Master — slot assignment routing bug');
-  test.todo('Machop CP:400 should win Great but currently gets Ultra — related to Machamp routing bug above');
+  it('Machamp CP:2450 wins Ultra slot (dustU=0, 99.5%) — nick shows Ⓤ not Ⓡ', () => {
+    const p = find('Machamp', 2450);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('U');
+    expect(p.nickname).toContain('Ⓤ');
+    expect(p.nickname).not.toContain('Ⓡ');
+  });
+
+  it('Machop CP:400 wins Great slot (does not get Ultra)', () => {
+    const p = find('Machop', 400);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.slots).not.toContain('U');
+  });
 
   it('Machop CP:350 (fav=1, loses Great to CP:400) — RED star', () => {
     // CP:350 is fav=1 but lower rank than CP:400 — should not win any slot
@@ -226,7 +249,17 @@ describe('Group 9 — Family grouping', () => {
     expect(maleFam.key).not.toBe(femaleFam.key);
   });
 
-  test.todo('Jellicent ♂ should be in same family as Frillish ♂ — evo-vote merging fails for gender-split species (Frillish famKey=592|♂, Jellicent famKey=593|♂ never unite)');
+  it('Jellicent ♂ is in the same family as Frillish ♂ (evo-vote gender merge)', () => {
+    const frillishFam = result.families.find(f =>
+      f.members.some(p => p.name === 'Frillish' && p.gender === '♂')
+    );
+    const jellicentFam = result.families.find(f =>
+      f.members.some(p => p.name === 'Jellicent' && p.gender === '♂')
+    );
+    expect(frillishFam).toBeDefined();
+    expect(jellicentFam).toBeDefined();
+    expect(frillishFam.key).toBe(jellicentFam.key);
+  });
 
   it('Growlithe (Normal form) and Arcanine (Normal form) are in the same family', () => {
     const growlitheFam = result.families.find(f =>
@@ -377,5 +410,24 @@ describe('Group 12 — Nuzleaf cyan star', () => {
     expect(p.isFavorite).toBe(true);
     expect(p.slots).not.toContain('L');
     expect(p.suggestStar).toBe(false);
+  });
+});
+
+// ─── Group 13 — Standalone evo target slot suppression ───────────────────────
+// Pokégenie sets Name(L)=Kleavor for Scyther rows and populates Rank%(L) with
+// Kleavor's Little League rank (~94%). Without the fix, Scyther would incorrectly
+// receive a Little League slot because the rank exceeds keepThreshold (90%).
+
+describe('Group 13 — Standalone evo target suppresses league slot', () => {
+  it('Scyther CP:260 (5/2/13) has no Little League slot despite 94% Rank%(L)', () => {
+    const p = find('Scyther', 260);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('L');
+  });
+
+  it('Scyther CP:260 standaloneEvoL flag is set', () => {
+    const p = find('Scyther', 260);
+    expect(p).toBeDefined();
+    expect(p.standaloneEvoL).toBe(true);
   });
 });

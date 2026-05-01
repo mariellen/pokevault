@@ -6,6 +6,18 @@
 'use strict';
 
 // ═══════════════════════════════════════════════
+// STAR PRIORITY (0=gold … 5=none)
+// ═══════════════════════════════════════════════
+function pokemonStarRank(p) {
+  if (p.suggestStar && p.isFavorite) return 0;
+  if (p.suggestStar && !p.isFavorite) return 1;
+  if (p.suggestStarCheaper) return 2;
+  if (p.suggestStarExpensive) return 3;
+  if (p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper) return 4;
+  return 5;
+}
+
+// ═══════════════════════════════════════════════
 // PER-FAMILY SORTING
 // ═══════════════════════════════════════════════
 function sortFamilyBy(thEl,col){
@@ -31,15 +43,7 @@ function sortFamilyBy(thEl,col){
     else if(col==='catchDate'){va=a.catchDateMs||0;vb=b.catchDateMs||0;}
     else if(col==='nick'){va=(a.nickname||'').toLowerCase();vb=(b.nickname||'').toLowerCase();}
     else if(col==='star'){
-      const starRank = p => {
-        if (p.suggestStar && p.isFavorite) return 0;           // gold ★ correct
-        if (p.suggestStar && !p.isFavorite) return 1;          // green ★ action needed
-        if (p.suggestStarCheaper) return 2;                    // cyan ★ cheaper alt
-        if (p.suggestStarExpensive) return 3;                  // blue ★ costly
-        if (p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper) return 4; // red ★ unstar
-        return 5;                                               // · none
-      };
-      va=starRank(a);vb=starRank(b);
+      va=pokemonStarRank(a);vb=pokemonStarRank(b);
     }
     else if(col==='name'){va=a.name.toLowerCase();vb=b.name.toLowerCase();}
     else if(col==='decision'){const o={keep:0,protected:1,review:2,trade:3};va=o[a.decision]||3;vb=o[b.decision]||3;}
@@ -191,7 +195,8 @@ function renderFamily(fam,isOpen){
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
-  const rows=members.map(p=>buildRow(p)).join('');
+  const sorted=[...members].sort((a,b)=>pokemonStarRank(a)-pokemonStarRank(b));
+  const rows=sorted.map(p=>buildRow(p)).join('');
 
   const thead=`<thead><tr>
     <th data-col="star" onclick="sortFamilyBy(this,'star')">&#9733;</th>
@@ -446,7 +451,8 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
     visible.forEach(p => { p._evoSearchTag = ''; });
   }
 
-  const rows=visible.map(p=>buildRow(p)).join('');
+  const sortedVisible=[...visible].sort((a,b)=>pokemonStarRank(a)-pokemonStarRank(b));
+  const rows=sortedVisible.map(p=>buildRow(p)).join('');
   const collSet = COLLECTION_SETS && COLLECTION_SETS[primaryName];
   const collBadge = collSet ? (() => {
     const havePatterns = new Set(members.map(p=>p.specialForm||p.vivillonPattern).filter(Boolean));
@@ -738,6 +744,61 @@ function closeCullModal(){
   document.getElementById('cull-modal').style.display='none';
 }
 
+// ── Merge candidates modal ────────────────────
+function openMergeModal(){
+  if(!allPokemon.length){alert('Load your collection first');return;}
+  const modal=document.getElementById('merge-modal');
+  const body=document.getElementById('merge-modal-body');
+  const sub=document.getElementById('merge-modal-sub');
+
+  const candidates=findMergeCandidates(families);
+
+  sub.textContent=candidates.length
+    ? candidates.length+' potential merge group'+(candidates.length===1?'':'s')+' found'
+    : 'No merge candidates found';
+
+  if(!candidates.length){
+    body.innerHTML='<div class="pv-modal-empty">No merge candidates found — all same-IV family members either have different IVs or both have catch dates</div>';
+    modal.style.display='flex';
+    return;
+  }
+
+  const rows=candidates.map(cand=>{
+    const sorted=[...cand.members].sort((a,b)=>{
+      // Older original scan date first (the base scan to keep)
+      const da=a.originalScanDate||'9999';
+      const db=b.originalScanDate||'9999';
+      return da.localeCompare(db);
+    });
+
+    const memberRows=sorted.map(p=>{
+      const iv=`${p.atkIV}/${p.defIV}/${p.staIV}`;
+      const catchStr=p.catchDate||'<span style="color:var(--gold)">no date</span>';
+      const origStr=p.originalScanDate||'—';
+      const noDate=!p.catchDate;
+      return `<div style="font-size:11px;padding:3px 0 3px 12px;${noDate?'color:var(--muted)':''}">
+        <span style="min-width:90px;display:inline-block;font-weight:600">${p.name}</span>
+        <span style="min-width:70px;display:inline-block">CP:${p.cp}</span>
+        <span style="min-width:80px;display:inline-block;font-family:monospace">iv:${iv}</span>
+        catch:${catchStr}&nbsp;&nbsp;orig:${origStr}
+      </div>`;
+    }).join('');
+
+    return `<div style="padding:10px 16px;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700;font-size:13px;color:var(--cyan);margin-bottom:4px">${cand.family} family</div>
+      ${memberRows}
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;padding-left:12px">→ These may be the same Pokémon. Use Pokégenie merge to consolidate.</div>
+    </div>`;
+  }).join('');
+
+  body.innerHTML=rows;
+  modal.style.display='flex';
+}
+
+function closeMergeModal(){
+  document.getElementById('merge-modal').style.display='none';
+}
+
 // ── Cleanup / Special modals ──────────────────
 let cleanupSortMode='stable';
 let specialSortMode='date';
@@ -970,11 +1031,26 @@ function setOverride(idx, field, value) {
       p.isLucky
     );
   }
-  // Re-render this row so star colour and decision badge update immediately
+  // Rebuild nick when shiny/dynamax/gigantamax/form fields change
+  const NICK_FIELDS = new Set(['is_shiny','is_dynamax','is_gigantamax','special_form','vivillon_pattern']);
+  if (NICK_FIELDS.has(field)) {
+    if (field === 'is_shiny' && value && !(p.slots||[]).includes('shiny')) p.slots.push('shiny');
+    const slots = p.slots || [];
+    const lgSlots = slots.filter(s => ['L','G','U','M'].includes(s));
+    let ns;
+    if (slots.includes('nundo')) ns = 'nundo';
+    else if (lgSlots.length > 0) {
+      const capped = lgSlots.filter(s => s !== 'M');
+      ns = capped.length > 0 ? capped.sort((a,b)=>(p['rankPct'+b]||0)-(p['rankPct'+a]||0))[0] : 'M';
+    } else if (slots.includes('shiny') || slots.includes('shiny_lower')) ns = 'shiny';
+    else if (slots.includes('lucky')) { const ll=['U','G','L','M'].find(l=>(p['rankPct'+l]||0)>=90); ns=ll||'M'; }
+    else ns = 'review';
+    p.nickname = buildNickname(p, ns);
+  }
+  // Re-render this row so star colour, nick, and decision badge update immediately
   const tr = document.querySelector(`tr[data-idx="${p.idx}"]`);
   if (tr) {
     const iv = Math.round(p.ivAvg||0);
-    const ivc = iv>=90?'var(--green)':iv>=70?'var(--cyan)':'var(--muted)';
     // Update star cell
     const starTd = tr.querySelector('td:first-child');
     if (starTd) starTd.innerHTML = starCell(p);
@@ -988,6 +1064,14 @@ function setOverride(idx, field, value) {
     if (nameTd) {
       const vt = nameTd.querySelector('.poke-variants');
       if (vt) vt.innerHTML = variantTags(p);
+    }
+    // Update nick cell when nick was rebuilt
+    if (NICK_FIELDS.has(field)) {
+      const nickTd = tr.cells[3];
+      if (nickTd && nickTd.firstChild) {
+        nickTd.firstChild.nodeValue = p.nickname;
+        nickTd.dataset.nick = p.nickname;
+      }
     }
   }
   // Save to Supabase

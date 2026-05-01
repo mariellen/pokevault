@@ -192,10 +192,13 @@ async function loadOverrides() {
 }
 
 function applyOverridesToPokemon() {
+  const toRerender = [];
   allPokemon.forEach(p => {
-    const ov = overridesCache[p.idx];
+    const ov = overridesCache[p.stableKey];
     if (!ov) return;
-    if (ov.is_shiny) p.isShiny = true;
+    const nickAffected = ov.is_shiny || ov.is_dynamax || ov.is_gigantamax
+                      || ov.special_form || ov.vivillon_pattern;
+    if (ov.is_shiny) { p.isShiny = true; if (!p.slots.includes('shiny')) p.slots.push('shiny'); }
     if (ov.is_dynamax) p.isDynamax = true;
     if (ov.is_gigantamax) p.isGigantamax = true;
     if (ov.is_costumed) p.isCostumed = true;
@@ -203,6 +206,18 @@ function applyOverridesToPokemon() {
     if (ov.special_form) p.specialForm = ov.special_form;
     if (ov.manual_decision) p.manualDecision = ov.manual_decision;
     if (ov.notes) p.notes = ov.notes;
+    if (nickAffected) toRerender.push(p);
+  });
+  // Re-render rows where nick-affecting overrides were applied
+  toRerender.forEach(p => {
+    const tr = document.querySelector(`tr[data-idx="${p.idx}"]`);
+    if (!tr || typeof buildRow !== 'function') return;
+    const ovRow = tr.nextElementSibling;
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = buildRow(p);
+    const [newTr, newOvRow] = tmp.children;
+    if (newTr) tr.replaceWith(newTr);
+    if (ovRow && ovRow.classList.contains('override-row') && newOvRow) ovRow.replaceWith(newOvRow);
   });
 }
 

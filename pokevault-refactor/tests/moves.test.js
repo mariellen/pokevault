@@ -109,8 +109,8 @@ describe('Metagross — Ultra League', () => {
 
   it('exists in the database', () => expect(m).not.toBeNull());
 
-  it('fast move is Bullet Punch', async () => {
-    expect(m.fast_move_best).toBe('Bullet Punch');
+  it('fast move is Shadow Claw', async () => {
+    expect(m.fast_move_best).toBe('Shadow Claw');
     expect(m.fast_move_legacy).toBe(false);
   });
 

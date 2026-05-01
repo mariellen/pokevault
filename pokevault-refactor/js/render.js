@@ -194,7 +194,6 @@ function buildRow(p){
             <input type="text" value="${p.notes||''}" placeholder="Optional notes" style="width:140px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','notes',this.value)">
           </label>
           <button class="btn" style="padding:2px 8px;font-size:10px" onclick="clearOverride('${p.stableKey}')">Clear overrides</button>
-          ${!p.catchDate?'<span style="color:var(--gold);font-size:10px">⚠ No catch date — override may not survive re-export</span>':''}
         </div>
       </td>
     </tr>

@@ -91,6 +91,25 @@
   </div>
 </div>
 
+<!-- Merge candidates modal -->
+<div class="pv-modal-overlay" id="merge-modal" onclick="if(event.target===this)closeMergeModal()">
+  <div class="pv-modal" style="max-width:740px">
+    <div class="pv-modal-header">
+      <div>
+        <div class="pv-modal-title">🔀 Merge Candidates</div>
+        <div class="pv-modal-sub" id="merge-modal-sub">Loading...</div>
+      </div>
+      <button class="pv-modal-close" onclick="closeMergeModal()">✕</button>
+    </div>
+    <div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)">
+      Same-IV Pokémon at different CP where at least one has no catch date — likely the same individual scanned before and after a power-up. Use Pokégenie merge to consolidate.
+    </div>
+    <div class="pv-modal-body" id="merge-modal-body">
+      <div class="pv-modal-empty">Load your collection first</div>
+    </div>
+  </div>
+</div>
+
 <!-- Cull modal -->
 <div class="pv-modal-overlay" id="cull-modal" onclick="if(event.target===this)closeCullModal()">
   <div class="pv-modal" style="max-width:820px">
@@ -156,6 +175,7 @@
     <button class="btn" id="costlyBtn" onclick="filterCostlyWinners(this)" title="Show only costly (blue star) recommendations">💰 Costly</button>
     <button class="btn" data-f="canEvolve" onclick="setDecFilter('canEvolve',this)">Can Evolve</button>
     <button class="btn" data-f="neverEvolved" onclick="setDecFilter('neverEvolved',this)">Never Evolved</button>
+    <button class="btn" onclick="openMergeModal()" title="Find merge candidates — same-IV Pokémon at different CP">🔀 Merge</button>
     <button class="btn" onclick="openCullModal()" title="Families with confirmed keepers — everything else is safe to cull">🗑 Cull</button>
     <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates">🌟 Purify</button>
     <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc">🎨 Set Forms</button>

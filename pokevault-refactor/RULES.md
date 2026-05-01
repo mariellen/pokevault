@@ -242,7 +242,7 @@ Manual flags stored in `pokemon_overrides` table, keyed by `stableKey`.
 
 Overrides are applied **after** analysis, so manual decisions override computed ones.
 
-**Stability warning:** Overrides on Pokémon without a catch date use `_idx{N}` fallback which is unstable after re-exports. A warning is shown in the override panel for these.
+**Stable key format:** `PokemonNumber|Form|Gender|AtkIV|DefIV|StaIV|CatchDate||OriginalScanDate`. Original Scan Date is always present (set on first scan, never changes), so 100% of Pokémon have a stable key regardless of catch date. The override panel no longer shows a catch-date warning.
 
 ---
 

@@ -82,3 +82,34 @@ const DUST_PP = {
   21:3000,22:3000,23:3500,24:3500,25:4000,26:4000,27:4500,28:4500,29:5000,30:5000,
   31:6000,32:6000,33:7000,34:7000,35:8000,36:8000,37:9000,38:9000,39:10000,40:10000
 };
+
+// Short prefixes used in nicknames when a Pokémon has a visually distinct form.
+// Applied in buildNickname when p.form or p.specialForm matches a key here.
+// Furfrou / Vivillon / Flabébé forms are set via the Set Forms modal (p.specialForm).
+const FORM_NICK_PREFIXES = {
+  // Castform
+  'Snowy':'Snow', 'Rainy':'Rain', 'Sunny':'Snny',
+  // Lycanroc
+  'Midnight':'Night', 'Dusk':'Dusk',
+  // Deoxys
+  'Attack':'Atk', 'Defense':'Def', 'Speed':'Spd',
+  // Giratina / Dialga
+  'Origin':'Orig',
+  // Forces of Nature (Tornadus/Thundurus/Landorus/Enamorus)
+  'Therian':'Ther',
+  // Groudon / Kyogre
+  'Primal':'Prml',
+  // Wormadam
+  'Sandy':'Sandy', 'Trash':'Trash',
+  // Furfrou trims (via Set Forms modal)
+  'Dandy':'Dand', 'Matron':'Matr', 'La Reine':'Rein', 'Kabuki':'Kbki',
+  'Pharaoh':'Phar', 'Star':'Star', 'Diamond':'Diam', 'Heart':'Hart', 'Natural':'Natl',
+  // Vivillon patterns (via Set Forms modal)
+  'Polar':'Polr', 'Meadow':'Mdow', 'Tundra':'Tndr', 'Continental':'Cont',
+  'Garden':'Grdn', 'Elegant':'Elgt', 'Icy Snow':'IcyS', 'Marine':'Marn',
+  'Modern':'Modn', 'Monsoon':'Mnsn', 'Ocean':'Ocen', 'River':'Rivr',
+  'Sandstorm':'Sand', 'Savanna':'Savn', 'Sun':'Sun', 'Jungle':'Jngl',
+  'Archipelago':'Arch', 'High Plains':'HiPl', 'Pokéball':'PBal', 'Fancy':'Fanc',
+  // Flabébé / Floette / Florges colours (via Set Forms modal)
+  'Red':'Red', 'Orange':'Orng', 'Yellow':'Yell', 'Blue':'Blue', 'White':'Whit',
+};

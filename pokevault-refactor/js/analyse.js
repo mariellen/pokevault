@@ -65,15 +65,19 @@ function buildFamilyMap(rows) {
     const form = r['Form']||'';
     const isRegional = REGIONAL_FORMS.has(form);
     const needsSplit = FORM_SPLIT_FORMS.has(form);
-    const baseFamKey = (isRegional || needsSplit) ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
+    const gender = r['Gender']||'';
+    const needsGenderSplit = GENDER_SPLIT_SPECIES.has(r['Name']);
+    let baseFamKey = (isRegional || needsSplit) ? r['Pokemon Number']+'|'+form : r['Pokemon Number'];
+    if (needsGenderSplit && gender) baseFamKey = baseFamKey + '|' + gender;
     ['Name (G)','Name (U)','Name (L)'].forEach(col => {
       const evoName = (r[col]||'').trim();
       if (!evoName || evoName === r['Name']) return;
       const evoNum = nameToNum[evoName];
       if (!evoNum) return;
       if (STANDALONE_SPECIES.has(evoName)) return; // e.g. Kleavor — standalone, not part of Scyther family
-      // Evo inherits same regional form
-      const evoFamKey = isRegional ? evoNum+'|'+form : evoNum;
+      // Evo inherits same regional form; gender-split evo inherits same gender (e.g. Frillish♂→Jellicent♂)
+      let evoFamKey = isRegional ? evoNum+'|'+form : evoNum;
+      if (needsGenderSplit && gender && GENDER_SPLIT_SPECIES.has(evoName)) evoFamKey = evoFamKey + '|' + gender;
       if (evoFamKey === baseFamKey) return;
       const key = baseFamKey + '>' + evoFamKey;
       voteCount[key] = (voteCount[key]||0) + 1;
@@ -152,6 +156,12 @@ function buildNickname(p, slot) {
   else if (slot==='L' && p.evolvedNameL) base=p.evolvedNameL;
   else if (slot==='M') base=p.evolvedNameU||p.evolvedNameG||p.name;
 
+  // Form nick prefix: visually distinct forms use short prefix instead of species name
+  // (e.g. Castform Snowy→'Snow', Deoxys Attack→'Atk', Furfrou Dandy→'Dand')
+  const activeForm = p.specialForm || p.form;
+  const formPrefix = activeForm && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[activeForm];
+  if (formPrefix) base = formPrefix;
+
   if (isNundo) return fitName(base, NUNDO, '', 12);
 
   // Build suffix first so we know how many chars it needs
@@ -168,18 +178,21 @@ function buildNickname(p, slot) {
       else if (t1 && dustForSlot >= t1) suf += '$';
     }
   }
-  // Shiny on non-shiny slots
-  if (p.isShiny&&slot!=='shiny'&&slot!=='shiny_lower') suf+='S';
   // Shadow purification suffix — only if shadow doesn't already hold a league slot
   if (p.isShadow && p.purifyLeague) {
     const alreadyHasSlot = p.slots.some(s => ['L','G','U','M'].includes(s));
     if (!alreadyHasSlot) suf += p.purifyHundo ? 'p✪' : 'p';
   }
-  if (p.isPurified) suf += '✦';
+  if (p.isPurified) suf += '*';
+  if (p.isDynamax) suf += 'Ⓓ';
+  if (p.isGigantamax) suf += 'Ⓧ';
 
   // Move flags
   if (p.hasAllBestMoves) suf+='☆';
   else if (p.hasTwoMoves&&p.hasBestMoves) suf+='b';
+
+  // Shiny on non-shiny slots — always last so ※ trails everything else in GO
+  if (p.isShiny && slot !== 'shiny' && slot !== 'shiny_lower') suf += SHINY_SFX;
 
   let mid='', nickSuf=suf;
 
@@ -237,9 +250,9 @@ function buildNickname(p, slot) {
       const pv=Math.round(p['rankPct'+best]||0);
       mid=LC[best]+(pv===100?PERFECT:String(pv));
     } else {
-      mid=String(iv);
+      mid=LC.R+String(iv);
     }
-    nickSuf=SHINY_SFX+suf;
+    nickSuf=suf+SHINY_SFX;
     return fitName(p.name, mid, nickSuf, 12);
   } else if (slot==='lucky') {
     // Lucky with no league slot: NameⓇIV (Master/level-up candidate)
@@ -443,6 +456,9 @@ function analyse(rows) {
       rankPctG:rG, rankPctU:rU, rankPctL:rL, rankPctM:iv,
       rankNumG:Number(r['Rank # (G)'])||null, rankNumU:Number(r['Rank # (U)'])||null, rankNumL:Number(r['Rank # (L)'])||null,
       evolvedNameG:validateEvo(r['Name (G)']), evolvedNameU:validateEvo(r['Name (U)']), evolvedNameL:validateEvo(r['Name (L)']),
+      standaloneEvoG:!!(r['Name (G)'] && r['Name (G)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (G)'])),
+      standaloneEvoU:!!(r['Name (U)'] && r['Name (U)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (U)'])),
+      standaloneEvoL:!!(r['Name (L)'] && r['Name (L)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (L)'])),
       dustG,dustU,dustL,dustMin,dustCostBest:dustMin,
       catchDate:r['Catch Date']||'', catchDateMs:parseCatchDate(r['Catch Date']),
       originalScanDate:r['Original Scan Date']||'',
@@ -472,6 +488,21 @@ function analyse(rows) {
   parsed.forEach(p => { p.stableKey = makeStableKey(p); });
   deduplicateKeys(parsed);
 
+  // Apply flag overrides before slot/nick building so isShiny, isDynamax, specialForm
+  // are correct when shiny slot assignment and buildNickname run.
+  if (typeof overridesCache !== 'undefined') {
+    parsed.forEach(p => {
+      const ov = overridesCache[p.stableKey];
+      if (!ov) return;
+      if (ov.is_shiny) p.isShiny = true;
+      if (ov.is_dynamax) p.isDynamax = true;
+      if (ov.is_gigantamax) p.isGigantamax = true;
+      if (ov.is_costumed) p.isCostumed = true;
+      if (ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
+      if (ov.special_form) p.specialForm = ov.special_form;
+    });
+  }
+
   // Simulate purification for shadows
   parsed.forEach(p => {
     simulatePurify(p, rows);
@@ -494,6 +525,12 @@ function analyse(rows) {
       const rankField=`rankPct${lg}`;
       const byEvoStage={};
       members.forEach(p=>{
+        // Skip leagues where the evo target is a standalone species — rankPct for that league
+        // reflects the standalone species' rank, not this Pokémon's, so the data is invalid.
+        if (lg==='L' && p.standaloneEvoL) return;
+        if (lg==='G' && p.standaloneEvoG) return;
+        if (lg==='U' && p.standaloneEvoU) return;
+
         const stageName = lg==='L'?(p.evolvedNameL||p.name)
           :lg==='G'?(p.evolvedNameG||p.name)
           :lg==='U'?(p.evolvedNameU||p.name)
@@ -752,9 +789,10 @@ function analyse(rows) {
       } else if (hasLeagueSlot) {
         const lgSlots=p.slots.filter(s=>RULES.leagues.includes(s)||s.endsWith('_affordable')).map(s=>s.replace('_affordable',''));
         const lgNames=lgSlots.map(s=>RULES.leagueNames[s]);
-        // If holding both Master and a capped league, prefer the capped league symbol (Ⓤ/Ⓖ/Ⓛ) over Ⓡ
-        const nickSlot = (lgSlots.includes('M') && lgSlots.some(s => s !== 'M'))
-          ? (['U','G','L'].find(s => lgSlots.includes(s)) || lgSlots[0])
+        // Prefer capped league (Ⓤ/Ⓖ/Ⓛ) over Master (Ⓡ); when multiple capped leagues, pick highest rank
+        const cappedSlots = lgSlots.filter(s => s !== 'M');
+        const nickSlot = cappedSlots.length > 0
+          ? cappedSlots.sort((a, b) => (p['rankPct'+b]||0) - (p['rankPct'+a]||0))[0]
           : (['M','U','G','L'].find(s => lgSlots.includes(s)) || lgSlots[0]);
         if(nickSlot==='M') p.targetEvo=p.evolvedNameU||p.evolvedNameG||'';
         else if(nickSlot==='G') p.targetEvo=p.evolvedNameG||'';
@@ -1073,4 +1111,32 @@ function analyse(rows) {
   }).sort((a,b)=>a.primaryName.localeCompare(b.primaryName));
 
   return {pokemon:parsed, families:famList};
+}
+
+// ═══════════════════════════════════════════════
+// MERGE CANDIDATES
+// Find same-IV pairs at different CP where ≥1 has no catch date —
+// likely the same individual scanned before and after a power-up.
+// ═══════════════════════════════════════════════
+function findMergeCandidates(families) {
+  const candidates = [];
+
+  families.forEach(fam => {
+    const byIV = {};
+    fam.members.forEach(p => {
+      const key = `${p.atkIV}/${p.defIV}/${p.staIV}`;
+      if (!byIV[key]) byIV[key] = [];
+      byIV[key].push(p);
+    });
+
+    Object.values(byIV).forEach(group => {
+      if (group.length < 2) return;
+      const cps = new Set(group.map(p => p.cp));
+      if (cps.size < 2) return; // identical CP = genuine duplicates, not merge candidates
+      if (!group.some(p => !p.catchDate)) return; // all have dates = probably fine
+      candidates.push({ family: fam.primaryName, members: group });
+    });
+  });
+
+  return candidates.sort((a, b) => a.family.localeCompare(b.family));
 }
