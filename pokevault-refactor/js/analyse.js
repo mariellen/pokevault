@@ -948,11 +948,25 @@ function analyse(rows) {
 
       const priority = ['M','U','G','L'];
 
-      // Keep highest league slot; remove conflicting lower slots (different evo stage)
-      const keepSlot = priority.find(s => leagueSlots.includes(s)); // always highest league
-
+      const keepSlot = priority.find(s => leagueSlots.includes(s)); // highest-priority league
       const keepEvo = slotEvo(keepSlot);
-      const conflicting = leagueSlots.filter(s => s !== keepSlot && slotEvo(s) !== keepEvo);
+
+      // Different evo stage: must release (can't physically be in two evo stages at once)
+      const diffEvoConflicts = leagueSlots.filter(s => s !== keepSlot && slotEvo(s) !== keepEvo);
+
+      // Same evo stage: keep the slot with the highest rank; release the rest
+      // (Pokémon should specialise in the league where it has the best rank)
+      // Ties (e.g. 100%/100%) are kept — nothing is released
+      const sameEvoSlots = leagueSlots.filter(s => slotEvo(s) === keepEvo);
+      const bestRankedSlot = sameEvoSlots.reduce((best, s) => {
+        const rb = p['rankPct'+best]||0, rs = p['rankPct'+s]||0;
+        return rs > rb ? s : best;
+      }, keepSlot);
+      const sameEvoConflicts = sameEvoSlots.filter(s =>
+        s !== bestRankedSlot && (p['rankPct'+s]||0) < (p['rankPct'+bestRankedSlot]||0)
+      );
+
+      const conflicting = [...diffEvoConflicts, ...sameEvoConflicts];
       if (!conflicting.length) return;
 
       conflicting.forEach(s => {
@@ -971,7 +985,16 @@ function analyse(rows) {
         const rf = 'rankPct'+s;
         const nextBest = members
           .filter(m => m !== p)
-          .filter(m => !m.slots.some(ms => RULES.leagues.includes(ms) && slotEvo(ms, m) === evoTarget))
+          .filter(m => {
+            // Must not already hold this league (even for a different evo target)
+            if (m.slots.includes(s)) return false;
+            // Candidate's evo target for this league must match the released slot's evo target
+            const candidateEvo = s==='L'?(m.evolvedNameL||m.name)
+              :s==='G'?(m.evolvedNameG||m.name)
+              :s==='U'?(m.evolvedNameU||m.name)
+              :(m.evolvedNameU||m.evolvedNameG||m.name);
+            return candidateEvo === evoTarget;
+          })
           .filter(m => {
             const d = s==='L'?m.dustL:s==='G'?m.dustG:s==='U'?m.dustU:0;
             const isFinal = !(m.evolvedNameG && m.evolvedNameG !== m.name) &&
@@ -1039,6 +1062,29 @@ function analyse(rows) {
       });
     });
     // ─────────────────────────────────────────────────────────────────────────
+
+    // Conflict resolution may assign new slots (via nextBest) to Pokémon whose
+    // decision was already set to trade/review when they had no slot. Re-pass
+    // promotes them to keep with correct nick and suggestStar.
+    members.forEach(p => {
+      const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
+      if (!leagueSlots.length || p.decision === 'keep') return;
+      if (!p.slotConfirmed) return; // below 90% — leave as review
+      const cappedSlots = leagueSlots.filter(s => s !== 'M');
+      const nickSlot = cappedSlots.length
+        ? cappedSlots.sort((a, b) => (p['rankPct'+b]||0) - (p['rankPct'+a]||0))[0]
+        : leagueSlots[0];
+      const lgNames = leagueSlots.map(s => RULES.leagueNames[s]);
+      p.decision = 'keep';
+      p.reason = 'Best ' + lgNames.join(' + ');
+      p.nickname = buildNickname(p, nickSlot);
+      if (nickSlot === 'L') p.dustCostBest = p.dustL || 0;
+      else if (nickSlot === 'G') p.dustCostBest = p.dustG || 0;
+      else if (nickSlot === 'U') p.dustCostBest = p.dustU || 0;
+      else p.dustCostBest = 0;
+      p.suggestStarExpensive = p.isExpensiveWinner === true;
+      p.suggestStar = !p.suggestStarExpensive;
+    });
 
     // Recompute cyan/expensive star flags — conflict resolution above may have
     // removed slots from p.slots, leaving cheaperAlternativeLeagues stale.

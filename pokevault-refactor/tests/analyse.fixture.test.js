@@ -1,6 +1,6 @@
 'use strict';
 // Fixture-based tests for the analysis engine.
-// Uses poke_genie_fixture.csv — 50 deterministic rows designed to exercise specific behaviours.
+// Uses poke_genie_fixture.csv — 52 deterministic rows designed to exercise specific behaviours.
 // See FIXTURE_CSV_SPEC.md for the full spec and expected outputs per row.
 //
 // Run with: npx jest tests/analyse.fixture.test.js
@@ -91,21 +91,23 @@ describe('Group 2 — Leafeon family (evolved preference)', () => {
   });
 });
 
-// ─── Group 3 — Vaporeon (rank beats zero dust) ───────────────────────────────
+// ─── Group 3 — Vaporeon (same-evo slot routing) ──────────────────────────────
+// CP:1497 holds both G (99.90%) and U (99.61%). Bug 1 fix: same-evo multi-slot
+// holders keep only the league with the highest rank. CP:1497 keeps G, releases U.
+// CP:2493 (98.68% Ultra, dustU=0) wins Ultra via nextBest.
 
-describe('Group 3 — Vaporeon (higher rank beats zero dust)', () => {
-  it('Vaporeon CP:1497 (99.61% Ultra, fav=0) wins over CP:2493 (98.68%, fav=1, dustU=0)', () => {
-    const winner = find('Vaporeon', 1497);
-    const loser = find('Vaporeon', 2493);
-    expect(winner.slots).toContain('U');
-    expect(loser.slots).not.toContain('U');
+describe('Group 3 — Vaporeon (same-evo slot routing)', () => {
+  it('Vaporeon CP:1497 (G=99.90%, U=99.61%) keeps Great — releases Ultra (lower rank)', () => {
+    const p = find('Vaporeon', 1497);
+    expect(p.slots).toContain('G');
+    expect(p.slots).not.toContain('U');
   });
 
-  it('Vaporeon CP:2493 (fav=1, loses Ultra slot) — RED star', () => {
+  it('Vaporeon CP:2493 (fav=1, dustU=0) wins Ultra after CP:1497 releases it — GOLD', () => {
     const p = find('Vaporeon', 2493);
+    expect(p.slots).toContain('U');
     expect(p.isFavorite).toBe(true);
-    expect(p.suggestStar).toBe(false);
-    expect(p.slots).not.toContain('U');
+    expect(p.suggestStar).toBe(true); // suggestStar+isFavorite = gold star
   });
 });
 
@@ -429,5 +431,37 @@ describe('Group 13 — Standalone evo target suppresses league slot', () => {
     const p = find('Scyther', 260);
     expect(p).toBeDefined();
     expect(p.standaloneEvoL).toBe(true);
+  });
+});
+
+// ─── Group 14 — Sawk multi-league deconfliction (Bug 1) ──────────────────────
+// CP:190 wins G (99.3%), U (75%), and L (98.8%) in initial pass.
+// Bug 1 fix: same-evo multi-slot → keep highest-rank league (G=99.3%), release rest.
+// U (75%) has no nextBest (CP:500 at 65% is below 70% threshold).
+// L (98.8%) nextBest → CP:500 (97.9%, dustL=0) wins Little.
+
+describe('Group 14 — Sawk multi-league deconfliction (Bug 1)', () => {
+  it('Sawk CP:190 (G=99.3%) wins Great slot', () => {
+    const p = find('Sawk', 190);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+  });
+
+  it('Sawk CP:190 does NOT hold Little slot — released to CP:500', () => {
+    const p = find('Sawk', 190);
+    expect(p.slots).not.toContain('L');
+  });
+
+  it('Sawk CP:500 (L=97.9%, dustL=0) wins Little slot', () => {
+    const p = find('Sawk', 500);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('L');
+  });
+
+  it('Sawk CP:500 shows green star (fav=0, wins Little, dustL=0)', () => {
+    const p = find('Sawk', 500);
+    expect(p.isFavorite).toBe(false);
+    expect(p.suggestStar).toBe(true);
+    expect(p.suggestStarExpensive).toBeFalsy();
   });
 });
