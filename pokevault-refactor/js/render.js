@@ -9,6 +9,7 @@
 // STATE
 // ═══════════════════════════════════════════════
 let allPokemon=[], families=[], filteredFamilies=[];
+let mergeCandidateKeys=new Set();
 let decFilter='all', leagueFilters=new Set(), searchTerm='', page=1, sortMode='star', countThreshold=100;
 const PER_PAGE=40;
 const familySortState={};
@@ -146,12 +147,13 @@ function buildRow(p){
   const genderStr=p.gender==='♂'?' <span style="color:#6fa8dc;font-size:10px">♂</span>':p.gender==='♀'?' <span style="color:#ea9999;font-size:10px">♀</span>':'';
   const rowSearchEsc=(p.name.toLowerCase()+'&cp'+(p.cp||0)).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const evoSearchTag=p._evoSearchTag||'';
+  const isMergeCandidate=mergeCandidateKeys.has(p.stableKey);
 
-  return `<tr class="row-${p.decision}${p.isHundo?' row-hundo':''}" data-idx="${p.idx}">
+  return `<tr class="row-${p.decision}${p.isHundo?' row-hundo':''}${isMergeCandidate?' row-merge-candidate':''}" data-idx="${p.idx}">
     <td style="min-width:44px;white-space:nowrap">${starCell(p)}<button class="edit-btn" onclick="toggleOverride('${p.stableKey}')" title="Overrides">✎</button></td>
     <td class="poke-name-cell">
       <div class="poke-variants">${variantTags(p)}</div>
-      <div class="poke-name">${p.name}${p.form?` <span class="poke-form">(${p.form})</span>`:''}${genderStr}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button></div>
+      <div class="poke-name">${p.name}${p.form?` <span class="poke-form">(${p.form})</span>`:''}${genderStr}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button>${isMergeCandidate?`<button class="merge-icon-btn" onclick="event.stopPropagation();openMergeModal('${p.stableKey}')" title="Merge candidate — tap to review">🔀</button>`:''}</div>
       ${evoIndicators}
     </td>
     <td style="font-size:11px;color:var(--muted)">${p.cp||'--'}</td>

@@ -216,6 +216,13 @@ tr.row-hidden{display:none;}
 .evo-gold{color:var(--gold);}
 .evo-grey{color:var(--muted);}
 tr.row-hundo td{background:rgba(227,179,65,0.04)!important;}
+tr.row-merge-candidate{opacity:0.7;}
+.merge-icon-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:1px 3px;margin-left:2px;opacity:0.8;vertical-align:middle;}
+.merge-icon-btn:hover{opacity:1;}
+.merge-copy-btn{background:none;border:none;padding:0;cursor:pointer;text-align:left;color:inherit;display:inline;}
+.merge-copy-btn:hover{opacity:0.7;}
+.merge-fam-link{color:var(--cyan);text-decoration:none;}
+.merge-fam-link:hover{text-decoration:underline;}
 /* COPY BUTTON */
 .copy-search-btn{background:none;border:1px solid var(--border);color:var(--muted);
   cursor:pointer;font-size:10px;padding:2px 8px;border-radius:4px;margin-left:4px;

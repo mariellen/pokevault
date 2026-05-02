@@ -745,7 +745,7 @@ function closeCullModal(){
 }
 
 // ── Merge candidates modal ────────────────────
-function openMergeModal(){
+function openMergeModal(scrollToKey){
   if(!allPokemon.length){alert('Load your collection first');return;}
   const modal=document.getElementById('merge-modal');
   const body=document.getElementById('merge-modal-body');
@@ -763,36 +763,41 @@ function openMergeModal(){
     return;
   }
 
-  const rows=candidates.map(cand=>{
+  const rows=candidates.map((cand,i)=>{
     const sorted=[...cand.members].sort((a,b)=>{
-      // Older original scan date first (the base scan to keep)
       const da=a.originalScanDate||'9999';
       const db=b.originalScanDate||'9999';
       return da.localeCompare(db);
     });
 
+    const famEsc=cand.family.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     const memberRows=sorted.map(p=>{
       const iv=`${p.atkIV}/${p.defIV}/${p.staIV}`;
       const catchStr=p.catchDate||'<span style="color:var(--gold)">no date</span>';
       const origStr=p.originalScanDate||'—';
-      const noDate=!p.catchDate;
-      return `<div style="font-size:11px;padding:3px 0 3px 12px;${noDate?'color:var(--muted)':''}">
-        <span style="min-width:90px;display:inline-block;font-weight:600">${p.name}</span>
-        <span style="min-width:70px;display:inline-block">CP:${p.cp}</span>
-        <span style="min-width:80px;display:inline-block;font-family:monospace">iv:${iv}</span>
-        catch:${catchStr}&nbsp;&nbsp;orig:${origStr}
+      const searchStr=(p.name.toLowerCase()+'&cp'+(p.cp||0)).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      return `<div style="padding:3px 0 3px 12px">
+        <button class="merge-copy-btn" data-search="${searchStr}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO search: ${searchStr}"><span style="font-weight:700;font-size:12px">${p.name} CP:${p.cp} ${iv}</span></button>
+        <div style="font-size:9px;color:var(--muted);margin-top:1px">catch:${catchStr}&nbsp;&nbsp;orig:${origStr}</div>
       </div>`;
     }).join('');
 
-    return `<div style="padding:10px 16px;border-bottom:1px solid var(--border)">
-      <div style="font-weight:700;font-size:13px;color:var(--cyan);margin-bottom:4px">${cand.family} family</div>
+    return `<div id="mg-${i}" style="padding:10px 16px;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700;font-size:13px;margin-bottom:4px"><a href="#" class="merge-fam-link" data-fam="${famEsc}" onclick="event.preventDefault();closeMergeModal();const b=document.getElementById('searchBox');if(b){b.value=this.dataset.fam;b.dispatchEvent(new Event('input'));}">${famEsc} family</a></div>
       ${memberRows}
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;padding-left:12px">→ These may be the same Pokémon. Use Pokégenie merge to consolidate.</div>
     </div>`;
   }).join('');
 
   body.innerHTML=rows;
   modal.style.display='flex';
+
+  if(scrollToKey){
+    const idx=candidates.findIndex(c=>c.members.some(m=>m.stableKey===scrollToKey));
+    if(idx>=0){
+      const el=body.querySelector('#mg-'+idx);
+      if(el) setTimeout(()=>el.scrollIntoView({block:'start',behavior:'smooth'}),50);
+    }
+  }
 }
 
 function closeMergeModal(){
@@ -978,6 +983,7 @@ async function handleCloudLoad() {
       allPokemon = result.pokemon;
       families = result.families;
       filteredFamilies = families.slice();
+      mergeCandidateKeys = new Set(findMergeCandidates(families).flatMap(c=>c.members.map(m=>m.stableKey)));
       setProgress('BUILDING DISPLAY...', 88);
       setTimeout(()=>{
         document.getElementById('loading-section').style.display='none';
@@ -1229,6 +1235,7 @@ function handleFile(file){
           try{
             console.time('analyse'); const result=analyse(rows); console.timeEnd('analyse');
             allPokemon=result.pokemon;families=result.families;filteredFamilies=families.slice();
+            mergeCandidateKeys=new Set(findMergeCandidates(families).flatMap(c=>c.members.map(m=>m.stableKey)));
             setProgress('BUILDING DISPLAY...',88);
             setTimeout(()=>{
               clearTimeout(watchdog);

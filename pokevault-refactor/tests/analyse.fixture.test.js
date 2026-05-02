@@ -48,16 +48,15 @@ describe('Group 1 — Glaceon family (evolved preference + committed)', () => {
     expect(p.suggestStar).toBe(true);
   });
 
-  it('Eevee CP:654 (same IVs as Glaceon 2500, fav=0) does NOT win over evolved Glaceon', () => {
-    // Glaceon 2500 already evolved → pre-evo Eevee should not displace it
-    const evolved = find('Glaceon', 2500);
+  it('Eevee CP:654 (same IVs as Glaceon 2500, fav=0) loses Ultra — evolved Glaceon wins tiebreaker', () => {
     const preEvo = find('Eevee', 654);
+    expect(preEvo).toBeDefined();
+    expect(preEvo.slots).not.toContain('U');
+    // Not a keeper — no confirmed league slot won
+    expect(['trade', 'review']).toContain(preEvo.decision);
+    // Glaceon must still hold Ultra
+    const evolved = find('Glaceon', 2500);
     expect(evolved.slots).toContain('U');
-    // Eevee may or may not get the slot — but Glaceon must win it
-    if (preEvo && preEvo.slots.includes('U')) {
-      // If both somehow hold it, Glaceon must at minimum be there
-      expect(evolved.slots).toContain('U');
-    }
   });
 });
 
@@ -68,6 +67,7 @@ describe('Group 2 — Leafeon family (evolved preference)', () => {
     const p = find('Leafeon', 1177);
     expect(p).toBeDefined();
     expect(p.slots).toContain('G');
+    expect(p.slots).not.toContain('U'); // Bug 1 fix: Great rank wins, Ultra released
     expect(p.nickname).toContain('Ⓖ');
     expect(p.isFavorite).toBe(true);
     expect(p.suggestStar).toBe(true);
@@ -194,6 +194,54 @@ describe('Group 6 — Totodile/Croconaw/Feraligatr', () => {
     const p = find('Totodile', 50);
     expect(['trade', 'review']).toContain(p.decision);
   });
+
+  it('Totodile CP:500 (dustG=13500, affordable) wins Great slot — GREEN star', () => {
+    const p = find('Totodile', 500);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.suggestStar).toBe(true);
+    expect(p.suggestStarExpensive).toBeFalsy();
+    expect(p.isFavorite).toBe(false);
+  });
+
+  it('Croconaw CP:800 wins Great slot — GREEN star', () => {
+    const p = find('Croconaw', 800);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.suggestStar).toBe(true);
+    expect(p.suggestStarExpensive).toBeFalsy();
+    expect(p.isFavorite).toBe(false);
+  });
+});
+
+// ─── Group 7 — Purify modal ──────────────────────────────────────────────────
+// simulatePurify fires when estimatedPurifiedRank = rank + improvement*0.4 ≥ 92
+// and rank is in (0, 90) — already-qualifying shadows are skipped.
+
+describe('Group 7 — Purify modal candidates', () => {
+  it('Gastly shadow CP:82 (G=89.5%, improvement≈6.7%) appears in purify modal', () => {
+    const p = find('Gastly', 82);
+    expect(p).toBeDefined();
+    expect(p.isShadow).toBe(true);
+    expect(p.purifyLeague).toBeTruthy();
+    expect(p.purifyRankPct).toBeGreaterThanOrEqual(92);
+  });
+
+  it('Cacnea shadow CP:80 (G=80%, improvement≈11.1%) does NOT appear — estimate too low', () => {
+    const p = find('Cacnea', 80);
+    expect(p).toBeDefined();
+    expect(p.isShadow).toBe(true);
+    expect(p.purifyRankPct).toBeLessThan(92);
+  });
+
+  it('Machop shadow CP:120 (G=88%, IVs 13/13/13 → hundo after purify) appears with purifyHundo=true', () => {
+    const p = find('Machop', 120);
+    expect(p).toBeDefined();
+    expect(p.isShadow).toBe(true);
+    expect(p.purifyLeague).toBeTruthy();
+    expect(p.purifyRankPct).toBeGreaterThanOrEqual(92);
+    expect(p.purifyHundo).toBe(true);
+  });
 });
 
 // ─── Group 8 — Star flags ────────────────────────────────────────────────────
@@ -203,6 +251,7 @@ describe('Group 8 — Explicit star colours', () => {
     const p = find('Machamp', 2450);
     expect(p).toBeDefined();
     expect(p.slots).toContain('U');
+    expect(p.slots).not.toContain('G'); // Bug 1 fix: Ultra rank wins, Great released
     expect(p.nickname).toContain('Ⓤ');
     expect(p.nickname).not.toContain('Ⓡ');
   });
@@ -216,12 +265,6 @@ describe('Group 8 — Explicit star colours', () => {
 
   it('Machop CP:350 (fav=1, loses Great to CP:400) — RED star', () => {
     // CP:350 is fav=1 but lower rank than CP:400 — should not win any slot
-    const p = find('Machop', 350);
-    expect(p.isFavorite).toBe(true);
-    expect(p.suggestStar).toBe(false);
-  });
-
-  it('Machop CP:350 (fav=1, loses Great to CP:400) — RED star', () => {
     const p = find('Machop', 350);
     expect(p.isFavorite).toBe(true);
     expect(p.suggestStar).toBe(false);
@@ -435,16 +478,19 @@ describe('Group 13 — Standalone evo target suppresses league slot', () => {
 });
 
 // ─── Group 14 — Sawk multi-league deconfliction (Bug 1) ──────────────────────
-// CP:190 wins G (99.3%), U (75%), and L (98.8%) in initial pass.
+// CP:190 (IVs 1/8/13, fav=1) wins G (99.3%), U (75%), and L (98.8%) in initial pass.
 // Bug 1 fix: same-evo multi-slot → keep highest-rank league (G=99.3%), release rest.
 // U (75%) has no nextBest (CP:500 at 65% is below 70% threshold).
-// L (98.8%) nextBest → CP:500 (97.9%, dustL=0) wins Little.
+// L (98.8%) nextBest → CP:500 (IVs 5/7/8, 97.9%, dustL=0) wins Little.
 
 describe('Group 14 — Sawk multi-league deconfliction (Bug 1)', () => {
-  it('Sawk CP:190 (G=99.3%) wins Great slot', () => {
+  it('Sawk CP:190 (G=99.3%, fav=1) wins Great slot only — GOLD star', () => {
     const p = find('Sawk', 190);
     expect(p).toBeDefined();
     expect(p.slots).toContain('G');
+    expect(p.slots).not.toContain('U'); // Bug 1 fix: U released (lower rank than G)
+    expect(p.isFavorite).toBe(true);
+    expect(p.suggestStar).toBe(true); // fav=1 + wins slot = gold
   });
 
   it('Sawk CP:190 does NOT hold Little slot — released to CP:500', () => {
