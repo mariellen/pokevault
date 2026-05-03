@@ -11,7 +11,7 @@
 </head>
 <body>
 <header>
-  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.19</span></div>
+  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.19</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span></div>
   <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
   <div id="sync-status" style="font-size:11px;color:var(--muted)">Connecting to cloud...</div>
 </header>
@@ -164,6 +164,12 @@
     <button class="league-btn btn lb-U" data-l="U" onclick="toggleLeague('U',this)">Ultra</button>
     <button class="league-btn btn lb-M" data-l="M" onclick="toggleLeague('M',this)">Master</button>
     <button class="btn active" id="sortCountBtn" onclick="cycleSortMode(this)">★ Stars</button>
+    <select id="nickConvention" title="Nick format" onchange="setNickConvention(this.value)" style="font-size:11px;padding:2px 4px;background:var(--surf);color:var(--text);border:1px solid var(--border);border-radius:4px;cursor:pointer">
+      <option value="pvpvault">⭐ PvP</option>
+      <option value="ivpct">% IV</option>
+      <option value="rawiv">Raw IV</option>
+      <option value="moves">Moves</option>
+    </select>
     <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)">
       Red: <input type="number" id="countThresholdInput" value="100" min="1" max="9999"
         style="width:44px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);font-size:11px;text-align:center"

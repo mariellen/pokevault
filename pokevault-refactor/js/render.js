@@ -160,8 +160,8 @@ function buildRow(p){
     <td style="font-size:11px;color:var(--muted)">${p.cp||'--'}</td>
     <td class="${p.suggestStar?'nick-starred':'nick-suggested'}" style="cursor:pointer"
         data-nick="${(p.nickname||'').replace(/"/g,'&quot;')}"
-        onclick="copyNick(this,this.dataset.nick)" title="Click to copy nickname">
-      ${p.nickname}${altNicks}
+        onclick="copyNick(this.querySelector('.main-nick'),this.dataset.nick)" title="Click to copy nickname">
+      <span class="main-nick">${p.nickname}</span>${altNicks}
       ${evoSearchTag?`<div style="margin-top:2px">${evoSearchTag}</div>`:''}
     </td>
     <td>

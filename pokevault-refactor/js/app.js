@@ -1021,6 +1021,8 @@ async function handleCloudLoad() {
         document.getElementById('loading-section').style.display='none';
         document.getElementById('dashboard').style.display='block';
         renderSummary(allPokemon); applyFilters();
+        const filenameEl=document.getElementById('csvFilename');
+        if(filenameEl){filenameEl.textContent='';filenameEl.style.display='none';}
         document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
         document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
         loadOverrides();
@@ -1275,6 +1277,8 @@ function handleFile(file){
               document.getElementById('loading-section').style.display='none';
               document.getElementById('dashboard').style.display='block';
               renderSummary(allPokemon);applyFilters();
+              const filenameEl=document.getElementById('csvFilename');
+              if(filenameEl){filenameEl.textContent=' · '+file.name;filenameEl.style.display='inline';}
               loadOverrides();
               // Save to cloud after successful import
               if (supabaseConnected) saveCollectionToCloud(allPokemon);
