@@ -321,10 +321,10 @@ function getFullFamily(speciesName) {
 }
 
 // Returns the pokemon_moves row for species+league, including last_verified_at.
-// league: 'Great'|'Ultra'|'Master'|'Little' or code 'GL'|'UL'|'ML'|'LL'.
+// league: 'Great'|'Ultra'|'Master'|'Little' or code 'G'|'U'|'M'|'L'.
 // Returns null if not found or Supabase unavailable.
 async function getMovesWithFreshness(species, league) {
-  const leagueCode = { 'Great': 'GL', 'Ultra': 'UL', 'Master': 'ML', 'Little': 'LL' }[league] || league;
+  const leagueCode = { 'Great': 'G', 'Ultra': 'U', 'Master': 'M', 'Little': 'L' }[league] || league;
   const data = await supabaseFetch('GET',
     `pokemon_moves?species=eq.${encodeURIComponent(species)}&league=eq.${encodeURIComponent(leagueCode)}&select=*&limit=1`
   );
