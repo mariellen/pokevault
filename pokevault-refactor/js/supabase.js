@@ -30,7 +30,7 @@ alter table pokemon_overrides disable row level security;
 let overridesCache = {};
 let supabaseConnected = false;
 
-async function supabaseFetch(method, path, body, isDeleteAll) {
+async function supabaseFetch(method, path, body, isDeleteAll, prefer) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
   try {
@@ -41,7 +41,7 @@ async function supabaseFetch(method, path, body, isDeleteAll) {
         'apikey': SUPABASE_KEY,
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'Content-Type': 'application/json',
-        'Prefer': isDeleteAll ? 'count=exact' : method === 'POST' ? 'return=minimal,resolution=merge-duplicates' : 'return=minimal'
+        'Prefer': prefer || (isDeleteAll ? 'count=exact' : method === 'POST' ? 'return=minimal,resolution=merge-duplicates' : 'return=minimal')
       }
     };
     if (body) opts.body = JSON.stringify(body);
@@ -69,17 +69,37 @@ async function supabaseFetch(method, path, body, isDeleteAll) {
 // Collection sync state
 let cloudCollectionDate = null;
 
-async function saveCollectionToCloud(pokemon) {
+const BATCH_SIZE = 200;
+
+async function saveCollectionToCloud(pokemon, onProgress) {
   updateSyncStatus('Saving collection to cloud...', 'ok');
+
+  // Cheap hash for dedup — Phase 2c upgrades to real SHA-256 via Web Crypto API
+  const csvHash = `${pokemon.length}:${pokemon[0]?.stableKey}:${pokemon[pokemon.length-1]?.stableKey}`;
+
+  // Create sync session — degrade gracefully if it fails
+  let sessionId = null;
+  const sessionRows = await supabaseFetch('POST', 'sync_sessions', {
+    total_records: pokemon.length,
+    status: 'in_progress',
+    csv_hash: csvHash,
+  }, false, 'return=representation');
+  if (sessionRows === null) {
+    console.warn('sync_sessions insert failed — continuing without session tracking');
+  } else {
+    sessionId = Array.isArray(sessionRows) ? (sessionRows[0]?.id ?? null) : null;
+  }
+
   // Delete existing collection first
-  // Delete all rows — use id=gte.0 with Prefer:count=exact to ensure full delete
   const delResult = await supabaseFetch('DELETE', 'pokemon_collection?id=gte.0', null, true);
   if (delResult === null) {
     updateSyncStatus('⚠ Could not clear old collection — check Supabase permissions', 'warn');
+    if (sessionId) {
+      supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, { status: 'failed', error_text: 'DELETE failed' });
+    }
     return;
   }
-  // Chunk into smaller batches to stay within payload limits
-  const BATCH = 100;
+
   const slim = pokemon.map(p => ({
     pokemon_index: p.stableKey,
     name: p.name,
@@ -114,21 +134,48 @@ async function saveCollectionToCloud(pokemon) {
     evolved_name_l: p.evolvedNameL||'',
     imported_at: new Date().toISOString()
   }));
+
   let saved = 0;
-  for (let i=0; i<slim.length; i+=BATCH) {
-    const batch = slim.slice(i, i+BATCH);
-    const result = await supabaseFetch('POST', 'pokemon_collection?on_conflict=pokemon_index', batch);
-    if (result === null) {
-      updateSyncStatus('⚠ Cloud save failed at row '+i+' — check F12 console for details', 'warn');
-      console.error('Failed batch:', batch.slice(0,2), '...');
-      return;
+  try {
+    for (let i = 0; i < slim.length; i += BATCH_SIZE) {
+      const batch = slim.slice(i, i + BATCH_SIZE);
+      const result = await supabaseFetch('POST', 'pokemon_collection?on_conflict=pokemon_index', batch);
+      if (result === null) throw new Error('Batch write failed at row ' + i);
+
+      saved += batch.length;
+
+      // Fire-and-forget progress update to sync_sessions (don't await — don't throttle batch loop)
+      if (sessionId) {
+        supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, { saved_records: saved });
+      }
+
+      updateSyncStatus(`Saving... ${saved}/${slim.length}`, 'ok');
+      if (onProgress) onProgress(saved, slim.length);
     }
-    saved += batch.length;
-    updateSyncStatus(`Saving... ${saved}/${slim.length}`, 'ok');
+
+    if (sessionId) {
+      await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
+        status: 'complete',
+        completed_at: new Date().toISOString(),
+        saved_records: saved,
+      });
+    }
+
+    cloudCollectionDate = new Date().toISOString();
+    localStorage.setItem('pokevault_last_cloud_save', cloudCollectionDate);
+    updateSyncStatus('✓ Collection saved to cloud (' + slim.length + ' Pokémon)', 'ok');
+
+  } catch (err) {
+    if (sessionId) {
+      await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
+        status: 'failed',
+        error_text: err.message,
+        saved_records: saved,
+      });
+    }
+    updateSyncStatus('⚠ Cloud save failed at row ' + saved + ' — check F12 console for details', 'warn');
+    console.error('saveCollectionToCloud error:', err);
   }
-  cloudCollectionDate = new Date().toISOString();
-  localStorage.setItem('pokevault_last_cloud_save', cloudCollectionDate);
-  updateSyncStatus('✓ Collection saved to cloud ('+slim.length+' Pokémon)', 'ok');
 }
 
 async function loadCollectionFromCloud() {

@@ -9,7 +9,7 @@
 // Install with: https://nodejs.org — then `npm install` in the pokevault-refactor folder.
 
 const path = require('path');
-const { analyse } = require('./loader');
+const { analyse, findMergeCandidates } = require('./loader');
 const { loadCSV } = require('./csvParser');
 
 const CSV_PATH = path.join(
@@ -361,5 +361,58 @@ describe('Cyan star regression — _136 CSV', () => {
         expect(p.slots).toContain(cl);
       });
     });
+  });
+});
+
+// ─── Merge candidate same catch date (Task 3) ────────────────────────────────
+
+function makeFamily(members, primaryName) {
+  return { primaryName: primaryName || 'Test', members };
+}
+function makeP(overrides) {
+  return Object.assign({ name: 'Magnemite', atkIV: 8, defIV: 10, staIV: 15, cp: 300, catchDate: '' }, overrides);
+}
+
+describe('findMergeCandidates — same catch date rule', () => {
+  it('same IV + different CP + same catch date → merge candidate', () => {
+    const fam = makeFamily([
+      makeP({ cp: 300, catchDate: '2025-02-10' }),
+      makeP({ cp: 400, catchDate: '2025-02-10' }),
+    ]);
+    const result = findMergeCandidates([fam]);
+    expect(result.length).toBe(1);
+    expect(result[0].family).toBe('Test');
+  });
+
+  it('same IV + different CP + different catch dates → NOT merge candidate', () => {
+    const fam = makeFamily([
+      makeP({ cp: 300, catchDate: '2025-02-10' }),
+      makeP({ cp: 400, catchDate: '2025-03-01' }),
+    ]);
+    expect(findMergeCandidates([fam]).length).toBe(0);
+  });
+
+  it('same IV + different CP + one has no catch date → merge candidate (regression lock)', () => {
+    const fam = makeFamily([
+      makeP({ cp: 300, catchDate: '' }),
+      makeP({ cp: 400, catchDate: '2025-02-10' }),
+    ]);
+    expect(findMergeCandidates([fam]).length).toBe(1);
+  });
+
+  it('different IV + same catch date → NOT merge candidate', () => {
+    const fam = makeFamily([
+      makeP({ cp: 300, atkIV: 8, catchDate: '2025-02-10' }),
+      makeP({ cp: 400, atkIV: 9, catchDate: '2025-02-10' }), // different atkIV
+    ]);
+    expect(findMergeCandidates([fam]).length).toBe(0);
+  });
+
+  it('identical CP + same IV + same catch date → NOT merge candidate (real duplicates)', () => {
+    const fam = makeFamily([
+      makeP({ cp: 300, catchDate: '2025-02-10' }),
+      makeP({ cp: 300, catchDate: '2025-02-10' }),
+    ]);
+    expect(findMergeCandidates([fam]).length).toBe(0);
   });
 });

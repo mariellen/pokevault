@@ -20,7 +20,16 @@ const combined = [
 // overridesCache is populated by supabase.js in the browser; empty object = no overrides.
 const shim = `const overridesCache = {};\n`;
 
-// All const/function declarations share one function scope, so analyse and
-// buildFamilyMap (declared inside that scope) are visible to the return statement.
-const factory = new Function(shim + combined + '\nreturn { analyse, buildFamilyMap };');
-module.exports = factory();
+// All const/function declarations share one function scope, so analyse,
+// buildFamilyMap, and buildNickname (declared inside that scope) are visible to the return.
+const factory = new Function(shim + combined + '\nreturn { analyse, buildFamilyMap, buildNickname, findMergeCandidates };');
+const base = factory();
+module.exports = base;
+
+// Factory with injected overrides — for testing Supabase override paths without Supabase.
+// Usage: const { analyse } = loader.createWithOverrides({ [stableKey]: { is_dynamax: true } });
+module.exports.createWithOverrides = function(overridesMap) {
+  const shimOv = `const overridesCache = ${JSON.stringify(overridesMap)};\n`;
+  const f = new Function(shimOv + combined + '\nreturn { analyse, buildFamilyMap, buildNickname, findMergeCandidates };');
+  return f();
+};

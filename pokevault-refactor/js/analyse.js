@@ -144,7 +144,7 @@ function buildFamilyMap(rows) {
 // (defined in config.js)
 // (defined in config.js)
 
-function buildNickname(p, slot) {
+function buildNickname(p, slot, convention) {
   const iv = Math.round(p.ivAvg||0);
   const atkIV=p.atkIV||0, defIV=p.defIV||0, staIV=p.staIV||0;
   const isNundo = atkIV===0&&defIV===0&&staIV===0;
@@ -164,6 +164,36 @@ function buildNickname(p, slot) {
 
   if (isNundo) return fitName(base, NUNDO, '', 12);
 
+  // Special marker suffixes applied regardless of convention (shiny ※, dynamax Ⓓ, gigantamax Ⓧ)
+  let specialSuf = '';
+  if (p.isDynamax) specialSuf += 'Ⓓ';
+  if (p.isGigantamax) specialSuf += 'Ⓧ';
+  if (p.isShiny || slot === 'shiny' || slot === 'shiny_lower') specialSuf += SHINY_SFX;
+
+  // Non-pvpvault conventions: simplified name+IV/moves format
+  if (convention && convention !== 'pvpvault') {
+    if (convention === 'ivpct') {
+      return fitName(base, String(iv), specialSuf, 12);
+    }
+    if (convention === 'rawiv') {
+      return fitName(base, String(atkIV)+String(defIV)+String(staIV), specialSuf, 12);
+    }
+    if (convention === 'moves') {
+      const mc = typeof MOVE_CODES !== 'undefined' ? MOVE_CODES : null;
+      const qCode = mc && mc[p.quickMove];
+      const cCode = mc && mc[p.chargeMove1];
+      if (qCode && cCode) return fitName(base, qCode+'/'+cCode, specialSuf, 12);
+      return fitName(base, String(iv), specialSuf, 12); // fallback to ivpct
+    }
+  }
+
+  // Redirect review slot for special-flagged pokemon — holding format is wrong for these
+  if (slot === 'review') {
+    if (p.isDynamax) slot = 'dynamax';
+    else if (p.isGigantamax) slot = 'gigantamax';
+    else if (p.isShiny) slot = 'shiny';
+  }
+
   // Build suffix first so we know how many chars it needs
   let suf='';
 
@@ -178,10 +208,11 @@ function buildNickname(p, slot) {
       else if (t1 && dustForSlot >= t1) suf += '$';
     }
   }
-  // Shadow purification suffix — only if shadow doesn't already hold a league slot
+  // Shadow purification suffix — omit only if shadow already holds its OWN league slot
+  // (the purify slot itself doesn't count — it IS the reason for the p flag)
   if (p.isShadow && p.purifyLeague) {
-    const alreadyHasSlot = p.slots.some(s => ['L','G','U','M'].includes(s));
-    if (!alreadyHasSlot) suf += p.purifyHundo ? 'p✪' : 'p';
+    const hasShadowOwnSlot = p.slots.some(s => ['L','G','U','M'].includes(s) && s !== p.purifyLeague);
+    if (!hasShadowOwnSlot) suf += p.purifyHundo ? 'p✪' : 'p';
   }
   if (p.isPurified) suf += '*';
   if (p.isDynamax) suf += 'Ⓓ';
@@ -254,6 +285,16 @@ function buildNickname(p, slot) {
     }
     nickSuf=suf+SHINY_SFX;
     return fitName(p.name, mid, nickSuf, 12);
+  } else if (slot==='dynamax') {
+    const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
+    if (best) { const pv=Math.round(p['rankPct'+best]||0); mid=LC[best]+(pv===100?PERFECT:String(pv)); }
+    else { mid=LC.R+String(iv); }
+    return fitName(p.name, mid, nickSuf, 12); // nickSuf has Ⓓ from suf
+  } else if (slot==='gigantamax') {
+    const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
+    if (best) { const pv=Math.round(p['rankPct'+best]||0); mid=LC[best]+(pv===100?PERFECT:String(pv)); }
+    else { mid=LC.R+String(iv); }
+    return fitName(p.name, mid, nickSuf, 12); // nickSuf has Ⓧ from suf
   } else if (slot==='lucky') {
     // Lucky with no league slot: NameⓇIV (Master/level-up candidate)
     const pv=Math.round(p.rankPctM||p.ivAvg||0);
@@ -512,6 +553,7 @@ function analyse(rows) {
       if (!p.slots.includes(p.purifyLeague)) {
         p.slots.push(p.purifyLeague);
         p.isPurifySlot = true;
+        p.slotConfirmed = true;
       }
     }
   });
@@ -681,7 +723,7 @@ function analyse(rows) {
         if (bestRank2 >= 70 || isLegendary) { // Only skip truly weak candidates
           if (!best2.slots.includes(lg)) best2.slots.push(lg);
           best2.targetEvo = stageName !== best2.name ? stageName : '';
-          best2.slotConfirmed = isConfirmed; // true = circled letter, false = review name
+          best2.slotConfirmed = isConfirmed || !!best2.slotConfirmed; // purify loop may have already confirmed
           if (!isConfirmed) best.slots.push(lg+'_tentative');
           const eDustCheck = effectiveDust(best);
           // Use league-specific evo key so a stage final for Little isn't blocked by a Great evo
@@ -758,6 +800,8 @@ function analyse(rows) {
     if(purified.length) purified[0].slots.push('purified');
     members.filter(p=>p.isLucky).forEach(p=>p.slots.push('lucky'));
     members.filter(p=>p.isNundo).forEach(p=>p.slots.push('nundo'));
+    members.filter(p=>p.isDynamax&&!p.slots.includes('dynamax')).forEach(p=>p.slots.push('dynamax'));
+    members.filter(p=>p.isGigantamax&&!p.slots.includes('gigantamax')).forEach(p=>p.slots.push('gigantamax'));
 
     // Set decisions and nicknames
     members.forEach(p=>{
@@ -817,6 +861,12 @@ function analyse(rows) {
       } else if (p.slots.includes('shiny')||p.slots.includes('shiny_lower')) {
         p.decision='keep'; p.reason='Shiny — always favourite';
         p.nickname=buildNickname(p,'shiny');
+      } else if (p.slots.includes('dynamax')) {
+        p.decision='keep'; p.reason='Dynamax — always keep';
+        p.nickname=buildNickname(p,'dynamax');
+      } else if (p.slots.includes('gigantamax')) {
+        p.decision='keep'; p.reason='Gigantamax — always keep';
+        p.nickname=buildNickname(p,'gigantamax');
       } else if (p.slots.includes('shadow')) {
         p.decision='keep'; p.reason='Best shadow — keep for raids/Master League';
         p.nickname=buildNickname(p,'lucky'); // NameⓇIV format — same as Lucky no-league
@@ -890,7 +940,9 @@ function analyse(rows) {
             isBestShiny ||
             p.slots.includes('nundo') ||
             p.slots.includes('shadow') ||
-            p.slots.includes('purified')
+            p.slots.includes('purified') ||
+            p.slots.includes('dynamax') ||
+            p.slots.includes('gigantamax')
           )) ||
           isProtectedBest ||
           (p.isLucky) ||
@@ -901,6 +953,26 @@ function analyse(rows) {
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
       p.isCheaperAlternative = cyanLeagues.some(cl => leagueSlots.includes(cl));
       p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStarExpensive;
+
+      // Force keep + green/gold star for special overrides — never red star
+      if (p.isDynamax || p.isGigantamax || p.isShiny) {
+        p.decision = 'keep';
+        p.suggestStar = true;
+      }
+
+      // starType: used by render.js and tests.
+      // Shiny pokemon all get suggestStar=true (forced above), but only show ✨ when
+      // the star reason is shiny-only (no real PvP/lucky/nundo slot alongside it).
+      const hasRealSlot = p.slots.some(s => RULES.leagues.includes(s))
+        || p.slots.includes('lucky') || p.slots.includes('nundo');
+      if (p.suggestStar && p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'gold';
+      else if (p.suggestStar && !p.isFavorite && !p.suggestStarCheaper && (!p.isShiny || hasRealSlot)) p.starType = 'green';
+      else if (p.suggestStarExpensive && p.isFavorite) p.starType = 'gold';
+      else if (p.suggestStarExpensive && !p.isFavorite) p.starType = 'blue';
+      else if (p.suggestStarCheaper && !p.isFavorite) p.starType = 'cyan';
+      else if (p.isShiny) p.starType = 'shiny'; // shiny with no real PvP slot reason
+      else if (!p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper && p.isFavorite) p.starType = 'red';
+      else p.starType = 'none';
     });
     // Fix dustCostBest to use the dust for the assigned league slot
     members.forEach(p=>{
@@ -1179,7 +1251,11 @@ function findMergeCandidates(families) {
       if (group.length < 2) return;
       const cps = new Set(group.map(p => p.cp));
       if (cps.size < 2) return; // identical CP = genuine duplicates, not merge candidates
-      if (!group.some(p => !p.catchDate)) return; // all have dates = probably fine
+      // Candidate if any member lacks a date, OR if two members share a date (same pokemon powered up)
+      const missingDate = group.some(p => !p.catchDate);
+      const dates = group.map(p => p.catchDate).filter(Boolean);
+      const hasDuplicateDate = new Set(dates).size < dates.length;
+      if (!missingDate && !hasDuplicateDate) return;
       candidates.push({ family: fam.primaryName, members: group });
     });
   });

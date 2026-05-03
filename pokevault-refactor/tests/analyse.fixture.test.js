@@ -6,7 +6,8 @@
 // Run with: npx jest tests/analyse.fixture.test.js
 
 const path = require('path');
-const { analyse } = require('./loader');
+const loader = require('./loader');
+const { analyse, buildNickname } = loader;
 const { loadCSV } = require('./csvParser');
 
 const FIXTURE_PATH = path.join(__dirname, 'poke_genie_fixture.csv');
@@ -325,7 +326,8 @@ describe('Group 9 — Family grouping', () => {
     const hisuiFam = result.families.find(f =>
       f.members.some(p => p.name === 'Growlithe' && p.form === 'Hisui')
     );
-    if (!normalFam || !hisuiFam) return;
+    expect(normalFam).toBeDefined();
+    expect(hisuiFam).toBeDefined();
     expect(normalFam.key).not.toBe(hisuiFam.key);
   });
 
@@ -375,7 +377,8 @@ describe('Group 10 — Nick format', () => {
 
   it('Snorlax CP:2990 (lucky hundo) nick contains Ⓡ or Ⓤ (lucky circled letter)', () => {
     const p = find('Snorlax', 2990);
-    if (!p || !p.nickname) return;
+    expect(p).toBeDefined();
+    expect(p.nickname).toBeDefined();
     const CIRCLED = new Set(['ⓛ', 'Ⓖ', 'Ⓤ', 'Ⓜ', 'Ⓡ']);
     const hasCircled = [...p.nickname].some(ch => CIRCLED.has(ch));
     expect(hasCircled).toBe(true);
@@ -509,5 +512,270 @@ describe('Group 14 — Sawk multi-league deconfliction (Bug 1)', () => {
     expect(p.isFavorite).toBe(false);
     expect(p.suggestStar).toBe(true);
     expect(p.suggestStarExpensive).toBeFalsy();
+  });
+});
+
+// ─── Group 15 — Special override = force keep (Shiny / Dynamax / Gigantamax) ─
+// Parameterised across all three flags — each produces 4 tests (12 total).
+// Snorlax CP:100 (stableKey='143|||5|5|5|2026-02-01') has no league rank data.
+// Machamp CP:2450 (stableKey='68|||15|15|14|2025-01-01') holds Ultra slot normally.
+
+describe.each([
+  ['is_shiny',      '※', 'isShiny'],
+  ['is_dynamax',    'Ⓓ', 'isDynamax'],
+  ['is_gigantamax', 'Ⓧ', 'isGigantamax'],
+])('Group 15 — %s override = force keep', (flagKey, suffix, propName) => {
+  let ovResult;
+  const ovFind = (name, cp) => ovResult.pokemon.find(p => p.name === name && p.cp === cp);
+
+  beforeAll(() => {
+    const csv = loadCSV(FIXTURE_PATH);
+    const overrides = {
+      '143|||5|5|5|2026-02-01': { [flagKey]: true },
+      '68|||15|15|14|2025-01-01': { [flagKey]: true },
+    };
+    ovResult = loader.createWithOverrides(overrides).analyse(csv);
+  });
+
+  it(`Snorlax CP:100 (${flagKey}, no league slot) → decision=keep, suggestStar=true`, () => {
+    const p = ovFind('Snorlax', 100);
+    expect(p).toBeDefined();
+    expect(p[propName]).toBe(true);
+    expect(p.decision).toBe('keep');
+    expect(p.suggestStar).toBe(true);
+  });
+
+  it(`Snorlax CP:100 (${flagKey}, fav=0) → green star not red`, () => {
+    const p = ovFind('Snorlax', 100);
+    expect(p.isFavorite).toBe(false);
+    expect(p.suggestStar).toBe(true);
+  });
+
+  it(`Snorlax CP:100 (${flagKey}, no league rank) → nick contains Ⓡ and ${suffix}`, () => {
+    const p = ovFind('Snorlax', 100);
+    expect(p.nickname).toContain('Ⓡ');
+    expect(p.nickname).toContain(suffix);
+    expect(p.nickname.length).toBeLessThanOrEqual(12);
+  });
+
+  it(`Machamp CP:2450 (${flagKey} + Ultra slot) → nick contains Ⓤ and ${suffix}`, () => {
+    const p = ovFind('Machamp', 2450);
+    expect(p).toBeDefined();
+    expect(p[propName]).toBe(true);
+    expect(p.decision).toBe('keep');
+    expect(p.nickname).toContain('Ⓤ');
+    expect(p.nickname).toContain(suffix);
+    expect(p.nickname.length).toBeLessThanOrEqual(12);
+  });
+});
+
+// ─── Group 16 — Nick convention selector ─────────────────────────────────────
+// Tests buildNickname() with convention param: ivpct, rawiv, moves.
+// Uses fixture data from the default beforeAll at the top of the file.
+
+describe('Group 16 — Nick convention selector', () => {
+  it('ivpct: Glaceon CP:1500 (IVs 2/9/14, ivAvg=55.6) → Glaceon56', () => {
+    const p = find('Glaceon', 1500);
+    expect(buildNickname(p, 'G', 'ivpct')).toBe('Glaceon56');
+  });
+
+  it('rawiv: Glaceon CP:1500 (IVs 2/9/14) → Glaceon2914', () => {
+    const p = find('Glaceon', 1500);
+    expect(buildNickname(p, 'G', 'rawiv')).toBe('Glaceon2914');
+  });
+
+  it('rawiv: Leafeon CP:1177 (IVs 0/14/15) → Leafeon01415', () => {
+    const p = find('Leafeon', 1177);
+    expect(buildNickname(p, 'G', 'rawiv')).toBe('Leafeon01415');
+  });
+
+  it('All conventions produce nicks ≤ 12 chars for all fixture pokemon', () => {
+    const conventions = ['pvpvault', 'ivpct', 'rawiv', 'moves'];
+    result.pokemon.forEach(p => {
+      conventions.forEach(conv => {
+        const slot = p.slots[0] || 'review';
+        const nick = buildNickname(p, slot, conv);
+        expect(nick.length).toBeLessThanOrEqual(12);
+      });
+    });
+  });
+
+  it('moves: falls back to ivpct for pokemon with no moves in CSV', () => {
+    const p = find('Glaceon', 1500); // no moves in fixture
+    const movesNick = buildNickname(p, 'G', 'moves');
+    const ivpctNick = buildNickname(p, 'G', 'ivpct');
+    expect(movesNick).toBe(ivpctNick);
+  });
+
+  it('moves: Feraligatr CP:2498 (Shadow Claw + Hydro Cannon) → nick uses move codes', () => {
+    const p = find('Feraligatr', 2498);
+    const nick = buildNickname(p, 'U', 'moves');
+    expect(nick).toContain('SC');
+    expect(nick).toContain('HC');
+    expect(nick).toContain('/');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  it('pvpvault: explicit "pvpvault" param produces same nick as no convention param', () => {
+    result.pokemon.forEach(p => {
+      const slot = p.slots[0] || 'review';
+      expect(buildNickname(p, slot, 'pvpvault')).toBe(buildNickname(p, slot));
+    });
+  });
+
+  it('pvpvault: Glaceon CP:1500 (Great winner, dustG=0) → GlaceonⒼ100', () => {
+    const p = find('Glaceon', 1500);
+    expect(buildNickname(p, 'G', 'pvpvault')).toBe('GlaceonⒼ100');
+  });
+});
+
+// ─── Group 16b — Special suffixes work across all conventions ─────────────────
+// Verifies that ※ (shiny suffix) threads through ivpct, rawiv, moves, pvpvault.
+
+describe('Group 16b — Special suffixes work across all conventions', () => {
+  let sfxResult;
+  const sfxFind = (name, cp) => sfxResult.pokemon.find(p => p.name === name && p.cp === cp);
+
+  beforeAll(() => {
+    const csv = loadCSV(FIXTURE_PATH);
+    const overrides = { '143|||5|5|5|2026-02-01': { is_shiny: true } };
+    sfxResult = loader.createWithOverrides(overrides).analyse(csv);
+  });
+
+  it.each(['pvpvault', 'ivpct', 'rawiv', 'moves'])(
+    '%s convention: shiny Snorlax CP:100 nick ends with ※',
+    (convention) => {
+      const p = sfxFind('Snorlax', 100);
+      const nick = buildNickname(p, p.slots[0] || 'review', convention);
+      expect(nick.endsWith('※')).toBe(true);
+      expect(nick.length).toBeLessThanOrEqual(12);
+    }
+  );
+});
+
+// ─── Group 17 — Shadow purify p suffix ───────────────────────────────────────
+// Regression lock for the bug where purifyLeague slot counted as "already has slot",
+// suppressing the p suffix that signals "worth purifying".
+
+describe('Group 17 — Shadow purify p suffix', () => {
+  it('Gastly shadow CP:82 (purifyRankPct≥92) → nick contains league symbol + p', () => {
+    const p = find('Gastly', 82);
+    expect(p).toBeDefined();
+    expect(p.purifyRankPct).toBeGreaterThanOrEqual(92);
+    expect(p.nickname).toMatch(/[ⓁⒼⓊ]\d+p/);
+  });
+
+  it('Gastly shadow CP:82 → nick length ≤ 12', () => {
+    const p = find('Gastly', 82);
+    expect(p.nickname.length).toBeLessThanOrEqual(12);
+  });
+
+  it('Machop shadow CP:120 (purifyHundo) → nick contains p✪', () => {
+    const p = find('Machop', 120);
+    expect(p).toBeDefined();
+    expect(p.purifyHundo).toBe(true);
+    expect(p.nickname).toContain('p✪');
+    expect(p.nickname.length).toBeLessThanOrEqual(12);
+  });
+
+  it('Cacnea shadow CP:80 (purifyRankPct<92, no purifyLeague) → nick does NOT contain purify p', () => {
+    const p = find('Cacnea', 80);
+    expect(p).toBeDefined();
+    expect(p.purifyLeague).toBeFalsy();
+    expect(p.nickname).not.toMatch(/[ⓁⒼⓊ]\d+p/);
+  });
+});
+
+// ─── Group 18 — Dynamax holding-format fix ───────────────────────────────────
+// Direct unit tests on buildNickname() — the fix redirects slot='review' to
+// slot='dynamax'/'gigantamax'/'shiny' when the pokemon has the corresponding flag.
+
+describe('Group 18 — Dynamax/Gigantamax/Shiny holding-format redirect', () => {
+  const makeP = (overrides) => Object.assign({
+    name: 'Entei', form: '', specialForm: '', vivillonPattern: '',
+    isDynamax: false, isGigantamax: false, isShiny: false,
+    isShadow: false, isPurified: false, isLucky: false, isNundo: false,
+    ivAvg: 82, atkIV: 10, defIV: 13, staIV: 14,
+    rankPctG: 75, rankPctU: 75, rankPctL: 0, rankPctM: 89,
+    slots: [], purifyLeague: '',
+    hasAllBestMoves: false, hasBestMoves: false, hasTwoMoves: false,
+    dustG: 0, dustU: 0, dustL: 0,
+    evolvedNameG: '', evolvedNameU: '', evolvedNameL: '',
+    quickMove: '', chargeMove1: '',
+  }, overrides);
+
+  it('isDynamax + slot=review → nick contains Ⓡ and Ⓓ, not holding format', () => {
+    const p = makeP({ isDynamax: true, slots: ['dynamax'] });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).toContain('Ⓓ');
+    expect(nick).not.toMatch(/\d+[lgum]/); // no lowercase holding letters
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  it('isGigantamax + slot=review → nick contains Ⓡ and Ⓧ, not holding format', () => {
+    const p = makeP({ isGigantamax: true, slots: ['gigantamax'] });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).toContain('Ⓧ');
+    expect(nick).not.toMatch(/\d+[lgum]/);
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  it('isShiny + slot=review → nick ends with ※, not holding format', () => {
+    const p = makeP({ isShiny: true, slots: ['shiny'] });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('※');
+    expect(nick).not.toMatch(/\d+[lgum]/);
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  it('isDynamax with qualifying league + slot=review → uses league symbol not Ⓡ', () => {
+    // rankPctU=95 >= 90 → should produce NameⓊ95Ⓓ
+    const p = makeP({ isDynamax: true, rankPctU: 95, slots: ['dynamax'] });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓤ');
+    expect(nick).toContain('Ⓓ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+});
+
+// ─── Group 19 — Shiny ✨ star type ────────────────────────────────────────────
+// starType='shiny' fires for shinies whose only star reason is the shiny flag itself
+// (no real PvP league slot, lucky, or nundo slot). Shinies with a real PvP slot
+// keep their gold/green starType unchanged.
+
+describe('Group 19 — Shiny ✨ starType', () => {
+  let shinyNoSlotResult, shinyWithSlotResult;
+  const findIn = (res, name, cp) => res.pokemon.find(p => p.name === name && p.cp === cp);
+
+  beforeAll(() => {
+    const csv = loadCSV(FIXTURE_PATH);
+    // Snorlax CP:100 (5/5/5) — no league slot; shiny override → starType should be 'shiny'
+    shinyNoSlotResult = loader.createWithOverrides({
+      '143|||5|5|5|2026-02-01': { is_shiny: true }
+    }).analyse(csv);
+    // Glaceon CP:1500 (2/9/14, fav=1) — has real Great League slot; shiny override → starType stays gold
+    shinyWithSlotResult = loader.createWithOverrides({
+      '471|||2|9|14|2025-01-01': { is_shiny: true }
+    }).analyse(csv);
+  });
+
+  it('shiny Snorlax CP:100 (no real league slot, fav=0) → starType is shiny not dot', () => {
+    const p = findIn(shinyNoSlotResult, 'Snorlax', 100);
+    expect(p).toBeDefined();
+    expect(p.isShiny).toBe(true);
+    expect(p.isFavorite).toBe(false);
+    expect(p.starType).toBe('shiny');
+    expect(p.starType).not.toBe('none');
+    expect(p.starType).not.toBe('red');
+  });
+
+  it('shiny Glaceon CP:1500 (has Great League slot, fav=1) → starType is gold not shiny', () => {
+    const p = findIn(shinyWithSlotResult, 'Glaceon', 1500);
+    expect(p).toBeDefined();
+    expect(p.isShiny).toBe(true);
+    expect(p.starType).toBe('gold'); // real PvP slot + fav=1 → gold unchanged
+    expect(p.starType).not.toBe('shiny');
   });
 });

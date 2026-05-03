@@ -512,12 +512,13 @@ function clearSearch(){
 
 function familyStarPriority(fam){
   const m=fam.members;
-  if(m.some(p=>p.isFavorite&&p.suggestStar))       return 0; // gold
-  if(m.some(p=>!p.isFavorite&&p.suggestStar))      return 1; // green
-  if(m.some(p=>p.suggestStarCheaper))              return 2; // cyan
-  if(m.some(p=>p.suggestStarExpensive))            return 3; // blue
-  if(m.some(p=>p.isFavorite&&!p.suggestStar))      return 4; // red
-  return 5;
+  if(m.some(p=>p.starType==='gold'))   return 0;
+  if(m.some(p=>p.starType==='green'))  return 1;
+  if(m.some(p=>p.starType==='cyan'))   return 2;
+  if(m.some(p=>p.starType==='blue'))   return 3;
+  if(m.some(p=>p.starType==='shiny'))  return 4; // ✨ between blue and red
+  if(m.some(p=>p.starType==='red'))    return 5;
+  return 6;
 }
 function cycleSortMode(btn){
   if(sortMode==='star'){sortMode='count';btn.textContent='Sort by Count';btn.classList.add('active');}
@@ -525,6 +526,34 @@ function cycleSortMode(btn){
   else{sortMode='star';btn.textContent='★ Stars';btn.classList.add('active');}
   applyFilters();
 }
+
+function getNickSlot(p) {
+  if (p.slots.includes('nundo')) return 'nundo';
+  const lgSlots = p.slots.filter(s => RULES.leagues.includes(s));
+  if (lgSlots.length) {
+    const cappedSlots = lgSlots.filter(s => s !== 'M');
+    return cappedSlots.length
+      ? cappedSlots.sort((a,b)=>(p['rankPct'+b]||0)-(p['rankPct'+a]||0))[0]
+      : lgSlots[0];
+  }
+  if (p.slots.includes('lucky') || p.isLucky) return 'lucky';
+  if (p.slots.includes('shiny') || p.slots.includes('shiny_lower')) return 'shiny';
+  if (p.slots.includes('dynamax') || p.isDynamax) return 'dynamax';
+  if (p.slots.includes('gigantamax') || p.isGigantamax) return 'gigantamax';
+  if (p.slots.includes('shadow')) return 'lucky';
+  if (p.slots.includes('purified')) return 'review';
+  if (p.decision === 'trade') return 'trade';
+  return 'review';
+}
+
+function setNickConvention(val) {
+  currentNickConvention = val;
+  localStorage.setItem('nickConvention', val);
+  if (!allPokemon.length) return;
+  allPokemon.forEach(p => { p.nickname = buildNickname(p, getNickSlot(p), val); });
+  applyFilters();
+}
+
 function setDecFilter(f,btn){
   // Toggle off if clicking the already-active filter
   if(decFilter===f){ decFilter='all'; document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected')); applyFilters(); return; }
@@ -564,6 +593,8 @@ function filterCostlyWinners(btn){
 // ═══════════════════════════════════════════════
 
 // ── Purify modal ──────────────────────────────
+let currentNickConvention = localStorage.getItem('nickConvention') || 'pvpvault';
+
 let purifySort='rank';       // 'rank' | 'dust' | 'league'
 let purifyLeagueFilter='';   // '' | 'L' | 'G' | 'U' | 'M'
 
@@ -984,6 +1015,7 @@ async function handleCloudLoad() {
       families = result.families;
       filteredFamilies = families.slice();
       mergeCandidateKeys = new Set(findMergeCandidates(families).flatMap(c=>c.members.map(m=>m.stableKey)));
+      if(currentNickConvention!=='pvpvault') allPokemon.forEach(p=>{p.nickname=buildNickname(p,getNickSlot(p),currentNickConvention);});
       setProgress('BUILDING DISPLAY...', 88);
       setTimeout(()=>{
         document.getElementById('loading-section').style.display='none';
@@ -1236,6 +1268,7 @@ function handleFile(file){
             console.time('analyse'); const result=analyse(rows); console.timeEnd('analyse');
             allPokemon=result.pokemon;families=result.families;filteredFamilies=families.slice();
             mergeCandidateKeys=new Set(findMergeCandidates(families).flatMap(c=>c.members.map(m=>m.stableKey)));
+            if(currentNickConvention!=='pvpvault') allPokemon.forEach(p=>{p.nickname=buildNickname(p,getNickSlot(p),currentNickConvention);});
             setProgress('BUILDING DISPLAY...',88);
             setTimeout(()=>{
               clearTimeout(watchdog);
@@ -1257,7 +1290,12 @@ function handleFile(file){
 }
 
 // Load overrides + evolution chains on page load
-window.addEventListener('load', () => { loadOverrides(); loadEvolutionChains(); });
+window.addEventListener('load', () => {
+  loadOverrides();
+  loadEvolutionChains();
+  const sel = document.getElementById('nickConvention');
+  if (sel) sel.value = currentNickConvention;
+});
 
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 const dz=document.getElementById('dropZone');

@@ -74,13 +74,14 @@ function decBadge(d){
 function starCell(p){
   const type=p.pokeType||'';
   const tc={Legendary:'st-legendary',Mythical:'st-mythical','Ultra Beast':'st-ub',Mega:'st-mega'}[type]||'';
+  const st=p.starType||'none';
   let si;
-  if(p.suggestStar&&p.isFavorite) si='<span class="star-yellow" title="Starred correctly ✓">★</span>';
-  else if(p.suggestStar&&!p.isFavorite&&!p.suggestStarCheaper) si='<span class="star-green" title="Should be starred — action needed">★</span>';
-  else if(p.suggestStarExpensive&&p.isFavorite) si='<span class="star-yellow" title="Starred correctly ✓ (costly pick)">★</span>';
-  else if(p.suggestStarExpensive&&!p.isFavorite) si='<span class="star-blue" title="Recommended but costly — over affordable threshold">★</span>';
-  else if(p.suggestStarCheaper&&!p.isFavorite) si='<span class="star-cyan" title="Equivalent to your starred pick — check before acting">★</span>';
-  else if(!p.suggestStar&&!p.suggestStarExpensive&&!p.suggestStarCheaper&&p.isFavorite) si='<span class="star-red" title="Currently starred — may not be needed">★</span>';
+  if(st==='gold') si='<span class="star-yellow" title="Starred correctly ✓">★</span>';
+  else if(st==='green') si='<span class="star-green" title="Should be starred — action needed">★</span>';
+  else if(st==='blue') si='<span class="star-blue" title="Recommended but costly — over affordable threshold">★</span>';
+  else if(st==='cyan') si='<span class="star-cyan" title="Equivalent to your starred pick — check before acting">★</span>';
+  else if(st==='shiny') si='<span class="star-shiny" title="Shiny — always keep">✨</span>';
+  else if(st==='red') si='<span class="star-red" title="Currently starred — may not be needed">★</span>';
   else si='<span class="star-none">·</span>';
   return `<div class="star-cell">
     <div class="star-icon">${si}</div>
