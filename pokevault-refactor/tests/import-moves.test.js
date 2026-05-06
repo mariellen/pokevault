@@ -4,7 +4,7 @@
 //
 // Run with: npx jest tests/import-moves.test.js
 
-const { extractForm, extractSpeciesName, pvpokeIdToDisplay, buildRow } =
+const { extractForm, extractSpeciesName, pvpokeIdToDisplay, buildRow, getMoveFlags, KNOWN_MOVE_FLAGS } =
   require('../scripts/import-moves-from-pvpoke');
 
 // ─── extractForm ──────────────────────────────────────────────────────────────
@@ -95,8 +95,8 @@ describe('buildRow', () => {
     expect(row.charged2_move).toBeNull();
   });
 
-  it('defaults all flag fields to false', () => {
-    const row = buildRow('Swampert', '', 'G', ['MUD_SHOT', 'HYDRO_CANNON', 'EARTHQUAKE'], now);
+  it('standard moves get all flags false', () => {
+    const row = buildRow('Swampert', '', 'G', ['MUD_SHOT', 'SURF', 'EARTHQUAKE'], now);
     expect(row.fast_move_legacy).toBe(false);
     expect(row.fast_move_cd).toBe(false);
     expect(row.fast_move_elite_tm).toBe(false);
@@ -106,6 +106,13 @@ describe('buildRow', () => {
     expect(row.charged2_legacy).toBe(false);
     expect(row.charged2_cd).toBe(false);
     expect(row.charged2_elite_tm).toBe(false);
+  });
+
+  it('CD move gets correct flags from KNOWN_MOVE_FLAGS', () => {
+    const row = buildRow('Swampert', '', 'G', ['MUD_SHOT', 'HYDRO_CANNON', 'EARTHQUAKE'], now);
+    expect(row.charged1_cd).toBe(true);
+    expect(row.charged1_elite_tm).toBe(true);
+    expect(row.charged1_legacy).toBe(false);
   });
 
   it('always sets verified=false', () => {
@@ -122,5 +129,59 @@ describe('buildRow', () => {
     const row = buildRow('Sandslash', 'Alolan', 'G', ['POWDER_SNOW', 'ICE_PUNCH', 'BLIZZARD'], now);
     expect(row.form).toBe('Alolan');
     expect(row.species).toBe('Sandslash');
+  });
+});
+
+// ─── getMoveFlags / KNOWN_MOVE_FLAGS ──────────────────────────────────────────
+
+describe('getMoveFlags', () => {
+  it('Hydro Cannon → cd=true, eliteTm=true, legacy=false', () => {
+    const flags = getMoveFlags('HYDRO_CANNON');
+    expect(flags.isCd).toBe(true);
+    expect(flags.isEliteTm).toBe(true);
+    expect(flags.isLegacy).toBe(false);
+  });
+
+  it('Aeroblast → eliteTm=true, legacy=false, cd=false', () => {
+    const flags = getMoveFlags('AEROBLAST');
+    expect(flags.isEliteTm).toBe(true);
+    expect(flags.isLegacy).toBe(false);
+    expect(flags.isCd).toBe(false);
+  });
+
+  it('Ice Shard → legacy=true', () => {
+    const flags = getMoveFlags('ICE_SHARD');
+    expect(flags.isLegacy).toBe(true);
+    expect(flags.isCd).toBe(false);
+    expect(flags.isEliteTm).toBe(false);
+  });
+
+  it('Frustration → legacy=true (shadow move)', () => {
+    const flags = getMoveFlags('FRUSTRATION');
+    expect(flags.isLegacy).toBe(true);
+  });
+
+  it('Mud Shot → all flags false (standard move)', () => {
+    const flags = getMoveFlags('MUD_SHOT');
+    expect(flags.isLegacy).toBe(false);
+    expect(flags.isCd).toBe(false);
+    expect(flags.isEliteTm).toBe(false);
+  });
+
+  it('normalisation: pvpoke ID and display name both match', () => {
+    expect(getMoveFlags('HYDRO_CANNON')).toEqual(getMoveFlags('hydro cannon'));
+    expect(getMoveFlags('HYDRO_CANNON')).toEqual(getMoveFlags('Hydro Cannon'));
+  });
+
+  it('unknown move → all flags false (safe default)', () => {
+    const flags = getMoveFlags('SOME_UNKNOWN_MOVE');
+    expect(flags.isLegacy).toBe(false);
+    expect(flags.isCd).toBe(false);
+    expect(flags.isEliteTm).toBe(false);
+  });
+
+  it('null/undefined → all flags false', () => {
+    expect(getMoveFlags(null)).toEqual({ isLegacy: false, isCd: false, isEliteTm: false });
+    expect(getMoveFlags(undefined)).toEqual({ isLegacy: false, isCd: false, isEliteTm: false });
   });
 });

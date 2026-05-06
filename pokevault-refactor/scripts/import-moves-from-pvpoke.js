@@ -70,30 +70,99 @@ function pvpokeIdToDisplay(moveId) {
   return stripped.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
 
-// Build a DB row from pvpoke data. All move-flag fields default false
-// because pvpoke's moves.json does not expose legacy/CD/elite-TM flags.
+// ── Move flags ────────────────────────────────────────────────────────────────
+// Hardcoded map of moves that require special treatment.
+// pvpoke's moves.json has no legacy/CD/elite-TM data, so we maintain this list.
+//
+// legacy:  move is permanently unobtainable via TM — do NOT TM away
+// cd:      Community Day move — obtainable during CD events or via Elite TM
+// eliteTm: requires Elite TM — standard TM will not work
+//
+// Sources: pvpoke.com, Bulbapedia, GO official announcements
+// Last updated: 2026-05-04
+// Re-verify after each Community Day or major GO update.
+// Uncertain entries are intentionally omitted — false is safer than wrong.
+const KNOWN_MOVE_FLAGS = {
+  // ── Signature / Elite TM required ────────────────────────────────────────
+  'aeroblast':        { eliteTm: true },   // Lugia
+  'origin pulse':     { eliteTm: true },   // Kyogre
+  'precipice blades': { eliteTm: true },   // Groudon
+  'spacial rend':     { eliteTm: true },   // Palkia (Origin)
+  'glaciate':         { eliteTm: true },   // Kyurem
+  'fusion flare':     { eliteTm: true },   // Reshiram
+  'fusion bolt':      { eliteTm: true },   // Zekrom
+  'dragon ascent':    { eliteTm: true },   // Rayquaza
+  'sandsear storm':   { eliteTm: true },   // Landorus Therian
+  'sparkling aria':   { eliteTm: true },   // Lapras
+  'psystrike':        { eliteTm: true },   // Mewtwo
+  'shadow ball':      { eliteTm: true },   // Mewtwo
+  'ominous wind':     { eliteTm: true },   // Giratina Origin
+  'acid spray':       { eliteTm: true },   // Alolan Muk
+  'drill run':        { eliteTm: true },   // Dewgong
+
+  // ── Community Day moves (CD event or Elite TM) ────────────────────────────
+  'hydro cannon':     { cd: true, eliteTm: true },  // Water starters
+  'frenzy plant':     { cd: true, eliteTm: true },  // Grass starters
+  'blast burn':       { cd: true, eliteTm: true },  // Fire starters
+  'draco meteor':     { cd: true, eliteTm: true },  // Dragon starters (some)
+  'last resort':      { cd: true, eliteTm: true },  // Eevee CD
+  'aqua tail':        { cd: true, eliteTm: true },  // Gyarados CD
+  'sky attack':       { cd: true, eliteTm: true },  // Moltres
+  'return':           { cd: true, eliteTm: true },  // Purified Pokémon
+  'meteor mash':      { cd: true, eliteTm: true },  // Metagross CD
+
+  // ── Legacy moves (unobtainable via any TM — do NOT TM away) ──────────────
+  'frustration':      { legacy: true },   // Shadow Pokémon
+  'psywave':          { legacy: true },   // Lapras legacy fast
+  'ice shard':        { legacy: true },   // Lapras / Dewgong legacy fast
+  'icy wind':         { legacy: true },   // Dewgong legacy charged
+  'shadow claw':      { legacy: true },   // Metagross legacy fast
+  'karate chop':      { legacy: true },   // Machamp legacy fast
+  'poison sting':     { legacy: true },   // Beedrill legacy fast
+};
+
+// Normalise a move name for map lookup — handles pvpoke IDs (HYDRO_CANNON)
+// and display names (Hydro Cannon) by lowercasing and replacing _ or - with space.
+function normaliseMoveKey(moveName) {
+  if (!moveName) return '';
+  return moveName.toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function getMoveFlags(moveName) {
+  const known = KNOWN_MOVE_FLAGS[normaliseMoveKey(moveName)];
+  return {
+    isLegacy:  known?.legacy   ?? false,
+    isCd:      known?.cd       ?? false,
+    isEliteTm: known?.eliteTm  ?? false,
+  };
+}
+
+// Build a DB row from pvpoke data.
 function buildRow(species, form, league, moveset, now) {
   const [fast, charged1, charged2] = moveset;
+  const fastFlags = getMoveFlags(fast);
+  const c1Flags   = getMoveFlags(charged1);
+  const c2Flags   = charged2 ? getMoveFlags(charged2) : { isLegacy: false, isCd: false, isEliteTm: false };
   return {
     species,
     league,
     form: form || '',
-    fast_move_best:    pvpokeIdToDisplay(fast),
-    fast_move_legacy:  false,
-    fast_move_cd:      false,
-    fast_move_elite_tm: false,
-    charged1_move:     pvpokeIdToDisplay(charged1),
-    charged1_legacy:   false,
-    charged1_cd:       false,
-    charged1_elite_tm: false,
-    charged2_move:     charged2 ? pvpokeIdToDisplay(charged2) : null,
-    charged2_legacy:   false,
-    charged2_cd:       false,
-    charged2_elite_tm: false,
+    fast_move_best:     pvpokeIdToDisplay(fast),
+    fast_move_legacy:   fastFlags.isLegacy,
+    fast_move_cd:       fastFlags.isCd,
+    fast_move_elite_tm: fastFlags.isEliteTm,
+    charged1_move:      pvpokeIdToDisplay(charged1),
+    charged1_legacy:    c1Flags.isLegacy,
+    charged1_cd:        c1Flags.isCd,
+    charged1_elite_tm:  c1Flags.isEliteTm,
+    charged2_move:      charged2 ? pvpokeIdToDisplay(charged2) : null,
+    charged2_legacy:    c2Flags.isLegacy,
+    charged2_cd:        c2Flags.isCd,
+    charged2_elite_tm:  c2Flags.isEliteTm,
     moveset_same_across_leagues: false,
-    move_pool_limited: false,
-    verified:          false,
-    last_verified_at:  now || new Date().toISOString(),
+    move_pool_limited:  false,
+    verified:           false,
+    last_verified_at:   now || new Date().toISOString(),
   };
 }
 
@@ -116,7 +185,7 @@ async function supabaseReq(method, path, body) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(`Supabase ${method} ${path}: ${txt.slice(0, 300)}`);
+    throw new Error(`Supabase ${method} ${path} → HTTP ${res.status}: ${txt.slice(0, 300)}`);
   }
   return method === 'GET' ? res.json() : null;
 }
@@ -126,7 +195,6 @@ async function supabaseReq(method, path, body) {
 async function getPrioritySpecies() {
   // Fetches distinct species names from pokemon_collection where any PvP rank ≥ 90%.
   // Column names: name, rank_pct_g, rank_pct_u, rank_pct_l (stored as 0–100 floats).
-  // Adjust column names here if the Supabase table schema differs.
   const rows = await supabaseReq('GET',
     'pokemon_collection?select=name&or=(rank_pct_g.gte.90,rank_pct_u.gte.90,rank_pct_l.gte.90)&limit=5000'
   );
@@ -251,7 +319,7 @@ async function main() {
   }
 }
 
-module.exports = { extractForm, extractSpeciesName, pvpokeIdToDisplay, buildRow };
+module.exports = { extractForm, extractSpeciesName, pvpokeIdToDisplay, buildRow, getMoveFlags, KNOWN_MOVE_FLAGS };
 
 if (require.main === module) {
   main().catch(e => { console.error('Fatal:', e); process.exit(1); });
