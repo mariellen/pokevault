@@ -162,6 +162,9 @@ const KNOWN_CORRECT_OVERRIDES = {
   'Lapras|U|fast':       'ice shard',         // pvpoke shows different fast
   'Leafeon|G|fast':      'razor leaf',        // pvpoke shows Quick Attack
   'Primeape|G|fast':     'counter',           // pvpoke shows Karate Chop (legacy)
+  'Blastoise|M|fast':    'water gun',         // pvpoke shows different fast
+  'Machamp|M|fast':      'counter',           // pvpoke shows Karate Chop (legacy)
+  'Metagross|M|fast':    'bullet punch',      // pvpoke shows Shadow Claw (legacy)
 };
 
 // Filter diffs that are covered by a KNOWN_CORRECT_OVERRIDES entry for this species+league.
