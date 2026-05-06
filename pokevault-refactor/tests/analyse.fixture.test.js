@@ -925,6 +925,7 @@ describe('Group 23 — Cross-evo-target slot routing', () => {
     const p = find('Gligar', 829);
     expect(p.suggestStar).toBe(true);
     expect(p.nickname).toMatch(/Ⓖ/);
+    expect(p.starType).toBe('green');
   });
 
   it('Gligar CP:124 keeps its best slot (Ultra as Gliscor)', () => {
@@ -953,6 +954,12 @@ describe('Group 23 — Cross-evo-target slot routing', () => {
     expect(mienfoo.staIV).toBe(15);
     expect(mienfoo.slots).toContain('M');
     expect(mienfoo.decision).toBe('keep');
+  });
+
+  it('Mienfoo hundo nick shows ML format (Ⓡ) not GL format (Ⓖ) after deconfliction', () => {
+    const mienfoo = find('Mienfoo', 793);
+    expect(mienfoo.nickname).toMatch(/Ⓡ/);
+    expect(mienfoo.nickname).not.toMatch(/Ⓖ/);
   });
 
   it('not.toContain: Mienshao does not win ML when hundo pre-evo exists', () => {

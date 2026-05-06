@@ -1048,6 +1048,7 @@ function analyse(rows) {
       });
     });
 
+    const releasedSlotPokemon = new Set();
     members.forEach(p => {
       if (p.slots.length < 2) return;
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
@@ -1088,6 +1089,8 @@ function analyse(rows) {
         const evoTarget = slotEvo(s);
         p.slots = p.slots.filter(x => x !== s);
         p.slotConfirmed = p.slots.some(x => RULES.leagues.includes(x));
+        if (p.expensiveForLeague === s) p.isExpensiveWinner = false;
+        releasedSlotPokemon.add(p);
 
         // Decrement winner count for this stage
         const wk = s+'|'+evoTarget;
@@ -1183,8 +1186,11 @@ function analyse(rows) {
     // promotes them to keep with correct nick and suggestStar.
     members.forEach(p => {
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
-      if (!leagueSlots.length || p.decision === 'keep') return;
+      if (!leagueSlots.length) return;
       if (!p.slotConfirmed) return; // below 90% — leave as review
+      // Run re-pass for: newly promoted nextBest pokemon (decision !== 'keep')
+      //                  OR pokemon that had a slot released by deconfliction
+      if (p.decision === 'keep' && !releasedSlotPokemon.has(p)) return;
       const cappedSlots = leagueSlots.filter(s => s !== 'M');
       const nickSlot = cappedSlots.length
         ? cappedSlots.sort((a, b) => (p['rankPct'+b]||0) - (p['rankPct'+a]||0))[0]
@@ -1199,6 +1205,13 @@ function analyse(rows) {
       else p.dustCostBest = 0;
       p.suggestStarExpensive = p.isExpensiveWinner === true;
       p.suggestStar = !p.suggestStarExpensive;
+      // Update starType to reflect current slot state (initial pass may be stale)
+      const hasRealSlot = p.slots.some(s => RULES.leagues.includes(s))
+        || p.slots.includes('lucky') || p.slots.includes('nundo');
+      if (p.suggestStar && p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'gold';
+      else if (p.suggestStar && !p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'green';
+      else if (p.suggestStarExpensive && p.isFavorite) p.starType = 'gold';
+      else if (p.suggestStarExpensive && !p.isFavorite) p.starType = 'blue';
     });
 
     // Recompute cyan/expensive star flags — conflict resolution above may have
