@@ -81,6 +81,7 @@ function starCell(p){
   else if(st==='blue') si='<span class="star-blue" title="Recommended but costly — over affordable threshold">★</span>';
   else if(st==='cyan') si='<span class="star-cyan" title="Equivalent to your starred pick — check before acting">★</span>';
   else if(st==='shiny') si='<span class="star-shiny" title="Shiny — always keep">✨</span>';
+  else if(st==='swirl') si='<span class="star-swirl" title="Unknown evo path — high PvP rank, consider evolving">🌀</span>';
   else if(st==='red') si='<span class="star-red" title="Currently starred — may not be needed">★</span>';
   else si='<span class="star-none">·</span>';
   return `<div class="star-cell">

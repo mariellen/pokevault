@@ -292,3 +292,23 @@ tr.row-merge-candidate{opacity:0.7;}
 .pv-modal-select{background:var(--surf2);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);font-size:11px;cursor:pointer;}
 .pv-modal-cb{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;}
 .pv-modal-empty{color:var(--muted);font-size:12px;text-align:center;padding:24px;}
+/* AUTH */
+.auth-section{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.user-email{font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.btn-google{background:#fff;color:#222;border:1px solid #ccc;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;}
+.btn-google:hover{background:#f0f0f0;}
+
+/* LOGIN MODAL */
+.login-box{background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:28px 28px 24px;max-width:340px;width:90%;position:relative;}
+.login-box h2{font-size:17px;margin-bottom:6px;}
+.login-box>p{color:var(--muted);font-size:12px;margin-bottom:18px;}
+.auth-divider{text-align:center;color:var(--dim);font-size:11px;margin:14px 0;position:relative;}
+.auth-divider::before,.auth-divider::after{content:'';position:absolute;top:50%;width:40%;height:1px;background:var(--border);}
+.auth-divider::before{left:0;} .auth-divider::after{right:0;}
+.magic-link-section{display:flex;flex-direction:column;gap:7px;}
+.magic-link-section input{background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;width:100%;}
+.magic-link-section input:focus{outline:none;border-color:var(--great);}
+.auth-note{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.5;}
+.login-close{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;}
+.login-close:hover{color:var(--text);}
+.login-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;z-index:1000;}

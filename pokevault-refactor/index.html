@@ -13,8 +13,34 @@
 <header>
   <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.19</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span></div>
   <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
-  <div id="sync-status" style="font-size:11px;color:var(--muted)">Connecting to cloud...</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div id="sync-status" style="font-size:11px;color:var(--muted)">Connecting...</div>
+    <div id="authSection" class="auth-section">
+      <span id="userEmail" class="user-email"></span>
+      <button id="loginBtn" class="btn" onclick="showLoginModal()">Sign in</button>
+      <button id="logoutBtn" class="btn" style="display:none" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
 </header>
+
+<!-- Login modal -->
+<div id="loginModal" class="login-modal-overlay" onclick="if(event.target===this)closeLoginModal()">
+  <div class="login-box">
+    <button class="login-close" onclick="closeLoginModal()">✕</button>
+    <h2>Sign in to PokéVault</h2>
+    <p>Save your collection and access it from any device.</p>
+    <button class="btn btn-google" onclick="signInWithGoogle()">
+      <img src="https://www.google.com/favicon.ico" width="14" height="14" style="vertical-align:middle"> Sign in with Google
+    </button>
+    <div class="auth-divider">or</div>
+    <div class="magic-link-section">
+      <input type="email" id="magicLinkEmail" placeholder="your@email.com" onkeydown="if(event.key==='Enter')sendMagicLink()">
+      <button class="btn" id="magicLinkBtn" onclick="sendMagicLink()">Send magic link</button>
+      <p class="auth-note" id="magicLinkSent" style="display:none;color:var(--green)">✓ Check your email for a login link</p>
+    </div>
+    <p class="auth-note">PokéVault works without signing in — your analysis runs locally and stays on this device.</p>
+  </div>
+</div>
 
 <div id="upload-section">
   <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
@@ -24,7 +50,7 @@
     <p style="margin-top:6px;font-size:11px;color:var(--great)">Supports full Pokégenie CSV export format</p>
   </div>
   <div style="text-align:center;margin-top:16px">
-    <button class="btn" id="cloudLoadBtn" onclick="handleCloudLoad()" style="padding:10px 24px;font-size:13px;display:none">
+    <button class="btn cloud-btn" id="cloudLoadBtn" onclick="handleCloudLoad()" style="padding:10px 24px;font-size:13px;display:none">
       ☁ Load last collection from cloud
     </button>
     <div id="cloud-load-status" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
@@ -188,13 +214,20 @@
     <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax">✨ Mark Special</button>
     <button class="btn export-btn" onclick="exportCSV()">⬇ Export</button>
   </div>
+  <div id="anon-import-bar" style="display:none;align-items:center;gap:12px;padding:7px 16px;border-bottom:1px solid var(--border);background:var(--surf);font-size:12px;color:var(--muted)">
+    <span style="flex:1">You're viewing a demo collection. Try it with your own Pokégenie CSV:</span>
+    <button class="btn" onclick="document.getElementById('tryOwnInput').click()" style="font-size:11px;white-space:nowrap">📦 Import your own CSV</button>
+    <input type="file" id="tryOwnInput" accept=".csv" style="display:none">
+  </div>
   <div id="main-content"></div>
 </div>
 
-<!-- Load order matters: config → data → supabase → analyse → render → app -->
+<!-- Load order matters: config → data → supabase → auth → analyse → render → app -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/data.js"></script>
 <script src="js/supabase.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/analyse.js"></script>
 <script src="js/render.js"></script>
 <script src="js/app.js"></script>

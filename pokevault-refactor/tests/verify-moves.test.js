@@ -6,6 +6,9 @@ const {
   normalizeMoveDisplay,
   compareMoves,
   buildSpeciesMap,
+  buildLookupKeys,
+  applyOverrides,
+  KNOWN_CORRECT_OVERRIDES,
 } = require('../scripts/verify-moves-against-pvpoke.js');
 
 // ── normalizeSpecies ───────────────────────────────────────────────────────
@@ -50,10 +53,10 @@ describe('normalizeSpecies', () => {
 
 // ── normalizeMoveId ────────────────────────────────────────────────────────
 describe('normalizeMoveId', () => {
-  it('strips underscores and lowercases', () => {
-    expect(normalizeMoveId('MUD_SHOT')).toBe('mudshot');
-    expect(normalizeMoveId('HYDRO_CANNON')).toBe('hydrocannon');
-    expect(normalizeMoveId('SHADOW_BALL')).toBe('shadowball');
+  it('replaces underscores with spaces and lowercases', () => {
+    expect(normalizeMoveId('MUD_SHOT')).toBe('mud shot');
+    expect(normalizeMoveId('HYDRO_CANNON')).toBe('hydro cannon');
+    expect(normalizeMoveId('SHADOW_BALL')).toBe('shadow ball');
   });
   it('handles single-word move', () => {
     expect(normalizeMoveId('THUNDER')).toBe('thunder');
@@ -63,15 +66,25 @@ describe('normalizeMoveId', () => {
     expect(normalizeMoveId('')).toBe('');
     expect(normalizeMoveId(null)).toBe('');
   });
+  it('strips type suffix from Weather Ball variants', () => {
+    expect(normalizeMoveId('WEATHER_BALL_ICE')).toBe('weather ball');
+    expect(normalizeMoveId('WEATHER_BALL_WATER')).toBe('weather ball');
+    expect(normalizeMoveId('WEATHER_BALL_FIRE')).toBe('weather ball');
+    expect(normalizeMoveId('WEATHER_BALL')).toBe('weather ball');
+  });
+  it('does not strip suffixes from non-Weather-Ball moves', () => {
+    expect(normalizeMoveId('SHADOW_BALL')).toBe('shadow ball');
+    expect(normalizeMoveId('FIRE_SPIN')).toBe('fire spin');
+  });
 });
 
 // ── normalizeMoveDisplay ───────────────────────────────────────────────────
 describe('normalizeMoveDisplay', () => {
-  it('strips spaces', () => {
-    expect(normalizeMoveDisplay('Mud Shot')).toBe('mudshot');
+  it('preserves spaces (lowercases)', () => {
+    expect(normalizeMoveDisplay('Mud Shot')).toBe('mud shot');
   });
-  it('strips hyphens', () => {
-    expect(normalizeMoveDisplay('Mud-Slap')).toBe('mudslap');
+  it('converts hyphens to spaces', () => {
+    expect(normalizeMoveDisplay('Mud-Slap')).toBe('mud slap');
   });
   it('returns empty string for falsy', () => {
     expect(normalizeMoveDisplay('')).toBe('');
@@ -81,6 +94,9 @@ describe('normalizeMoveDisplay', () => {
     expect(normalizeMoveDisplay('Hydro Cannon')).toBe(normalizeMoveId('HYDRO_CANNON'));
     expect(normalizeMoveDisplay('Shadow Ball')).toBe(normalizeMoveId('SHADOW_BALL'));
     expect(normalizeMoveDisplay('Thunder Punch')).toBe(normalizeMoveId('THUNDER_PUNCH'));
+  });
+  it('keeps distinct moves distinct', () => {
+    expect(normalizeMoveDisplay('Mud Shot')).not.toBe(normalizeMoveDisplay('Mudshot'));
   });
 });
 
@@ -97,6 +113,7 @@ describe('compareMoves', () => {
   });
 
   it('handles hyphenated display move matching underscore pvpoke ID', () => {
+    // "Mud-Slap" → "mud slap", "MUD_SLAP" → "mud slap"
     const row = { fast_move_best: 'Mud-Slap', charged1_move: 'Stone Edge', charged2_move: null };
     expect(compareMoves(row, ['MUD_SLAP', 'STONE_EDGE'])).toBe('match');
   });
@@ -110,18 +127,23 @@ describe('compareMoves', () => {
     expect(result[0]).toContain('BULLET_PUNCH');
   });
 
-  it('detects charged1 diff', () => {
+  it('detects charged diff when DB charged move not in pvpoke set', () => {
     const row = { fast_move_best: 'Bullet Punch', charged1_move: 'Earthquake', charged2_move: null };
     const result = compareMoves(row, ['BULLET_PUNCH', 'METEOR_MASH']);
     expect(Array.isArray(result)).toBe(true);
-    expect(result.some(d => d.includes('charged1:'))).toBe(true);
+    expect(result.some(d => d.includes('charged:'))).toBe(true);
   });
 
-  it('detects charged2 diff when both present', () => {
+  it('detects charged diff when DB c2 not in pvpoke set', () => {
     const row = { fast_move_best: 'Mud Shot', charged1_move: 'Hydro Cannon', charged2_move: 'Ice Beam' };
     const result = compareMoves(row, ['MUD_SHOT', 'HYDRO_CANNON', 'EARTHQUAKE']);
     expect(Array.isArray(result)).toBe(true);
-    expect(result.some(d => d.includes('charged2:'))).toBe(true);
+    expect(result.some(d => d.includes('charged:'))).toBe(true);
+  });
+
+  it('C1/C2 comparison is order-independent', () => {
+    const row = { fast_move_best: 'Dragon Tail', charged1_move: 'Dragon Claw', charged2_move: 'Ancient Power' };
+    expect(compareMoves(row, ['DRAGON_TAIL', 'ANCIENT_POWER', 'DRAGON_CLAW'])).toBe('match');
   });
 
   it('returns skip when pvpoke moveset is missing', () => {
@@ -163,6 +185,147 @@ describe('buildSpeciesMap', () => {
   it('looked-up entry has moveset', () => {
     const map = buildSpeciesMap(fakeRankings);
     expect(map.get('swampert').moveset).toEqual(['MUD_SHOT', 'HYDRO_CANNON', 'EARTHQUAKE']);
+  });
+
+  it('regional form with qualified speciesId does not overwrite base species entry', () => {
+    const rankings = [
+      { speciesId: 'electrode', speciesName: 'Electrode', moveset: ['VOLT_SWITCH', 'WILD_CHARGE'] },
+      { speciesId: 'electrode_hisuian', speciesName: 'Hisuian Electrode', moveset: ['THUNDER_SHOCK', 'WILD_CHARGE'] },
+    ];
+    const map = buildSpeciesMap(rankings);
+    expect(map.get('electrode').moveset[0]).toBe('VOLT_SWITCH');
+  });
+
+  it('regional form that shares bare speciesId does not overwrite base species entry', () => {
+    // Worst case: pvpoke gives Hisuian Electrode speciesId="electrode" (same as regular)
+    const rankings = [
+      { speciesId: 'electrode', speciesName: 'Electrode', moveset: ['VOLT_SWITCH', 'WILD_CHARGE'] },
+      { speciesId: 'electrode', speciesName: 'Hisuian Electrode', moveset: ['THUNDER_SHOCK', 'WILD_CHARGE'] },
+    ];
+    const map = buildSpeciesMap(rankings);
+    expect(map.get('electrode').moveset[0]).toBe('VOLT_SWITCH');
+  });
+
+  it('regional form is indexed under its speciesName key', () => {
+    const rankings = [
+      { speciesId: 'electrode', speciesName: 'Electrode', moveset: ['VOLT_SWITCH', 'WILD_CHARGE'] },
+      { speciesId: 'electrode', speciesName: 'Hisuian Electrode', moveset: ['THUNDER_SHOCK', 'WILD_CHARGE'] },
+    ];
+    const map = buildSpeciesMap(rankings);
+    expect(map.get('hisuian_electrode').moveset[0]).toBe('THUNDER_SHOCK');
+  });
+});
+
+// ── buildLookupKeys ────────────────────────────────────────────────────────
+describe('buildLookupKeys', () => {
+  it('returns bare species when form is absent', () => {
+    expect(buildLookupKeys('Swampert', '')).toEqual(['swampert']);
+    expect(buildLookupKeys('Swampert', null)).toEqual(['swampert']);
+  });
+
+  it('returns species+form first for named forms', () => {
+    const keys = buildLookupKeys('Giratina', 'Origin');
+    expect(keys[0]).toBe('giratina_origin');
+  });
+
+  it('falls back to bare species for default forms', () => {
+    const keys = buildLookupKeys('Tornadus', 'Incarnate');
+    expect(keys).toContain('tornadus');
+    expect(keys[0]).toBe('tornadus_incarnate');
+  });
+
+  it('maps Armored form to _a alias', () => {
+    const keys = buildLookupKeys('Mewtwo', 'Armored');
+    expect(keys).toContain('mewtwo_a');
+  });
+
+  it('de-duplicates keys', () => {
+    const keys = buildLookupKeys('Mewtwo', 'Normal');
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('maps Paldean form to _paldea alias (pvpoke naming convention)', () => {
+    const keys = buildLookupKeys('Tauros', 'Paldean');
+    expect(keys).toContain('tauros_paldean');
+    expect(keys).toContain('tauros_paldea');
+  });
+
+  it('maps Alolan form to _alola alias', () => {
+    const keys = buildLookupKeys('Raichu', 'Alolan');
+    expect(keys).toContain('raichu_alolan');
+    expect(keys).toContain('raichu_alola');
+  });
+
+  it('maps Hisuian form to _hisui alias and reversed key', () => {
+    const keys = buildLookupKeys('Electrode', 'Hisuian');
+    expect(keys).toContain('electrode_hisuian');
+    expect(keys).toContain('electrode_hisui');
+    // Also try reversed "hisuian_electrode" for pvpoke entries indexed by speciesName
+    expect(keys).toContain('hisuian_electrode');
+  });
+
+  it('does NOT fall back to bare species for non-default regional forms', () => {
+    // Paldean Tauros should not fall through to regular Tauros entry
+    const keys = buildLookupKeys('Tauros', 'Paldean');
+    expect(keys).not.toContain('tauros');
+  });
+
+  it('does NOT fall back to bare species for unrecognised non-default forms', () => {
+    // Rotom Wash should not silently match bare rotom entry
+    const keys = buildLookupKeys('Rotom', 'Wash');
+    expect(keys).not.toContain('rotom');
+    expect(keys[0]).toBe('rotom_wash');
+  });
+});
+
+// ── applyOverrides ────────────────────────────────────────────────────────
+describe('applyOverrides', () => {
+  it('passes through match and skip unchanged', () => {
+    expect(applyOverrides('match', 'Groudon', 'M')).toBe('match');
+    expect(applyOverrides('skip', 'Groudon', 'M')).toBe('skip');
+  });
+
+  it('suppresses fast diff when KNOWN_CORRECT_OVERRIDES entry present', () => {
+    // Groudon M|fast is overridden — a fast diff should become match
+    const fakeDiff = ['fast: DB="Mud Shot" pvpoke="DRAGON_TAIL"'];
+    expect(applyOverrides(fakeDiff, 'Groudon', 'M')).toBe('match');
+  });
+
+  it('suppresses charged diff when KNOWN_CORRECT_OVERRIDES entry present', () => {
+    const fakeDiff = ['charged: DB="Sky Attack" pvpoke="FLY"'];
+    expect(applyOverrides(fakeDiff, 'Lugia', 'M')).toBe('match');
+  });
+
+  it('keeps diff when no override entry matches', () => {
+    const fakeDiff = ['fast: DB="Vine Whip" pvpoke="RAZOR_LEAF"'];
+    const result = applyOverrides(fakeDiff, 'Venusaur', 'G');
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(1);
+  });
+
+  it('removes only the overridden diff when multiple diffs exist', () => {
+    // Groudon M|fast is overridden, but a charged diff should survive
+    const fakeDiff = [
+      'fast: DB="Mud Shot" pvpoke="DRAGON_TAIL"',
+      'charged: DB="Fire Blast" pvpoke="SOLAR_BEAM"',
+    ];
+    const result = applyOverrides(fakeDiff, 'Groudon', 'M');
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toContain('charged:');
+  });
+
+  it('KNOWN_CORRECT_OVERRIDES contains expected species', () => {
+    expect('Groudon|M|fast' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Machamp|U|fast' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Lugia|M|charged' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Beedrill|G|fast' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Electrode|G|fast' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Electrode|G|charged' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Lapras|G|fast' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Lapras|U|fast' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Leafeon|G|fast' in KNOWN_CORRECT_OVERRIDES).toBe(true);
+    expect('Primeape|G|fast' in KNOWN_CORRECT_OVERRIDES).toBe(true);
   });
 });
 

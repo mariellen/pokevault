@@ -40,20 +40,24 @@ function normalizeSpecies(displayName) {
 }
 
 // Convert a pvpoke move ID to a canonical form for comparison.
-// "MUD_SHOT" → "mudshot", "HYDRO_CANNON" → "hydrocannon"
+// "MUD_SHOT" → "mud shot", "WEATHER_BALL_ICE" → "weather ball"
 function normalizeMoveId(pvpokeId) {
   if (!pvpokeId) return '';
-  return pvpokeId.toLowerCase().replace(/_/g, '');
+  // Strip typed Weather Ball suffixes before general normalisation
+  const stripped = pvpokeId.replace(/^(WEATHER_BALL)_[A-Z]+$/i, '$1');
+  return stripped.toLowerCase().replace(/_/g, ' ').trim();
 }
 
 // Convert a DB move display name to the same canonical form.
-// "Mud Shot" → "mudshot", "Mud-Slap" → "mudslap", "Hydro Cannon" → "hydrocannon"
+// "Mud Shot" → "mud shot", "Mud-Slap" → "mud slap", "Hydro Cannon" → "hydro cannon"
 function normalizeMoveDisplay(name) {
   if (!name) return '';
-  return name.toLowerCase().replace(/[-'.\s_]/g, '');
+  return name.toLowerCase().replace(/[-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 // Compare a DB row's moves against a pvpoke moveset array [fast, c1, c2?].
+// Charged moves are compared as an order-independent set: DB moves must all
+// appear in pvpoke's set, but pvpoke may list extra moves DB doesn't have.
 // Returns 'match', 'skip' (no pvpoke entry / too few moves), or array of diff strings.
 function compareMoves(dbRow, pvpokeMoveset) {
   if (!pvpokeMoveset || pvpokeMoveset.length < 2) return 'skip';
@@ -66,19 +70,52 @@ function compareMoves(dbRow, pvpokeMoveset) {
     diffs.push(`fast: DB="${dbRow.fast_move_best}" pvpoke="${pvpokeMoveset[0]}"`);
   }
 
-  const c1   = normalizeMoveDisplay(dbRow.charged1_move);
-  const pvC1 = normalizeMoveId(pvpokeMoveset[1]);
-  if (c1 && pvC1 && c1 !== pvC1) {
-    diffs.push(`charged1: DB="${dbRow.charged1_move}" pvpoke="${pvpokeMoveset[1]}"`);
-  }
-
-  const c2   = normalizeMoveDisplay(dbRow.charged2_move || '');
-  const pvC2 = normalizeMoveId(pvpokeMoveset[2] || '');
-  if (c2 && pvC2 && c2 !== pvC2) {
-    diffs.push(`charged2: DB="${dbRow.charged2_move}" pvpoke="${pvpokeMoveset[2]}"`);
+  // Charged: DB moves must be a subset of pvpoke's charged set (order-independent)
+  const dbCharged = [dbRow.charged1_move, dbRow.charged2_move]
+    .filter(Boolean).map(normalizeMoveDisplay);
+  const pvSet = new Set(
+    [pvpokeMoveset[1], pvpokeMoveset[2]].filter(Boolean).map(normalizeMoveId)
+  );
+  if (dbCharged.length && pvSet.size && !dbCharged.every(m => pvSet.has(m))) {
+    const dbLabel = [dbRow.charged1_move, dbRow.charged2_move].filter(Boolean).join('/');
+    const pvLabel = pvpokeMoveset.slice(1).filter(Boolean).join('/');
+    diffs.push(`charged: DB="${dbLabel}" pvpoke="${pvLabel}"`);
   }
 
   return diffs.length ? diffs : 'match';
+}
+
+// pvpoke drops the trailing 'n' from regional form names (Paldean → paldea, Alolan → alola, Hisuian → hisui)
+const FORM_ALIASES = { paldean: 'paldea', alolan: 'alola', hisuian: 'hisui', galarian: 'galarian' };
+
+// Forms that pvpoke indexes under the bare species key (no suffix)
+const DEFAULT_FORMS = new Set(['normal', 'altered', 'incarnate', 'land', 'red_striped', 'baile', 'midday', 'solo']);
+
+// Regional form names as they appear in DB form column (lowercased)
+const REGIONAL_FORMS = new Set(['hisuian', 'galarian', 'alolan', 'paldean']);
+
+// Regex to detect regional prefix in pvpoke speciesName (e.g. "Hisuian Electrode")
+const REGIONAL_PREFIX_RE = /^(Hisuian|Galarian|Alolan|Paldean)\s+/i;
+
+// Build candidate pvpoke speciesId keys from a DB species+form pair.
+// pvpoke encodes form into speciesId (e.g. "giratina_origin", "mewtwo_a").
+// Returns an ordered list of keys to try, most-specific first.
+// Non-default forms without a pvpoke entry will return no base fallback → SKIP.
+function buildLookupKeys(species, form) {
+  const base = normalizeSpecies(species);
+  if (!form || !form.trim()) return [base];
+  const f = form.toLowerCase().trim().replace(/\s+/g, '_');
+  const keys = [base + '_' + f];
+  if (f === 'armored') keys.push(base + '_a');  // pvpoke uses _a for Armored Mewtwo
+  if (FORM_ALIASES[f]) keys.push(base + '_' + FORM_ALIASES[f]);
+  // pvpoke sometimes indexes regional forms as "region_species" (e.g. "hisuian_electrode")
+  // rather than "species_region" — try both orderings
+  if (REGIONAL_FORMS.has(f)) {
+    keys.push(f + '_' + base);
+    if (FORM_ALIASES[f]) keys.push(FORM_ALIASES[f] + '_' + base);
+  }
+  if (DEFAULT_FORMS.has(f)) keys.push(base);
+  return [...new Set(keys)];
 }
 
 // Build a lookup map: normalizedSpeciesKey → pvpoke entry, for one league's data.
@@ -88,13 +125,60 @@ function buildSpeciesMap(rankings) {
   for (const entry of rankings) {
     const id = entry.speciesId || '';
     if (/_shadow|_mega|_xl$|_xs$|_buddy/.test(id)) continue;
-    // Index by both speciesId and normalised speciesName so we have two lookup paths
-    map.set(id.replace(/-/g, '_'), entry);
-    if (entry.speciesName) {
-      map.set(normalizeSpecies(entry.speciesName), entry);
+    const idKey = id.replace(/-/g, '_');
+    const name = entry.speciesName || '';
+
+    if (name && REGIONAL_PREFIX_RE.test(name)) {
+      // Regional form: always index under normalised speciesName ("hisuian_electrode")
+      // so it can be found by buildLookupKeys reversed-key candidates.
+      map.set(normalizeSpecies(name), entry);
+      // Also index under idKey only when it's form-qualified, not the bare base species.
+      // This prevents pvpoke's Hisuian Electrode (speciesId="electrode") from overwriting
+      // the regular Electrode entry when they share the same bare speciesId.
+      const baseKey = normalizeSpecies(name.replace(REGIONAL_PREFIX_RE, '').trim());
+      if (idKey !== baseKey) map.set(idKey, entry);
+    } else {
+      map.set(idKey, entry);
+      // Only add speciesName key when it exactly matches the speciesId
+      if (name && normalizeSpecies(name) === idKey) map.set(normalizeSpecies(name), entry);
     }
   }
   return map;
+}
+
+// DB moves confirmed correct that pvpoke shows differently (legacy moves, IV-specific quirks).
+// Key: 'Species|League|fast' or 'Species|League|charged'. Value: normalised DB move name.
+// When DB move matches the override value, treat as MATCH regardless of pvpoke.
+const KNOWN_CORRECT_OVERRIDES = {
+  'Groudon|M|fast':      'mud shot',          // pvpoke shows Dragon Tail for a specific IV configuration
+  'Machamp|U|fast':      'counter',           // pvpoke shows Karate Chop (legacy)
+  'Medicham|G|fast':     'counter',           // pvpoke shows Psycho Cut
+  'Togekiss|M|fast':     'charm',             // pvpoke shows Peck
+  'Lugia|M|charged':     'sky attack',        // pvpoke shows Fly
+  'Beedrill|G|fast':     'poison jab',        // pvpoke shows Poison Sting
+  'Electrode|G|fast':    'volt switch',       // pvpoke shows Thunder Shock (Hisuian fast)
+  'Electrode|G|charged': 'discharge/foul play', // pvpoke shows Hisuian charged set
+  'Lapras|G|fast':       'ice shard',         // pvpoke shows Ice Shard (confirmed correct)
+  'Lapras|U|fast':       'ice shard',         // pvpoke shows different fast
+  'Leafeon|G|fast':      'razor leaf',        // pvpoke shows Quick Attack
+  'Primeape|G|fast':     'counter',           // pvpoke shows Karate Chop (legacy)
+};
+
+// Filter diffs that are covered by a KNOWN_CORRECT_OVERRIDES entry for this species+league.
+function applyOverrides(compareResult, species, league) {
+  if (compareResult === 'match' || compareResult === 'skip') return compareResult;
+  const filtered = compareResult.filter(diff => {
+    if (diff.startsWith('fast:')) {
+      const ov = KNOWN_CORRECT_OVERRIDES[`${species}|${league}|fast`];
+      if (ov) return false;  // override present → suppress diff
+    }
+    if (diff.startsWith('charged:')) {
+      const ov = KNOWN_CORRECT_OVERRIDES[`${species}|${league}|charged`];
+      if (ov) return false;
+    }
+    return true;
+  });
+  return filtered.length ? filtered : 'match';
 }
 
 // ── Supabase helpers ───────────────────────────────────────────────────────
@@ -164,15 +248,15 @@ async function main() {
     const map = speciesMaps[row.league];
     if (!map) { skips.push({ row, reason: `unknown league "${row.league}"` }); continue; }
 
-    const key = normalizeSpecies(row.species);
-    const pvEntry = map.get(key);
+    const keys = buildLookupKeys(row.species, row.form);
+    const pvEntry = keys.reduce((found, k) => found || map.get(k), undefined);
 
     if (!pvEntry) {
       skips.push({ row, reason: 'not in pvpoke rankings' });
       continue;
     }
 
-    const result = compareMoves(row, pvEntry.moveset);
+    const result = applyOverrides(compareMoves(row, pvEntry.moveset), row.species, row.league);
 
     if (result === 'match') {
       matches.push(row);
@@ -211,8 +295,9 @@ async function main() {
   console.log(`\nUpdating ${matches.length} matched rows (last_verified_at, verified=true)...`);
   let updated = 0;
   for (const row of matches) {
+    const formFilter = row.form ? `&form=eq.${encodeURIComponent(row.form)}` : `&form=eq.`;
     await supabaseReq('PATCH',
-      `pokemon_moves?species=eq.${encodeURIComponent(row.species)}&league=eq.${encodeURIComponent(row.league)}`,
+      `pokemon_moves?species=eq.${encodeURIComponent(row.species)}&league=eq.${encodeURIComponent(row.league)}${formFilter}`,
       { last_verified_at: now, verified: true }
     );
     updated++;
@@ -223,7 +308,7 @@ async function main() {
 }
 
 // Export pure functions for unit tests; run main() only when executed directly.
-module.exports = { normalizeSpecies, normalizeMoveId, normalizeMoveDisplay, compareMoves, buildSpeciesMap };
+module.exports = { normalizeSpecies, normalizeMoveId, normalizeMoveDisplay, compareMoves, buildSpeciesMap, buildLookupKeys, applyOverrides, KNOWN_CORRECT_OVERRIDES };
 
 if (require.main === module) {
   main().catch(e => { console.error('Fatal:', e); process.exit(1); });

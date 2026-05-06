@@ -21,6 +21,8 @@ const SHIMS = `
   const SUPABASE_KEY = 'test';
   const SUPABASE_URL = 'http://test';
   const localStorage = { setItem() {}, getItem() { return null; } };
+  const supabaseClient = undefined;
+  async function getCurrentUserId() { return 'test-user-id'; }
 `;
 
 /**

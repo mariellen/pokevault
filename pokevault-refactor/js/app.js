@@ -609,13 +609,17 @@ function openPurifyModal(){
   const sub=document.getElementById('purify-modal-sub');
 
   // 92% threshold (not keepThreshold) to buffer for heuristic approximation
-  let candidates=allPokemon.filter(p=>p.isShadow&&p.purifyLeague&&p.purifyRankPct>=92);
+  // Also include hundo-on-purify candidates regardless of rank (all IVs ≥ 13)
+  let candidates=allPokemon.filter(p=>p.isShadow&&(p.purifyHundo||(p.purifyLeague&&p.purifyRankPct>=92)));
 
-  if(purifyLeagueFilter) candidates=candidates.filter(p=>p.purifyLeague===purifyLeagueFilter);
+  if(purifyLeagueFilter) candidates=candidates.filter(p=>p.purifyLeague===purifyLeagueFilter||p.purifyHundo);
 
   candidates.sort((a,b)=>{
+    // Hundo-on-purify always sorts to the top
+    if(a.purifyHundo&&!b.purifyHundo) return -1;
+    if(!a.purifyHundo&&b.purifyHundo) return 1;
     if(purifySort==='dust'){
-      const da=a['dust'+a.purifyLeague]||0, db=b['dust'+b.purifyLeague]||0;
+      const da=a['dust'+(a.purifyLeague||'G')]||0, db=b['dust'+(b.purifyLeague||'G')]||0;
       return da-db;
     }
     if(purifySort==='league'){
@@ -626,7 +630,9 @@ function openPurifyModal(){
     return (b.purifyRankPct||0)-(a.purifyRankPct||0);
   });
 
-  sub.textContent=candidates.length+' shadow'+(candidates.length===1?'':'s')+' qualify when purified';
+  const hundoCandidates=candidates.filter(p=>p.purifyHundo);
+  const rankCandidates=candidates.filter(p=>!p.purifyHundo);
+  sub.textContent=candidates.length+' shadow'+(candidates.length===1?'':'s')+' qualify when purified'+(hundoCandidates.length?' ('+hundoCandidates.length+' become hundo)':'');
 
   ['rank','dust','league'].forEach(s=>{
     const btn=document.getElementById('purify-sort-'+s);
@@ -648,27 +654,30 @@ function openPurifyModal(){
   }
 
   const rows=candidates.map(p=>{
-    const lg=p.purifyLeague;
-    const lgName=LEAGUE_NAMES_P[lg]||lg;
+    const lg=p.purifyLeague||'';
+    const lgName=LEAGUE_NAMES_P[lg]||'—';
     const lgColor=LEAGUE_COLORS_P[lg]||'var(--muted)';
-    const lgSym=LEAGUE_SYMS_P[lg]||lg;
+    const lgSym=LEAGUE_SYMS_P[lg]||'Ⓡ';
     const shadowDust=p['dust'+lg]||0;
     const purifyDust=Math.round(shadowDust/2);
     const purifyBaseName=p.purifyEvo||p.name;
-    const purifyNick=fitName(purifyBaseName,lgSym+p.purifyRankPct+(p.purifyHundo?'✪':''),'p',12);
+    const purifyNick=p.purifyHundo&&!lg
+      ? fitName(purifyBaseName,'Ⓡ'+(Math.round(p.ivAvg||0)||100),'p✪',12)
+      : fitName(purifyBaseName,lgSym+p.purifyRankPct+(p.purifyHundo?'✪':''),'p',12);
     const ivStr=p.atkIV+'/'+p.defIV+'/'+p.staIV;
     const pAtk=Math.min(15,(p.atkIV||0)+2);
     const pDef=Math.min(15,(p.defIV||0)+2);
     const pSta=Math.min(15,(p.staIV||0)+2);
     const purifiedIvStr=pAtk+'/'+pDef+'/'+pSta;
+    const isHundoOnly=p.purifyHundo&&(!lg||p.purifyRankPct<92);
 
     return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
-        padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px">
+        padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px${isHundoOnly?';background:rgba(255,215,0,0.05)':''}">
       <div>
         <div style="font-weight:700;color:var(--text)">${p.name}${p.purifyEvo&&p.purifyEvo!==p.name?' <span style="color:var(--muted);font-size:11px;font-weight:400">→ '+p.purifyEvo+'</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
-          ${p.purifyHundo?'<span style="color:var(--gold);font-size:10px"> ★ Hundo after purify</span>':''}
+          ${p.purifyHundo?'<span style="color:var(--gold);font-size:10px"> ✨ Becomes hundo!</span>':''}
         </div>
-        <div style="color:var(--muted);font-size:11px">IVs: ${ivStr} → ${purifiedIvStr} · <span style="color:${lgColor};font-weight:700">${lgName}</span> est. <span style="font-weight:700;color:var(--green)">${p.purifyRankPct}%</span> · dust: <span style="color:var(--cyan)">${purifyDust>0?purifyDust.toLocaleString():'at cap'}</span></div>
+        <div style="color:var(--muted);font-size:11px">IVs: ${ivStr} → ${purifiedIvStr}${lg?' · <span style="color:'+lgColor+';font-weight:700">'+lgName+'</span> est. <span style="font-weight:700;color:var(--green)">'+p.purifyRankPct+'%</span>':''} · dust: <span style="color:var(--cyan)">${purifyDust>0?purifyDust.toLocaleString():'at cap'}</span></div>
       </div>
       <button class="copy-search-btn" onclick="copyGoSearch('${p.name}&cp${p.cp}&shadow',this)" title="Copy name+CP+shadow to find in GO/Pokégenie">🔍</button>
       <button class="copy-search-btn" onclick="copyGoSearch('${ivStr}',this)" title="Copy IVs to search in Pokégenie">IV</button>
@@ -951,17 +960,7 @@ function closeSpecialModal(){document.getElementById('special-modal').classList.
 // COPY SUGGESTED NICKS
 // ═══════════════════════════════════════════════
 
-async function handleCloudLoad() {
-  const btn = document.getElementById('cloudLoadBtn');
-  const status = document.getElementById('cloud-load-status');
-  if (btn) { btn.disabled=true; btn.textContent='Loading...'; }
-  const rows = await loadCollectionFromCloud();
-  if (!rows) {
-    if (status) status.textContent = 'No cloud data found. Import a CSV first.';
-    if (btn) { btn.disabled=false; btn.textContent='☁ Load last collection from cloud'; }
-    return;
-  }
-  // Convert cloud rows back to CSV-like format for analyse()
+function processCloudRows(rows) {
   const csvRows = rows.map(r => ({
     'Index': r.pokemon_index,
     'Name': r.name,
@@ -1031,6 +1030,36 @@ async function handleCloudLoad() {
       showError('Cloud load failed', err.message);
     }
   },80);
+}
+
+async function handleCloudLoad() {
+  const btn = document.getElementById('cloudLoadBtn');
+  const status = document.getElementById('cloud-load-status');
+  if (btn) { btn.disabled=true; btn.textContent='Loading...'; }
+  const rows = await loadCollectionFromCloud();
+  if (!rows) {
+    if (status) status.textContent = 'No cloud data found. Import a CSV first.';
+    if (btn) { btn.disabled=false; btn.textContent='☁ Load last collection from cloud'; }
+    return;
+  }
+  processCloudRows(rows);
+}
+
+async function autoLoadFromCloud() {
+  const status = document.getElementById('cloud-load-status');
+  if (status) status.textContent = 'Checking for latest collection...';
+  const rows = await loadCollectionFromCloud();
+  if (!rows) {
+    if (status) status.textContent = '';
+    return;
+  }
+  processCloudRows(rows);
+  // Show the "try with your own CSV" bar for visitors who aren't signed in
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    const bar = document.getElementById('anon-import-bar');
+    if (bar) bar.style.display = 'flex';
+  }
 }
 
 function toggleOverride(idx) {
@@ -1280,8 +1309,7 @@ function handleFile(file){
               const filenameEl=document.getElementById('csvFilename');
               if(filenameEl){filenameEl.textContent=' · '+file.name;filenameEl.style.display='inline';}
               loadOverrides();
-              // Save to cloud after successful import
-              if (supabaseConnected) saveCollectionToCloud(allPokemon);
+              saveCollectionToCloud(allPokemon);  // guards on auth internally
               document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
               document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
             },50);
@@ -1293,15 +1321,25 @@ function handleFile(file){
   reader.readAsText(file);
 }
 
-// Load overrides + evolution chains on page load
-window.addEventListener('load', () => {
-  loadOverrides();
+// Initialise auth + evolution chains on page load, then auto-load cloud collection
+window.addEventListener('load', async () => {
+  await initAuth();  // sets auth state; calls loadOverrides() when logged in
   loadEvolutionChains();
   const sel = document.getElementById('nickConvention');
   if (sel) sel.value = currentNickConvention;
+  // Auto-load from cloud for all users (anon read policy allows this).
+  // Falls back silently to the CSV import screen if cloud is empty or unavailable.
+  if (allPokemon.length === 0) autoLoadFromCloud();
 });
 
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+document.getElementById('tryOwnInput')?.addEventListener('change',e=>{
+  const f=e.target.files[0];
+  if(!f) return;
+  const bar=document.getElementById('anon-import-bar');
+  if(bar) bar.style.display='none';
+  handleFile(f);
+});
 const dz=document.getElementById('dropZone');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));

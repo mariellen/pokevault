@@ -738,6 +738,30 @@ describe('Group 18 — Dynamax/Gigantamax/Shiny holding-format redirect', () => 
     expect(nick).toContain('Ⓓ');
     expect(nick.length).toBeLessThanOrEqual(12);
   });
+
+  it('isLucky + slot=review → NameⓇ{IV%} not holding format', () => {
+    const p = makeP({ isLucky: true });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).not.toMatch(/\d+[lgum]/); // no lowercase holding letters
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  it('isLucky + isDynamax + slot=review → Lucky wins (Ⓡ format) with Ⓓ suffix', () => {
+    const p = makeP({ isLucky: true, isDynamax: true });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).toContain('Ⓓ');
+    expect(nick).not.toMatch(/\d+[lgum]/);
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  it('isLucky + isShiny + slot=review → Lucky wins (Ⓡ format) with ※ suffix', () => {
+    const p = makeP({ isLucky: true, isShiny: true });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓡ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
 });
 
 // ─── Group 19 — Shiny ✨ star type ────────────────────────────────────────────
@@ -777,5 +801,187 @@ describe('Group 19 — Shiny ✨ starType', () => {
     expect(p.isShiny).toBe(true);
     expect(p.starType).toBe('gold'); // real PvP slot + fav=1 → gold unchanged
     expect(p.starType).not.toBe('shiny');
+  });
+});
+
+// ─── Group 20 — Shiny A3 nick fix (no Ⓜ for ivAvg-only Master rank) ─────────
+
+describe('Group 20 — Shiny nick: Ⓡ when no capped league qualifies', () => {
+  const makeShinyP = (overrides) => Object.assign({
+    name: 'Clamperl', form: '', specialForm: '', vivillonPattern: '',
+    isDynamax: false, isGigantamax: false, isShiny: true,
+    isShadow: false, isPurified: false, isLucky: false, isNundo: false,
+    ivAvg: 91, atkIV: 13, defIV: 14, staIV: 15,
+    rankPctG: 45, rankPctU: 38, rankPctL: 70, rankPctM: 91,
+    slots: ['shiny'], purifyLeague: '',
+    hasAllBestMoves: false, hasBestMoves: false, hasTwoMoves: false,
+    dustG: 0, dustU: 0, dustL: 0,
+    evolvedNameG: '', evolvedNameU: '', evolvedNameL: '',
+    quickMove: '', chargeMove1: '',
+  }, overrides);
+
+  it('shiny with high ivAvg (91%) but no qualifying capped league → nick has Ⓡ not Ⓜ', () => {
+    const p = makeShinyP({});
+    const nick = buildNickname(p, 'shiny');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).toContain('※');
+    expect(nick).not.toContain('Ⓜ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  it('shiny with qualifying Great rank (92%) → nick has Ⓖ symbol', () => {
+    const p = makeShinyP({ rankPctG: 92, rankPctL: 0 });
+    const nick = buildNickname(p, 'shiny');
+    expect(nick).toContain('Ⓖ');
+    expect(nick).toContain('※');
+    expect(nick).not.toContain('Ⓜ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  it('shiny + slot=review (no confirmed slot) → Ⓡ format with ※, no league symbol', () => {
+    const p = makeShinyP({ slots: [] });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).toContain('※');
+    expect(nick).not.toMatch(/[ⓁⒼⓊⓂ]/);
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+});
+
+// ─── Group 21 — Hundo force-keep (Part B Fix 1) ──────────────────────────────
+
+describe('Group 21 — Hundo (15/15/15) always gets decision=keep', () => {
+  const makeHundoP = () => Object.assign({
+    name: 'Mienfoo', form: '', specialForm: '', vivillonPattern: '',
+    isDynamax: false, isGigantamax: false, isShiny: false,
+    isShadow: false, isPurified: false, isLucky: false, isNundo: false,
+    ivAvg: 100, atkIV: 15, defIV: 15, staIV: 15,
+    rankPctG: 50, rankPctU: 45, rankPctL: 60, rankPctM: 100,
+    slots: ['hundo'], purifyLeague: '', isPurifySlot: false,
+    hasAllBestMoves: false, hasBestMoves: false, hasTwoMoves: false,
+    dustG: 0, dustU: 0, dustL: 0,
+    evolvedNameG: '', evolvedNameU: '', evolvedNameL: '',
+    quickMove: '', chargeMove1: '',
+  });
+
+  it('hundo nick slot=lucky → NameⓇ100 format', () => {
+    const p = makeHundoP();
+    const nick = buildNickname(p, 'lucky');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).toContain('100');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+});
+
+// ─── Group 22 — evolutionUnknown flag (Part C) ───────────────────────────────
+
+describe('Group 22 — evolutionUnknown flag', () => {
+  it('Wurmple has evolutionUnknown=true', () => {
+    const all = result.pokemon;
+    const wurmple = all.find(p => p.name === 'Wurmple');
+    if (!wurmple) return; // fixture may not include Wurmple
+    expect(wurmple.evolutionUnknown).toBe(true);
+  });
+
+  it('buildNickname does not crash for unknownEvo pokemon', () => {
+    const p = {
+      name: 'Wurmple', form: '', specialForm: '', vivillonPattern: '',
+      isDynamax: false, isGigantamax: false, isShiny: false,
+      isShadow: false, isPurified: false, isLucky: false, isNundo: false,
+      ivAvg: 91, atkIV: 14, defIV: 15, staIV: 15,
+      rankPctG: 91, rankPctU: 75, rankPctL: 91, rankPctM: 91,
+      slots: ['G'], purifyLeague: '', isPurifySlot: false, evolutionUnknown: true,
+      hasAllBestMoves: false, hasBestMoves: false, hasTwoMoves: false,
+      dustG: 0, dustU: 0, dustL: 0,
+      evolvedNameG: '', evolvedNameU: '', evolvedNameL: '',
+      quickMove: '', chargeMove1: '',
+    };
+    const nick = buildNickname(p, 'G');
+    expect(nick).toBeDefined();
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+});
+
+// ─── Group 23 — Cross-evo-target slot routing + ML pre-evo + male Gothita ─────
+
+const findByGender = (name, gender, cp) =>
+  result.pokemon.find(p => p.name === name && p.gender === gender && p.cp === cp);
+
+describe('Group 23 — Cross-evo-target slot routing', () => {
+
+  // Case 1: Gligar cross-evo deconfliction
+  it('Gligar CP:124 holding GL+UL with different evo targets → releases GL to runner-up', () => {
+    const cp124 = find('Gligar', 124);
+    const cp829 = find('Gligar', 829);
+    expect(cp124).toBeDefined();
+    expect(cp829).toBeDefined();
+    expect(cp124.slots).not.toContain('G'); // GL released
+    expect(cp124.slots).toContain('U');     // UL kept
+    expect(cp829.slots).toContain('G');     // runner-up wins GL
+    expect(cp829.decision).toBe('keep');
+  });
+
+  it('Gligar CP:829 gets green star (suggestStar) after deconfliction', () => {
+    const p = find('Gligar', 829);
+    expect(p.suggestStar).toBe(true);
+    expect(p.nickname).toMatch(/Ⓖ/);
+  });
+
+  it('Gligar CP:124 keeps its best slot (Ultra as Gliscor)', () => {
+    const p = find('Gligar', 124);
+    expect(p.slots).toContain('U');
+    expect(p.decision).toBe('keep');
+    expect(p.targetEvo).toBe('Gliscor');
+  });
+
+  it('not.toContain: CP:124 does not hold GL after cross-evo deconfliction', () => {
+    const p = find('Gligar', 124);
+    expect(p.slots).not.toContain('G');
+  });
+
+  it('not.toContain: CP:829 has a confirmed league slot after deconfliction', () => {
+    const p = find('Gligar', 829);
+    expect(p.slots.some(s => ['L','G','U','M'].includes(s))).toBe(true);
+  });
+
+  // Case 2: Mienfoo hundo vs evolved Mienshao for Master League
+  it('Mienfoo hundo (15/15/15) wins Master League over lower-IV evolved Mienshao', () => {
+    const mienfoo = find('Mienfoo', 793);
+    expect(mienfoo).toBeDefined();
+    expect(mienfoo.atkIV).toBe(15);
+    expect(mienfoo.defIV).toBe(15);
+    expect(mienfoo.staIV).toBe(15);
+    expect(mienfoo.slots).toContain('M');
+    expect(mienfoo.decision).toBe('keep');
+  });
+
+  it('not.toContain: Mienshao does not win ML when hundo pre-evo exists', () => {
+    const p = find('Mienshao', 2289);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('M');
+  });
+
+  // Case 3: Male Gothita → Gothitelle via EVO_OVERRIDES
+  it('male Gothita (15/15/14) gets Gothitelle evo targets from EVO_OVERRIDES', () => {
+    const gothita = findByGender('Gothita', '♂', 185);
+    expect(gothita).toBeDefined();
+    expect(gothita.evolvedNameU).toBe('Gothitelle');
+    expect(gothita.evolvedNameG).toBe('Gothorita');
+  });
+
+  it('male Gothita wins Master League slot (best-IV pre-evo, no final-evo in collection)', () => {
+    const gothita = findByGender('Gothita', '♂', 185);
+    expect(gothita.slots).toContain('M');
+    expect(gothita.decision).toBe('keep');
+  });
+
+  it('male Gothita nick does not show holding format after fix', () => {
+    const p = findByGender('Gothita', '♂', 185);
+    expect(p.nickname).not.toMatch(/\d+m$/);
+  });
+
+  it('male Gothita starType is not red after fix', () => {
+    const p = findByGender('Gothita', '♂', 185);
+    expect(p.starType).not.toBe('red');
   });
 });

@@ -70,8 +70,16 @@ const GENDER_DIMORPHIC = new Set([
 const FAMILY_OVERRIDES = {
   // Kleavor is only obtainable via raids — treat as its own family, not part of Scyther line
   standalone: new Set(['Kleavor']),
-  // Wurmple evolution path is random — flag as unknown
-  unknownEvo: new Set(['Wurmple']),
+  // Wurmple and Clamperl evolution paths are random — flag as unknown
+  unknownEvo: new Set(['Wurmple', 'Clamperl']),
+};
+
+// ── Evolution overrides ───────────────────────────────────
+// Species where Pokégenie omits evo targets (e.g. male Gothita: evolves to Gothitelle in GO
+// but Pokégenie exports blank Name (G/U/L) for male-specific rows).
+// Keys: 'Name|gender' or 'Name'. Values: { G, U, L } evo targets.
+const EVO_OVERRIDES = {
+  'Gothita|♂': { G: 'Gothorita', U: 'Gothitelle', L: 'Gothorita' },
 };
 
 // ── Stardust power-up cost table ─────────────────────────
@@ -112,4 +120,59 @@ const FORM_NICK_PREFIXES = {
   'Archipelago':'Arch', 'High Plains':'HiPl', 'Pokéball':'PBal', 'Fancy':'Fanc',
   // Flabébé / Floette / Florges colours (via Set Forms modal)
   'Red':'Red', 'Orange':'Orng', 'Yellow':'Yell', 'Blue':'Blue', 'White':'Whit',
+};
+
+// ── Nick convention ───────────────────────────────
+// 'pvpvault' = default (league symbol + rank%)
+// 'ivpct'    = ShortName + rounded IV%  e.g. Glaceon56
+// 'rawiv'    = ShortName + AtkDefSta    e.g. Glaceon2914
+// 'moves'    = ShortName + QCode/CCode  e.g. SwamperMS/HC (fallback: ivpct)
+const NICK_CONVENTION = 'pvpvault';
+
+// Two-letter move codes for the 'moves' nick convention.
+// Full list sourced from NAMING_CONVENTIONS_PLAN.md; add entries as needed.
+const MOVE_CODES = {
+  // Fast moves
+  'Air Slash':'AS', 'Astonish':'Ast', 'Bite':'Bt', 'Bug Bite':'BB',
+  'Bullet Punch':'BP', 'Charm':'Ch', 'Confusion':'Cn', 'Counter':'Co',
+  'Dragon Breath':'DB', 'Feint Attack':'FA', 'Fire Spin':'Fs',
+  'Frost Breath':'FB', 'Gust':'Gu', 'Hex':'Hx', 'Hidden Power':'HP',
+  'Ice Shard':'IS', 'Incinerate':'In', 'Karate Chop':'KC', 'Lick':'Li',
+  'Lock On':'LO', 'Low Kick':'LK', 'Metal Claw':'MC', 'Mud Shot':'MS',
+  'Mud Slap':'Ml', 'Peck':'Pe', 'Poison Jab':'PJ', 'Pound':'Pd',
+  'Powder Snow':'PS', 'Quick Attack':'QA', 'Razor Leaf':'RL',
+  'Rock Smash':'RkS', 'Rock Throw':'RT', 'Scratch':'Sr', 'Shadow Claw':'SC',
+  'Spark':'Sk', 'Steel Wing':'SW', 'Snarl':'Sn', 'Splash':'Spl',
+  'Sucker Punch':'SuP', 'Tackle':'Tc', 'Thunder Shock':'TS',
+  'Vine Whip':'VW', 'Water Gun':'WG', 'Waterfall':'Wt',
+  'Wing Attack':'WA', 'Yawn':'Yn', 'Zen Headbutt':'ZH',
+  // Charge moves
+  'Aerial Ace':'AA', 'Ancient Power':'AnP', 'Aqua Tail':'AT',
+  'Aurora Beam':'AuB', 'Blizzard':'Bz', 'Body Slam':'BS',
+  'Brave Bird':'BrB', 'Bubble Beam':'BuB', 'Close Combat':'CC',
+  'Crunch':'Cr', 'Dazzling Gleam':'DG', 'Dig':'Dg', 'Dark Pulse':'DP',
+  'Discharge':'Di', 'Doom Desire':'DD', 'Draco Meteor':'DM',
+  'Dragon Claw':'DrC', 'Dragon Pulse':'DrP', 'Drill Run':'DR',
+  'Earthquake':'EQ', 'Energy Ball':'EB', 'Fire Blast':'FbB',
+  'Flame Charge':'FC', 'Flame Wheel':'FlW', 'Flash Cannon':'FlC',
+  'Flamethrower':'Fm', 'Focus Blast':'FcB', 'Foul Play':'FP',
+  'Frustration':'Fr', 'Grass Knot':'GK', 'Gunk Shot':'GkS',
+  'Heat Wave':'HW', 'Hurricane':'Hu', 'Hydro Cannon':'HC',
+  'Hyper Beam':'HB', 'Ice Beam':'IB', 'Ice Punch':'IP',
+  'Icy Wind':'IcW', 'Iron Head':'IH', 'Last Resort':'LR',
+  'Leaf Blade':'LB', 'Magnet Bomb':'MgB', 'Meteor Mash':'MM',
+  'Mirror Shot':'MrS', 'Moonblast':'MB', 'Mud Bomb':'MdB',
+  'Muddy Water':'MdW', 'Night Shade':'NS', 'Overheat':'OH',
+  'Play Rough':'PR', 'Poison Fang':'PoF', 'Power Gem':'PG',
+  'Power-Up Punch':'PuP', 'Psychic':'Pc', 'Psyshock':'Psk',
+  'Return':'Rn', 'Rock Blast':'RkB', 'Rock Slide':'RS',
+  'Sand Tomb':'SaT', 'Scald':'Sc', 'Seed Bomb':'SdB',
+  'Shadow Ball':'SBl', 'Shadow Bone':'SBn', 'Shadow Punch':'SpN',
+  'Shadow Sneak':'SSn', 'Signal Beam':'SiB', 'Sky Attack':'SkA',
+  'Skull Bash':'SkB', 'Sludge Bomb':'SlB', 'Solar Beam':'SoB',
+  'Stone Edge':'SE', 'Superpower':'SpP', 'Surf':'Su',
+  'Swift':'Sf', 'Thunder':'Th', 'Thunderbolt':'Tb',
+  'Trailblaze':'Tr', 'Triple Axel':'TrA',
+  'Water Pulse':'WP', 'Water Shuriken':'WS', 'Wild Charge':'WC',
+  'X-Scissor':'XS', 'Zap Cannon':'ZaC',
 };

@@ -33,13 +33,32 @@ let supabaseConnected = false;
 async function supabaseFetch(method, path, body, isDeleteAll, prefer) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+  // Always fetch the current session so RLS sees auth.uid() for authenticated users.
+  // Use window.supabaseClient explicitly — const in auth.js is not a window property
+  // and may not be visible across classic script boundaries via bare identifier.
+  let bearerToken = SUPABASE_KEY;
+  try {
+    if (window.supabaseClient) {
+      const { data } = await window.supabaseClient.auth.getSession();
+      // TEMP DEBUG — remove after auth is confirmed working
+      console.log('[supabaseFetch]', method, path.split('?')[0],
+        '| session:', data?.session ? 'EXISTS' : 'NULL',
+        '| token prefix:', data?.session?.access_token?.substring(0, 20) || 'none',
+        '| uid:', data?.session?.user?.id || 'none');
+      if (data?.session?.access_token) bearerToken = data.session.access_token;
+    } else {
+      console.warn('[supabaseFetch] window.supabaseClient not ready — using anon key');
+    }
+  } catch (_) { /* leave as anon key */ }
+
   try {
     const opts = {
       method,
       signal: controller.signal,
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Authorization': 'Bearer ' + bearerToken,
         'Content-Type': 'application/json',
         'Prefer': prefer || (isDeleteAll ? 'count=exact' : method === 'POST' ? 'return=minimal,resolution=merge-duplicates' : 'return=minimal')
       }
@@ -72,6 +91,11 @@ let cloudCollectionDate = null;
 const BATCH_SIZE = 200;
 
 async function saveCollectionToCloud(pokemon, onProgress) {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    updateSyncStatus('Sign in to save your collection', 'warn');
+    return;
+  }
   updateSyncStatus('Saving collection to cloud...', 'ok');
 
   // Cheap hash for dedup — Phase 2c upgrades to real SHA-256 via Web Crypto API
@@ -132,7 +156,8 @@ async function saveCollectionToCloud(pokemon, onProgress) {
     evolved_name_g: p.evolvedNameG||'',
     evolved_name_u: p.evolvedNameU||'',
     evolved_name_l: p.evolvedNameL||'',
-    imported_at: new Date().toISOString()
+    imported_at: new Date().toISOString(),
+    user_id: userId
   }));
 
   let saved = 0;
@@ -271,7 +296,9 @@ function applyOverridesToPokemon() {
 async function saveOverride(pokemonIdx, fields) {
   overridesCache[pokemonIdx] = Object.assign(overridesCache[pokemonIdx]||{}, fields, {pokemon_index: pokemonIdx});
   if (!supabaseConnected) return;
-  const payload = Object.assign({pokemon_index: pokemonIdx, updated_at: new Date().toISOString()}, fields);
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+  const payload = Object.assign({pokemon_index: pokemonIdx, updated_at: new Date().toISOString(), user_id: userId}, fields);
   await supabaseFetch('POST', 'pokemon_overrides', payload);
   updateSyncStatus('✓ Saved', 'ok');
 }

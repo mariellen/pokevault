@@ -187,11 +187,19 @@ function buildNickname(p, slot, convention) {
     }
   }
 
-  // Redirect review slot for special-flagged pokemon — holding format is wrong for these
-  if (slot === 'review') {
+  // Special-status with no confirmed slot — must short-circuit before holding nick
+  const hasSlot = slot && slot !== 'review';
+  if (!hasSlot) {
+    // Lucky: always Ⓡ format regardless of rank (includes any co-occurring special suffixes)
+    if (p.isLucky) {
+      const specSuf = (p.isDynamax ? 'Ⓓ' : '') + (p.isGigantamax ? 'Ⓧ' : '') + (p.isShiny ? SHINY_SFX : '');
+      return fitName(p.name, LC.R + String(iv), specSuf, 12);
+    }
+    // Shiny with no slot: Ⓡ + iv + ※ — never holding format, never wrong league symbol
+    if (p.isShiny) return fitName(p.name, LC.R + String(iv), SHINY_SFX, 12);
+    // Dynamax/Gigantamax: redirect to slot handlers that pick best qualifying league
     if (p.isDynamax) slot = 'dynamax';
     else if (p.isGigantamax) slot = 'gigantamax';
-    else if (p.isShiny) slot = 'shiny';
   }
 
   // Build suffix first so we know how many chars it needs
@@ -232,6 +240,14 @@ function buildNickname(p, slot, convention) {
     mid=iv+'t';
     return fitName(p.name, mid, nickSuf, 12);
   } else if (slot==='review') {
+    // Shadow purify: use purify league symbol + purifyRankPct when no own-league slot
+    if (p.isShadow && p.purifyLeague) {
+      const ownSlotExists = p.slots.some(s => ['L','G','U','M'].includes(s) && s !== p.purifyLeague);
+      if (!ownSlotExists) {
+        const pv = Math.round(p.purifyRankPct || 0);
+        return fitName(p.name, (LC[p.purifyLeague]||LC.R) + String(pv), nickSuf, 12);
+      }
+    }
     // Holding name: Name + best league IV% + lowercase league letter + next league IV% etc
     // e.g. Pin95l93g for 95% Little, 93% Great
     // Exclude leagues where dust is prohibitive (>300k) for non-final non-legendary pokemon
@@ -272,11 +288,13 @@ function buildNickname(p, slot, convention) {
     mid=LC.R+(pv===100?PERFECT:String(pv));
     return fitName(base, mid, nickSuf, 12);
   } else if (['L','G','U'].includes(slot)) {
-    const pv=Math.round(slot==='L'?p.rankPctL:slot==='G'?p.rankPctG:p.rankPctU);
+    const pv = (p.isPurifySlot && slot === p.purifyLeague)
+      ? Math.round(p.purifyRankPct || 0)
+      : Math.round(slot==='L'?p.rankPctL:slot==='G'?p.rankPctG:p.rankPctU);
     mid=LC[slot]+(pv===100?PERFECT:String(pv));
     return fitName(base, mid, nickSuf, 12);
   } else if (slot==='shiny'||slot==='shiny_lower') {
-    const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
+    const best=['G','U','L'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
     if (best) {
       const pv=Math.round(p['rankPct'+best]||0);
       mid=LC[best]+(pv===100?PERFECT:String(pv));
@@ -483,6 +501,14 @@ function analyse(rows) {
       return name;
     };
 
+    // Apply evo overrides for species where Pokégenie omits evo path data (e.g. male Gothita)
+    const evoOvr = (typeof EVO_OVERRIDES !== 'undefined')
+      ? (EVO_OVERRIDES[r['Name']+'|'+(r['Gender']||'')] || EVO_OVERRIDES[r['Name']] || null)
+      : null;
+    const evolvedNameG = validateEvo(r['Name (G)']) || (evoOvr && validateEvo(evoOvr.G)) || '';
+    const evolvedNameU = validateEvo(r['Name (U)']) || (evoOvr && validateEvo(evoOvr.U)) || '';
+    const evolvedNameL = validateEvo(r['Name (L)']) || (evoOvr && validateEvo(evoOvr.L)) || '';
+
     return {
       idx:r['Index'], name:r['Name'], form:r['Form']||'',
       pokeNum:baseNum, familyKey:getFamKey(r['Name'], r['Form']||'', r['Gender']||''),
@@ -496,7 +522,7 @@ function analyse(rows) {
       isNundo:atkIV===0&&defIV===0&&staIV===0,
       rankPctG:rG, rankPctU:rU, rankPctL:rL, rankPctM:iv,
       rankNumG:Number(r['Rank # (G)'])||null, rankNumU:Number(r['Rank # (U)'])||null, rankNumL:Number(r['Rank # (L)'])||null,
-      evolvedNameG:validateEvo(r['Name (G)']), evolvedNameU:validateEvo(r['Name (U)']), evolvedNameL:validateEvo(r['Name (L)']),
+      evolvedNameG, evolvedNameU, evolvedNameL,
       standaloneEvoG:!!(r['Name (G)'] && r['Name (G)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (G)'])),
       standaloneEvoU:!!(r['Name (U)'] && r['Name (U)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (U)'])),
       standaloneEvoL:!!(r['Name (L)'] && r['Name (L)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (L)'])),
@@ -514,6 +540,7 @@ function analyse(rows) {
       targetEvo:'', hidden:false, evoIndicator:'', canEvolve:false, neverEvolved:false, isHundo:false, dustToL40:0, belowCapNote:'',
       isDynamax:false, isGigantamax:false, isCostumed:false, vivillonPattern:'', specialForm:'', manualDecision:'', notes:'', stableKey:'',
       overBudget100:false, cheaperAvailable:false,
+      evolutionUnknown: typeof FAMILY_OVERRIDES !== 'undefined' && FAMILY_OVERRIDES.unknownEvo ? FAMILY_OVERRIDES.unknownEvo.has(r['Name']) : false,
       purifyHundo:false, purifyLeague:'', purifyRankPct:0,
     };
   });
@@ -611,7 +638,16 @@ function analyse(rows) {
         const eligible = (lg==='M' ? group : group.filter(p => (p.cp||0) <= leagueCap * 1.05))
           .filter(p => {
             // Master league: only the final evolution (must BE stageName, not just evolve to it)
-            if (lg === 'M' && p.name !== stageName) return false;
+            // Exception 1: hundo pre-evos always allowed — will be evolved, and 15/15/15 beats any evolved form
+            // Exception 2: best-IV pre-evo allowed when no evolved form is available in the group
+            if (lg === 'M' && p.name !== stageName) {
+              const isHundo = p.atkIV === 15 && p.defIV === 15 && p.staIV === 15;
+              if (isHundo) return true;
+              const hasFinalEvoInGroup = group.some(m => m.name === stageName);
+              if (hasFinalEvoInGroup) return false;
+              const maxIV = Math.max(...group.map(m => m.ivAvg || 0));
+              return (p.ivAvg || 0) >= maxIV;
+            }
 
             // Dust exclusion: non-final, non-legendary over 300k excluded
             const d = leagueDust(p);
@@ -959,6 +995,12 @@ function analyse(rows) {
         p.decision = 'keep';
         p.suggestStar = true;
       }
+      // Hundos always keep regardless of slot routing
+      if (p.atkIV === 15 && p.defIV === 15 && p.staIV === 15) {
+        p.decision = 'keep';
+        if (!p.slots.includes('hundo')) p.slots.push('hundo');
+        p.suggestStar = true;
+      }
 
       // starType: used by render.js and tests.
       // Shiny pokemon all get suggestStar=true (forced above), but only show ✨ when
@@ -972,6 +1014,7 @@ function analyse(rows) {
       else if (p.suggestStarCheaper && !p.isFavorite) p.starType = 'cyan';
       else if (p.isShiny) p.starType = 'shiny'; // shiny with no real PvP slot reason
       else if (!p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper && p.isFavorite) p.starType = 'red';
+      else if (p.evolutionUnknown && Math.max(p.rankPctG||0,p.rankPctU||0,p.rankPctL||0,p.rankPctM||0) >= 90) p.starType = 'swirl';
       else p.starType = 'none';
     });
     // Fix dustCostBest to use the dust for the assigned league slot
