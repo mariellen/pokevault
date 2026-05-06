@@ -4,7 +4,7 @@
 //
 // Run with: npx jest tests/import-moves.test.js
 
-const { extractForm, extractSpeciesName, pvpokeIdToDisplay, buildRow, getMoveFlags, KNOWN_MOVE_FLAGS } =
+const { extractForm, extractSpeciesName, pvpokeIdToDisplay, parseMoveWithFlags, buildRow, getMoveFlags, KNOWN_MOVE_FLAGS } =
   require('../scripts/import-moves-from-pvpoke');
 
 // ─── extractForm ──────────────────────────────────────────────────────────────
@@ -129,6 +129,27 @@ describe('buildRow', () => {
     const row = buildRow('Sandslash', 'Alolan', 'G', ['POWDER_SNOW', 'ICE_PUNCH', 'BLIZZARD'], now);
     expect(row.form).toBe('Alolan');
     expect(row.species).toBe('Sandslash');
+  });
+});
+
+// ─── parseMoveWithFlags ───────────────────────────────────────────────────────
+
+describe('parseMoveWithFlags', () => {
+  it('standard move ID → correct display name, eliteTm=false', () => {
+    const result = parseMoveWithFlags('MUD_SHOT');
+    expect(result.name).toBe('Mud Shot');
+    expect(result.eliteTm).toBe(false);
+  });
+
+  it('* suffix → eliteTm=true and * stripped from display name', () => {
+    const result = parseMoveWithFlags('HYDRO_CANNON*');
+    expect(result.name).toBe('Hydro Cannon');
+    expect(result.eliteTm).toBe(true);
+  });
+
+  it('null/undefined → null name, eliteTm=false', () => {
+    expect(parseMoveWithFlags(null)).toEqual({ name: null, eliteTm: false });
+    expect(parseMoveWithFlags(undefined)).toEqual({ name: null, eliteTm: false });
   });
 });
 

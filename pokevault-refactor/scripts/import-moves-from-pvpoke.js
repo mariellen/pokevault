@@ -121,11 +121,11 @@ const KNOWN_MOVE_FLAGS = {
   'poison sting':     { legacy: true },   // Beedrill legacy fast
 };
 
-// Normalise a move name for map lookup — handles pvpoke IDs (HYDRO_CANNON)
-// and display names (Hydro Cannon) by lowercasing and replacing _ or - with space.
+// Normalise a move name for map lookup — handles pvpoke IDs (HYDRO_CANNON),
+// display names (Hydro Cannon), and strips * if pvpoke ever adopts that convention.
 function normaliseMoveKey(moveName) {
   if (!moveName) return '';
-  return moveName.toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
+  return moveName.toLowerCase().replace(/\*/g, '').replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function getMoveFlags(moveName) {
@@ -137,28 +137,48 @@ function getMoveFlags(moveName) {
   };
 }
 
+// Parse a pvpoke move ID, extracting the display name and any Elite TM signal.
+// pvpoke does not currently use * in their JSON, but this strips it defensively
+// in case a future pvpoke update adds the convention.
+function parseMoveWithFlags(moveId) {
+  if (!moveId) return { name: null, eliteTm: false };
+  const isEliteTm = moveId.endsWith('*');
+  const cleanId = moveId.replace(/\*$/, '');
+  return {
+    name: pvpokeIdToDisplay(cleanId),
+    eliteTm: isEliteTm,
+  };
+}
+
 // Build a DB row from pvpoke data.
+// Elite TM flag = pvpoke * suffix (defensive) OR KNOWN_MOVE_FLAGS entry (primary source).
+// CD and legacy flags come from KNOWN_MOVE_FLAGS only.
 function buildRow(species, form, league, moveset, now) {
-  const [fast, charged1, charged2] = moveset;
-  const fastFlags = getMoveFlags(fast);
-  const c1Flags   = getMoveFlags(charged1);
-  const c2Flags   = charged2 ? getMoveFlags(charged2) : { isLegacy: false, isCd: false, isEliteTm: false };
+  const [rawFast, rawC1, rawC2] = moveset;
+  const fast = parseMoveWithFlags(rawFast);
+  const c1   = parseMoveWithFlags(rawC1);
+  const c2   = rawC2 ? parseMoveWithFlags(rawC2) : null;
+
+  const fastFlags = getMoveFlags(fast.name);
+  const c1Flags   = getMoveFlags(c1.name);
+  const c2Flags   = c2 ? getMoveFlags(c2.name) : { isLegacy: false, isCd: false, isEliteTm: false };
+
   return {
     species,
     league,
     form: form || '',
-    fast_move_best:     pvpokeIdToDisplay(fast),
+    fast_move_best:     fast.name,
     fast_move_legacy:   fastFlags.isLegacy,
     fast_move_cd:       fastFlags.isCd,
-    fast_move_elite_tm: fastFlags.isEliteTm,
-    charged1_move:      pvpokeIdToDisplay(charged1),
+    fast_move_elite_tm: fast.eliteTm || fastFlags.isEliteTm,
+    charged1_move:      c1.name,
     charged1_legacy:    c1Flags.isLegacy,
     charged1_cd:        c1Flags.isCd,
-    charged1_elite_tm:  c1Flags.isEliteTm,
-    charged2_move:      charged2 ? pvpokeIdToDisplay(charged2) : null,
+    charged1_elite_tm:  c1.eliteTm || c1Flags.isEliteTm,
+    charged2_move:      c2?.name ?? null,
     charged2_legacy:    c2Flags.isLegacy,
     charged2_cd:        c2Flags.isCd,
-    charged2_elite_tm:  c2Flags.isEliteTm,
+    charged2_elite_tm:  (c2?.eliteTm ?? false) || c2Flags.isEliteTm,
     moveset_same_across_leagues: false,
     move_pool_limited:  false,
     verified:           false,
@@ -319,7 +339,7 @@ async function main() {
   }
 }
 
-module.exports = { extractForm, extractSpeciesName, pvpokeIdToDisplay, buildRow, getMoveFlags, KNOWN_MOVE_FLAGS };
+module.exports = { extractForm, extractSpeciesName, pvpokeIdToDisplay, parseMoveWithFlags, buildRow, getMoveFlags, KNOWN_MOVE_FLAGS };
 
 if (require.main === module) {
   main().catch(e => { console.error('Fatal:', e); process.exit(1); });
