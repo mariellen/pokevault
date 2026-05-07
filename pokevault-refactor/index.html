@@ -14,6 +14,7 @@
   <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.19</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span></div>
   <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
   <div style="display:flex;align-items:center;gap:12px">
+    <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" class="btn-donation" title="Support PokéVault">☕ Support</a>
     <div id="sync-status" style="font-size:11px;color:var(--muted)">Connecting...</div>
     <div id="authSection" class="auth-section">
       <span id="userEmail" class="user-email"></span>
@@ -237,10 +238,13 @@
     <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax">✨ Mark Special</button>
     <button class="btn export-btn" onclick="exportCSV()">⬇ Export</button>
   </div>
-  <div id="anon-import-bar" style="display:none;align-items:center;gap:12px;padding:7px 16px;border-bottom:1px solid var(--border);background:var(--surf);font-size:12px;color:var(--muted)">
-    <span style="flex:1">You're viewing a demo collection. Try it with your own Pokégenie CSV:</span>
-    <button class="btn" onclick="document.getElementById('tryOwnInput').click()" style="font-size:11px;white-space:nowrap">📦 Import your own CSV</button>
-    <input type="file" id="tryOwnInput" accept=".csv" style="display:none">
+  <div id="anon-import-bar" style="display:none;flex-direction:column;gap:0;border-bottom:1px solid var(--border);background:var(--surf)">
+    <div style="display:flex;align-items:center;gap:12px;padding:7px 16px;font-size:12px;color:var(--muted)">
+      <span style="flex:1">You're viewing a demo collection. Try it with your own Pokégenie CSV:</span>
+      <button class="btn" onclick="document.getElementById('tryOwnInput').click()" style="font-size:11px;white-space:nowrap">📦 Import your own CSV</button>
+      <input type="file" id="tryOwnInput" accept=".csv" style="display:none">
+    </div>
+    <div style="padding:4px 16px 6px;font-size:11px;color:var(--muted)">If you find PokéVault useful, <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">☕ buy me a coffee</a></div>
   </div>
   <div id="main-content"></div>
 </div>

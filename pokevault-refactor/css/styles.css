@@ -83,6 +83,8 @@ header{background:var(--surf);border-bottom:1px solid var(--border);padding:10px
 .lb-M.active{background:var(--master);color:#000;}
 .export-btn{background:linear-gradient(135deg,var(--great),var(--ultra));border:none;color:#000;font-weight:700;}
 .export-btn:hover{opacity:.85;color:#000;}
+.btn-donation{font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted);text-decoration:none;transition:color .2s,border-color .2s;white-space:nowrap;}
+.btn-donation:hover{color:var(--gold);border-color:var(--gold);}
 
 /* MAIN */
 #main-content{padding:10px 14px;}
