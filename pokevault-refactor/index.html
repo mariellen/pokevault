@@ -117,6 +117,28 @@
   </div>
 </div>
 
+<!-- Shinies modal -->
+<div class="pv-modal-overlay" id="shiny-modal" onclick="if(event.target===this)closeShinyModal()">
+  <div class="pv-modal" style="max-width:700px">
+    <div class="pv-modal-header">
+      <div>
+        <div class="pv-modal-title">✨ Shiny Collection</div>
+        <div class="pv-modal-sub" id="shiny-modal-sub">Loading...</div>
+      </div>
+      <button class="pv-modal-close" onclick="closeShinyModal()">✕</button>
+    </div>
+    <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <span style="color:var(--muted);font-size:11px">Filter:</span>
+      <button id="shiny-filter-all"       onclick="shinyFilter='all';openShinyModal()"       style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">All</button>
+      <button id="shiny-filter-keep"      onclick="shinyFilter='keep';openShinyModal()"      style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--green)">Keep</button>
+      <button id="shiny-filter-tradeable" onclick="shinyFilter='tradeable';openShinyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--red)">Tradeable</button>
+    </div>
+    <div class="pv-modal-body" id="shiny-modal-body">
+      <div class="pv-modal-empty">Load your collection first</div>
+    </div>
+  </div>
+</div>
+
 <!-- Merge candidates modal -->
 <div class="pv-modal-overlay" id="merge-modal" onclick="if(event.target===this)closeMergeModal()">
   <div class="pv-modal" style="max-width:740px">
@@ -210,6 +232,7 @@
     <button class="btn" onclick="openMergeModal()" title="Find merge candidates — same-IV Pokémon at different CP">🔀 Merge</button>
     <button class="btn" onclick="openCullModal()" title="Families with confirmed keepers — everything else is safe to cull">🗑 Cull</button>
     <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates">🌟 Purify</button>
+    <button class="btn" onclick="openShinyModal()" title="Shiny Pokémon tagged via overrides">✨ Shinies</button>
     <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc">🎨 Set Forms</button>
     <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax">✨ Mark Special</button>
     <button class="btn export-btn" onclick="exportCSV()">⬇ Export</button>

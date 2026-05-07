@@ -697,6 +697,99 @@ function closePurifyModal(){
   document.getElementById('purify-modal').style.display='none';
 }
 
+// ── Shinies modal ──────────────────────────────
+let shinyFilter='all'; // 'all' | 'keep' | 'tradeable'
+
+function isShinyTradeable(p){
+  if(p.isLucky) return false;
+  if((p.ivAvg||0)>=80) return false;
+  return p.decision==='trade'||(p.decision==='review'&&!p.slotConfirmed);
+}
+
+function openShinyModal(){
+  if(!allPokemon.length){alert('Load your collection first');return;}
+  const modal=document.getElementById('shiny-modal');
+  const body=document.getElementById('shiny-modal-body');
+  const sub=document.getElementById('shiny-modal-sub');
+
+  const all=allPokemon.filter(p=>p.isShiny);
+  const tradeableCount=all.filter(isShinyTradeable).length;
+
+  let candidates=all;
+  if(shinyFilter==='keep')      candidates=all.filter(p=>p.decision==='keep'||p.decision==='protected');
+  if(shinyFilter==='tradeable') candidates=all.filter(isShinyTradeable);
+
+  // keep first → rank% descending
+  candidates.sort((a,b)=>{
+    const da=a.decision==='keep'||a.decision==='protected'?0:a.decision==='review'?1:2;
+    const db=b.decision==='keep'||b.decision==='protected'?0:b.decision==='review'?1:2;
+    if(da!==db) return da-db;
+    const ra=Math.max(a.rankPctG||0,a.rankPctU||0,a.rankPctL||0,a.rankPctM||0);
+    const rb=Math.max(b.rankPctG||0,b.rankPctU||0,b.rankPctL||0,b.rankPctM||0);
+    return rb-ra;
+  });
+
+  sub.textContent=all.length+' shiny'+(all.length===1?'':'s')+' tagged'+(tradeableCount?' ('+tradeableCount+' tradeable)':'');
+
+  ['all','keep','tradeable'].forEach(f=>{
+    const btn=document.getElementById('shiny-filter-'+f);
+    if(!btn) return;
+    const active=shinyFilter===f;
+    btn.style.background=active?'var(--cyan)':'none';
+    btn.style.color=active?'#000':(f==='keep'?'var(--green)':f==='tradeable'?'var(--red)':'var(--muted)');
+  });
+
+  if(!candidates.length){
+    body.innerHTML='<div class="pv-modal-empty">'+(all.length?'No shinies match this filter':'No shinies tagged — use ✨ Mark Special to tag shinies')+'</div>';
+    modal.style.display='flex';
+    return;
+  }
+
+  const lgNames={L:'Little',G:'Great',U:'Ultra',M:'Master'};
+  const lgColors={L:'var(--little)',G:'var(--great)',U:'var(--ultra)',M:'var(--master)'};
+
+  const rows=candidates.map(p=>{
+    const ivStr=p.atkIV+'/'+p.defIV+'/'+p.staIV;
+    const iv=Math.round(p.ivAvg||0);
+    const ivColor=iv>=90?'var(--green)':iv>=70?'var(--cyan)':'var(--muted)';
+
+    // Best league slot
+    const slot=['M','U','G','L'].find(lg=>(p.slots||[]).includes(lg));
+    const slotStr=slot
+      ? `<span style="color:${lgColors[slot]};font-weight:700">${lgNames[slot]}</span> <span style="color:var(--green)">${Math.round(p['rankPct'+slot]||0)}%</span>`
+      : '<span style="color:var(--muted)">—</span>';
+
+    const tradeable=isShinyTradeable(p);
+    const decClass=p.decision==='keep'||p.decision==='protected'?'dec-keep':p.decision==='trade'?'dec-trade':'dec-review';
+    const decLabel=p.decision==='protected'?'protected':p.decision||'—';
+
+    const nick=p.nickname||'';
+    const searchStr=(p.name+'&cp'+p.cp).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+
+    return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
+        padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px">
+      <div>
+        <div style="font-weight:700;color:var(--text)">${p.name}${p.form?' <span style="color:var(--muted);font-size:11px;font-weight:400">('+p.form+')</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
+          ${tradeable?'<span style="color:var(--red);font-size:10px;margin-left:4px">Trade?</span>':''}
+        </div>
+        <div style="color:var(--muted);font-size:11px">IVs: ${ivStr} · <span style="color:${ivColor}">${iv}%</span> · ${slotStr}
+          ${p.isLucky?' · <span style="color:var(--gold)">Lucky</span>':''}
+        </div>
+      </div>
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px" class="${decClass}">${decLabel}</span>
+      <button class="copy-search-btn" data-copy="${searchStr}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search for this Pokémon">🔍 Me</button>
+      <span onclick="copyGoSearch('${nick.replace(/'/g,"\\'").replace(/&/g,'&amp;')}',this)" style="font-family:monospace;color:var(--gold);cursor:pointer;font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;white-space:nowrap" title="Click to copy nick">${nick||'—'}</span>
+    </div>`;
+  }).join('');
+
+  body.innerHTML=rows;
+  modal.style.display='flex';
+}
+
+function closeShinyModal(){
+  document.getElementById('shiny-modal').style.display='none';
+}
+
 // ── Cull modal ──────────────────────────────────
 function openCullModal(){
   if(!allPokemon.length){alert('Load your collection first');return;}
