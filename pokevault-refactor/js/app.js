@@ -790,6 +790,214 @@ function closeShinyModal(){
   document.getElementById('shiny-modal').style.display='none';
 }
 
+// ── Collection Completion / Pokédex modal ────────
+const DEX_ALL_TYPES = ['Normal','Fighting','Flying','Poison','Ground','Rock','Bug','Ghost','Steel','Fire','Water','Grass','Electric','Psychic','Ice','Dragon','Dark','Fairy'];
+
+let dexView      = 'have';    // 'have' | 'missing'
+let dexCat       = 'all';     // 'all' | 'Legendary' | 'Mythical' | 'Ultra Beast'
+let dexQualShiny = false;
+let dexQualLucky = false;
+let dexTypes     = new Set(); // selected type pills
+let dexTypesOpen = false;
+let allSpecies   = null;      // cached from Supabase pokemon_species
+
+async function openDexModal() {
+  const modal = document.getElementById('dex-modal');
+  modal.style.display = 'flex';
+  if (!allSpecies) {
+    document.getElementById('dex-modal-sub').textContent = 'Loading Pokédex data...';
+    document.getElementById('dex-modal-body').innerHTML = '<div class="pv-modal-empty">Fetching species from database…</div>';
+    const data = await supabaseFetch('GET', 'pokemon_species?select=*&order=pokedex_number&limit=2000', null);
+    if (!data) {
+      document.getElementById('dex-modal-sub').textContent = '';
+      document.getElementById('dex-modal-body').innerHTML = '<div class="pv-modal-empty" style="color:var(--red)">Failed to load Pokédex data. Run scripts/fetch-pokemon-species.js first.</div>';
+      return; // don't cache — allow retry on next open
+    }
+    allSpecies = data;
+  }
+  renderTypePills();
+  renderDexModal();
+}
+
+function closeDexModal() {
+  document.getElementById('dex-modal').style.display = 'none';
+}
+
+function renderTypePills() {
+  const row = document.getElementById('dex-types-row');
+  row.innerHTML = DEX_ALL_TYPES.map(t => {
+    const active = dexTypes.has(t);
+    return `<button class="dex-type-pill${active?' dex-type-pill-active':''}" onclick="toggleDexType('${t}')" id="dexpill-${t}">${t}</button>`;
+  }).join('');
+}
+
+function toggleDexType(type) {
+  if (dexTypes.has(type)) dexTypes.delete(type); else dexTypes.add(type);
+  renderDexModal();
+}
+
+function toggleDexTypes() {
+  dexTypesOpen = !dexTypesOpen;
+  document.getElementById('dex-types-row').style.display = dexTypesOpen ? 'flex' : 'none';
+}
+
+function updateDexFilterButtons() {
+  // View toggle
+  document.getElementById('dex-view-have').classList.toggle('dex-view-active', dexView === 'have');
+  document.getElementById('dex-view-missing').classList.toggle('dex-view-active', dexView === 'missing');
+  // Category
+  ['dex-cat-all','dex-cat-leg','dex-cat-myth','dex-cat-ub'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.background = 'var(--bg)';
+  });
+  const catMap = { all:'dex-cat-all', Legendary:'dex-cat-leg', Mythical:'dex-cat-myth', 'Ultra Beast':'dex-cat-ub' };
+  const activeCat = document.getElementById(catMap[dexCat]);
+  if (activeCat) activeCat.style.background = 'var(--surf2)';
+  // Qualifiers
+  const shinyBtn = document.getElementById('dex-qual-shiny');
+  const luckyBtn = document.getElementById('dex-qual-lucky');
+  if (shinyBtn) shinyBtn.style.background = dexQualShiny ? 'var(--surf2)' : 'var(--bg)';
+  if (luckyBtn) luckyBtn.style.background = dexQualLucky ? 'var(--surf2)' : 'var(--bg)';
+  // Type pills
+  document.querySelectorAll('.dex-type-pill').forEach(btn => {
+    btn.classList.toggle('dex-type-pill-active', dexTypes.has(btn.textContent));
+  });
+}
+
+function applyDexFilters(species) {
+  // Category filter
+  let filtered = dexCat === 'all' ? species.slice() : species.filter(s => s.category === dexCat);
+  // Type filter (AND: all selected types must appear in the species' types)
+  if (dexTypes.size > 0) {
+    const types = [...dexTypes];
+    filtered = filtered.filter(s => types.every(t => s.type1 === t || s.type2 === t));
+  }
+  return filtered;
+}
+
+function renderDexModal() {
+  if (!allSpecies) return;
+  updateDexFilterButtons();
+
+  const filteredSpecies = applyDexFilters(allSpecies);
+  const body = document.getElementById('dex-modal-body');
+
+  if (dexView === 'have') {
+    renderDexHaveView(body, filteredSpecies);
+  } else {
+    renderDexMissingView(body, filteredSpecies);
+  }
+}
+
+function renderDexHaveView(body, filteredSpecies) {
+  const speciesNums = new Set(filteredSpecies.map(s => s.pokedex_number));
+
+  let have = allPokemon.filter(p => speciesNums.has(p.pokeNum));
+  if (dexQualShiny && dexQualLucky) have = have.filter(p => p.isShiny && p.isLucky);
+  else if (dexQualShiny)            have = have.filter(p => p.isShiny);
+  else if (dexQualLucky)            have = have.filter(p => p.isLucky);
+
+  document.getElementById('dex-modal-sub').textContent = have.length + ' Pokémon';
+
+  if (!have.length) {
+    body.innerHTML = '<div class="pv-modal-empty">No Pokémon match the current filters</div>';
+    return;
+  }
+
+  // Count shinies per species for solo-shiny detection
+  const shinyCountBySpecies = {};
+  have.filter(p => p.isShiny).forEach(p => {
+    shinyCountBySpecies[p.pokeNum] = (shinyCountBySpecies[p.pokeNum] || 0) + 1;
+  });
+
+  // Group by category: Legendary → Mythical → Ultra Beast → Regular
+  const CAT_ORDER = ['Legendary','Mythical','Ultra Beast','Regular'];
+  const speciesByCat = {};
+  filteredSpecies.forEach(s => {
+    (speciesByCat[s.category] = speciesByCat[s.category] || []).push(s);
+  });
+
+  let html = '';
+  for (const cat of CAT_ORDER) {
+    const catNums = new Set((speciesByCat[cat] || []).map(s => s.pokedex_number));
+    const catPokemon = have.filter(p => catNums.has(p.pokeNum));
+    if (!catPokemon.length) continue;
+
+    catPokemon.sort((a, b) => {
+      // Solo shinies first, then alphabetical
+      const aSolo = a.isShiny && (shinyCountBySpecies[a.pokeNum] || 0) === 1 && !a.isLucky ? 0 : 1;
+      const bSolo = b.isShiny && (shinyCountBySpecies[b.pokeNum] || 0) === 1 && !b.isLucky ? 0 : 1;
+      if (aSolo !== bSolo) return aSolo - bSolo;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    if (cat !== 'Regular') html += `<div class="dex-cat-header">${cat}</div>`;
+
+    html += catPokemon.map(p => {
+      const sp = filteredSpecies.find(s => s.pokedex_number === p.pokeNum);
+      const type2str = sp?.type2 ? `/${sp.type2}` : '';
+      const isSoloShiny = p.isShiny && (shinyCountBySpecies[p.pokeNum] || 0) === 1 && !p.isLucky;
+      const num = String(p.pokeNum || 0).padStart(3, '0');
+      return `<div class="dex-row">
+  <div class="dex-row-main">
+    <span class="dex-num">#${num}</span>
+    <span class="dex-name">${p.name}</span>
+    <span class="dex-types">${sp?.type1 || ''}${type2str}</span>
+    <span class="dex-meta">CP:${p.cp || '?'} IV:${p.atkIV || 0}/${p.defIV || 0}/${p.staIV || 0}${p.isShiny ? ' ✨' : ''}${p.isLucky ? ' 🍀' : ''}</span>
+  </div>${isSoloShiny ? '\n  <div class="dex-solo-notice">⚠ Only one — Lucky/Mirror trade only</div>' : ''}
+</div>`;
+    }).join('');
+  }
+
+  body.innerHTML = html;
+}
+
+function renderDexMissingView(body, filteredSpecies) {
+  let missing;
+  if (dexQualShiny && dexQualLucky) {
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => p.pokeNum === s.pokedex_number && p.isShiny && p.isLucky));
+  } else if (dexQualShiny) {
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => p.pokeNum === s.pokedex_number && p.isShiny));
+  } else if (dexQualLucky) {
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => p.pokeNum === s.pokedex_number && p.isLucky));
+  } else {
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => p.pokeNum === s.pokedex_number));
+  }
+
+  // Sort: in-GO first, then alphabetical; not-in-GO after
+  missing.sort((a, b) => {
+    if (a.is_in_go !== b.is_in_go) return (b.is_in_go ? 1 : 0) - (a.is_in_go ? 1 : 0);
+    return a.name.localeCompare(b.name);
+  });
+
+  document.getElementById('dex-modal-sub').textContent = missing.length + ' missing';
+
+  if (!missing.length) {
+    body.innerHTML = '<div class="pv-modal-empty">No missing Pokémon — collection complete! 🎉</div>';
+    return;
+  }
+
+  body.innerHTML = missing.map(s => {
+    const type2str = s.type2 ? `/${s.type2}` : '';
+    const num = String(s.pokedex_number).padStart(3, '0');
+    let noticeHtml = '';
+    if (!s.is_in_go) {
+      noticeHtml = '<span class="dex-notice-grey">Not in GO</span>';
+    } else if (dexQualShiny && !s.is_shiny_available) {
+      noticeHtml = '<span class="dex-notice-amber">No shiny in GO ✨</span>';
+    }
+    const safeName = s.name.replace(/'/g, "\\'");
+    return `<div class="dex-row dex-row-missing${!s.is_in_go ? ' dex-not-in-go' : ''}" onclick="navigator.clipboard?.writeText('${safeName}')" title="Tap to copy GO search string">
+  <div class="dex-row-main">
+    <span class="dex-num">#${num}</span>
+    <span class="dex-name">${s.name}</span>
+    <span class="dex-types">${s.type1}${type2str}</span>
+    ${noticeHtml}
+  </div>
+</div>`;
+  }).join('');
+}
+
 // ── Cull modal ──────────────────────────────────
 function openCullModal(){
   if(!allPokemon.length){alert('Load your collection first');return;}
@@ -1426,6 +1634,7 @@ window.addEventListener('load', async () => {
 });
 
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+document.getElementById('csvFileInput')?.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 document.getElementById('tryOwnInput')?.addEventListener('change',e=>{
   const f=e.target.files[0];
   if(!f) return;

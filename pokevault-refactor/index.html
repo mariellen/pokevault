@@ -11,7 +11,7 @@
 </head>
 <body>
 <header>
-  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.19</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span></div>
+  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.19</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">📂</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
   <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
   <div style="display:flex;align-items:center;gap:12px">
     <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" class="btn-donation" title="Support PokéVault">☕ Support</a>
@@ -140,6 +140,36 @@
   </div>
 </div>
 
+<!-- Collection Completion / Pokédex modal -->
+<div class="pv-modal-overlay" id="dex-modal" onclick="if(event.target===this)closeDexModal()">
+  <div class="pv-modal" style="max-width:760px">
+    <div class="pv-modal-header">
+      <div>
+        <div class="pv-modal-title">📖 Collection Tracker</div>
+        <div class="pv-modal-sub" id="dex-modal-sub">Loading...</div>
+      </div>
+      <button class="pv-modal-close" onclick="closeDexModal()">✕</button>
+    </div>
+    <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button id="dex-view-have"    onclick="dexView='have';renderDexModal()"    class="dex-view-btn">Have ▼</button>
+      <button id="dex-view-missing" onclick="dexView='missing';renderDexModal()" class="dex-view-btn">Missing ▼</button>
+      <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
+      <button id="dex-cat-all"    onclick="dexCat='all';renderDexModal()"          style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">All</button>
+      <button id="dex-cat-leg"    onclick="dexCat='Legendary';renderDexModal()"    style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Legendary</button>
+      <button id="dex-cat-myth"   onclick="dexCat='Mythical';renderDexModal()"     style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Mythical</button>
+      <button id="dex-cat-ub"     onclick="dexCat='Ultra Beast';renderDexModal()"  style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Ultra Beast</button>
+      <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
+      <button id="dex-qual-shiny" onclick="dexQualShiny=!dexQualShiny;renderDexModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">✨ Shiny</button>
+      <button id="dex-qual-lucky" onclick="dexQualLucky=!dexQualLucky;renderDexModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">🍀 Lucky</button>
+      <button id="dex-types-btn"  onclick="toggleDexTypes()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">🔥 Types ▾</button>
+    </div>
+    <div id="dex-types-row" style="display:none;padding:6px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:4px"></div>
+    <div class="pv-modal-body" id="dex-modal-body">
+      <div class="pv-modal-empty">Load your collection first</div>
+    </div>
+  </div>
+</div>
+
 <!-- Merge candidates modal -->
 <div class="pv-modal-overlay" id="merge-modal" onclick="if(event.target===this)closeMergeModal()">
   <div class="pv-modal" style="max-width:740px">
@@ -234,6 +264,7 @@
     <button class="btn" onclick="openCullModal()" title="Families with confirmed keepers — everything else is safe to cull">🗑 Cull</button>
     <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates">🌟 Purify</button>
     <button class="btn" onclick="openShinyModal()" title="Shiny Pokémon tagged via overrides">✨ Shinies</button>
+    <button class="btn" onclick="openDexModal()" title="Collection Tracker — see what you have and what's missing">📖 Pokédex</button>
     <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc">🎨 Set Forms</button>
     <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax">✨ Mark Special</button>
     <button class="btn export-btn" onclick="exportCSV()">⬇ Export</button>

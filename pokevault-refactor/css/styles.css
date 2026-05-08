@@ -294,6 +294,29 @@ tr.row-merge-candidate{opacity:0.7;}
 .pv-modal-select{background:var(--surf2);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);font-size:11px;cursor:pointer;}
 .pv-modal-cb{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;}
 .pv-modal-empty{color:var(--muted);font-size:12px;text-align:center;padding:24px;}
+
+/* DEX MODAL */
+.dex-view-btn{border:1px solid var(--border);border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;font-weight:600;}
+.dex-view-active{background:var(--great)!important;color:#000!important;border-color:var(--great)!important;}
+.dex-cat-header{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;padding:10px 0 4px;border-top:1px solid var(--border);margin-top:6px;}
+.dex-cat-header:first-child{margin-top:0;border-top:none;padding-top:2px;}
+.dex-row{padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.dex-row:last-child{border-bottom:none;}
+.dex-row-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.dex-row-missing{cursor:pointer;}
+.dex-row-missing:hover .dex-name{color:var(--great);}
+.dex-not-in-go{opacity:.45;}
+.dex-num{color:var(--muted);font-size:10px;min-width:30px;font-family:'Share Tech Mono',monospace;}
+.dex-name{font-weight:600;color:var(--text);}
+.dex-types{color:var(--muted);font-size:11px;}
+.dex-meta{color:var(--dim);font-size:10px;margin-left:auto;}
+.dex-solo-notice{font-size:10px;color:var(--gold);margin-top:2px;padding-left:38px;}
+.dex-notice-grey{font-size:10px;color:var(--muted);background:var(--surf2);border-radius:3px;padding:1px 6px;}
+.dex-notice-amber{font-size:10px;color:var(--gold);background:rgba(227,179,65,.1);border-radius:3px;padding:1px 6px;}
+.dex-type-pill{border:1px solid var(--border);border-radius:12px;padding:2px 8px;font-size:10px;cursor:pointer;background:var(--bg);color:var(--muted);transition:all .15s;}
+.dex-type-pill:hover{border-color:var(--text);color:var(--text);}
+.dex-type-pill-active{background:var(--surf2)!important;color:var(--text)!important;border-color:var(--great)!important;}
+
 /* AUTH */
 .auth-section{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .user-email{font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
