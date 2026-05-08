@@ -882,6 +882,12 @@ function renderDexModal() {
   const filteredSpecies = applyDexFilters(allSpecies);
   const body = document.getElementById('dex-modal-body');
 
+  if (!allPokemon.length) {
+    document.getElementById('dex-modal-sub').textContent = '';
+    body.innerHTML = '<div class="pv-modal-empty">Load your collection first</div>';
+    return;
+  }
+
   if (dexView === 'have') {
     renderDexHaveView(body, filteredSpecies);
   } else {
@@ -890,9 +896,10 @@ function renderDexModal() {
 }
 
 function renderDexHaveView(body, filteredSpecies) {
+  // p.pokeNum is a raw CSV string; s.pokedex_number is a Supabase integer — convert for comparison
   const speciesNums = new Set(filteredSpecies.map(s => s.pokedex_number));
 
-  let have = allPokemon.filter(p => speciesNums.has(p.pokeNum));
+  let have = allPokemon.filter(p => speciesNums.has(Number(p.pokeNum)));
   if (dexQualShiny && dexQualLucky) have = have.filter(p => p.isShiny && p.isLucky);
   else if (dexQualShiny)            have = have.filter(p => p.isShiny);
   else if (dexQualLucky)            have = have.filter(p => p.isLucky);
@@ -904,10 +911,11 @@ function renderDexHaveView(body, filteredSpecies) {
     return;
   }
 
-  // Count shinies per species for solo-shiny detection
+  // Count shinies per species (keyed by integer) for solo-shiny detection
   const shinyCountBySpecies = {};
   have.filter(p => p.isShiny).forEach(p => {
-    shinyCountBySpecies[p.pokeNum] = (shinyCountBySpecies[p.pokeNum] || 0) + 1;
+    const n = Number(p.pokeNum);
+    shinyCountBySpecies[n] = (shinyCountBySpecies[n] || 0) + 1;
   });
 
   // Group by category: Legendary → Mythical → Ultra Beast → Regular
@@ -920,13 +928,12 @@ function renderDexHaveView(body, filteredSpecies) {
   let html = '';
   for (const cat of CAT_ORDER) {
     const catNums = new Set((speciesByCat[cat] || []).map(s => s.pokedex_number));
-    const catPokemon = have.filter(p => catNums.has(p.pokeNum));
+    const catPokemon = have.filter(p => catNums.has(Number(p.pokeNum)));
     if (!catPokemon.length) continue;
 
     catPokemon.sort((a, b) => {
-      // Solo shinies first, then alphabetical
-      const aSolo = a.isShiny && (shinyCountBySpecies[a.pokeNum] || 0) === 1 && !a.isLucky ? 0 : 1;
-      const bSolo = b.isShiny && (shinyCountBySpecies[b.pokeNum] || 0) === 1 && !b.isLucky ? 0 : 1;
+      const aSolo = a.isShiny && (shinyCountBySpecies[Number(a.pokeNum)] || 0) === 1 && !a.isLucky ? 0 : 1;
+      const bSolo = b.isShiny && (shinyCountBySpecies[Number(b.pokeNum)] || 0) === 1 && !b.isLucky ? 0 : 1;
       if (aSolo !== bSolo) return aSolo - bSolo;
       return (a.name || '').localeCompare(b.name || '');
     });
@@ -934,13 +941,14 @@ function renderDexHaveView(body, filteredSpecies) {
     if (cat !== 'Regular') html += `<div class="dex-cat-header">${cat}</div>`;
 
     html += catPokemon.map(p => {
-      const sp = filteredSpecies.find(s => s.pokedex_number === p.pokeNum);
+      const pNum = Number(p.pokeNum);
+      const sp = filteredSpecies.find(s => s.pokedex_number === pNum);
       const type2str = sp?.type2 ? `/${sp.type2}` : '';
-      const isSoloShiny = p.isShiny && (shinyCountBySpecies[p.pokeNum] || 0) === 1 && !p.isLucky;
-      const num = String(p.pokeNum || 0).padStart(3, '0');
+      const isSoloShiny = p.isShiny && (shinyCountBySpecies[pNum] || 0) === 1 && !p.isLucky;
+      const numStr = String(pNum || 0).padStart(3, '0');
       return `<div class="dex-row">
   <div class="dex-row-main">
-    <span class="dex-num">#${num}</span>
+    <span class="dex-num">#${numStr}</span>
     <span class="dex-name">${p.name}</span>
     <span class="dex-types">${sp?.type1 || ''}${type2str}</span>
     <span class="dex-meta">CP:${p.cp || '?'} IV:${p.atkIV || 0}/${p.defIV || 0}/${p.staIV || 0}${p.isShiny ? ' ✨' : ''}${p.isLucky ? ' 🍀' : ''}</span>
@@ -953,15 +961,16 @@ function renderDexHaveView(body, filteredSpecies) {
 }
 
 function renderDexMissingView(body, filteredSpecies) {
+  // p.pokeNum is a raw CSV string; convert to number before comparing with s.pokedex_number (integer)
   let missing;
   if (dexQualShiny && dexQualLucky) {
-    missing = filteredSpecies.filter(s => !allPokemon.some(p => p.pokeNum === s.pokedex_number && p.isShiny && p.isLucky));
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number && p.isShiny && p.isLucky));
   } else if (dexQualShiny) {
-    missing = filteredSpecies.filter(s => !allPokemon.some(p => p.pokeNum === s.pokedex_number && p.isShiny));
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number && p.isShiny));
   } else if (dexQualLucky) {
-    missing = filteredSpecies.filter(s => !allPokemon.some(p => p.pokeNum === s.pokedex_number && p.isLucky));
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number && p.isLucky));
   } else {
-    missing = filteredSpecies.filter(s => !allPokemon.some(p => p.pokeNum === s.pokedex_number));
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number));
   }
 
   // Sort: in-GO first, then alphabetical; not-in-GO after
