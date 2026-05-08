@@ -154,14 +154,14 @@
       <button id="dex-view-have"    onclick="dexView='have';renderDexModal()"    class="dex-view-btn">Have ▼</button>
       <button id="dex-view-missing" onclick="dexView='missing';renderDexModal()" class="dex-view-btn">Missing ▼</button>
       <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
-      <button id="dex-cat-all"    onclick="dexCat='all';renderDexModal()"          style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">All</button>
-      <button id="dex-cat-leg"    onclick="dexCat='Legendary';renderDexModal()"    style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Legendary</button>
-      <button id="dex-cat-myth"   onclick="dexCat='Mythical';renderDexModal()"     style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Mythical</button>
-      <button id="dex-cat-ub"     onclick="dexCat='Ultra Beast';renderDexModal()"  style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Ultra Beast</button>
+      <button id="dex-cat-all"    class="dex-filter-btn" onclick="dexCat='all';renderDexModal()">All</button>
+      <button id="dex-cat-leg"    class="dex-filter-btn" onclick="dexCat='Legendary';renderDexModal()">Legendary</button>
+      <button id="dex-cat-myth"   class="dex-filter-btn" onclick="dexCat='Mythical';renderDexModal()">Mythical</button>
+      <button id="dex-cat-ub"     class="dex-filter-btn" onclick="dexCat='Ultra Beast';renderDexModal()">Ultra Beast</button>
       <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
-      <button id="dex-qual-shiny" onclick="dexQualShiny=!dexQualShiny;renderDexModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">✨ Shiny</button>
-      <button id="dex-qual-lucky" onclick="dexQualLucky=!dexQualLucky;renderDexModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">🍀 Lucky</button>
-      <button id="dex-types-btn"  onclick="toggleDexTypes()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">🔥 Types ▾</button>
+      <button id="dex-qual-shiny" class="dex-filter-btn" onclick="dexQualShiny=!dexQualShiny;renderDexModal()">✨ Shiny</button>
+      <button id="dex-qual-lucky" class="dex-filter-btn" onclick="dexQualLucky=!dexQualLucky;renderDexModal()">🍀 Lucky</button>
+      <button id="dex-types-btn"  class="dex-filter-btn" onclick="toggleDexTypes()">🔥 Types ▾</button>
     </div>
     <div id="dex-types-row" style="display:none;padding:6px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:4px"></div>
     <div class="pv-modal-body" id="dex-modal-body">

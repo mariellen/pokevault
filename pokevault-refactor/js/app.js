@@ -823,6 +823,15 @@ function closeDexModal() {
   document.getElementById('dex-modal').style.display = 'none';
 }
 
+function dexNavigate(name) {
+  closeDexModal();
+  const box = document.getElementById('searchBox');
+  if (box) box.value = name;
+  searchTerm = name.toLowerCase();
+  applyFilters();
+  document.getElementById('searchClear')?.classList.add('visible');
+}
+
 function renderTypePills() {
   const row = document.getElementById('dex-types-row');
   row.innerHTML = DEX_ALL_TYPES.map(t => {
@@ -845,19 +854,13 @@ function updateDexFilterButtons() {
   // View toggle
   document.getElementById('dex-view-have').classList.toggle('dex-view-active', dexView === 'have');
   document.getElementById('dex-view-missing').classList.toggle('dex-view-active', dexView === 'missing');
-  // Category
-  ['dex-cat-all','dex-cat-leg','dex-cat-myth','dex-cat-ub'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.background = 'var(--bg)';
-  });
+  // Category — use CSS class, not inline style
   const catMap = { all:'dex-cat-all', Legendary:'dex-cat-leg', Mythical:'dex-cat-myth', 'Ultra Beast':'dex-cat-ub' };
-  const activeCat = document.getElementById(catMap[dexCat]);
-  if (activeCat) activeCat.style.background = 'var(--surf2)';
+  Object.values(catMap).forEach(id => document.getElementById(id)?.classList.remove('dex-filter-active'));
+  document.getElementById(catMap[dexCat])?.classList.add('dex-filter-active');
   // Qualifiers
-  const shinyBtn = document.getElementById('dex-qual-shiny');
-  const luckyBtn = document.getElementById('dex-qual-lucky');
-  if (shinyBtn) shinyBtn.style.background = dexQualShiny ? 'var(--surf2)' : 'var(--bg)';
-  if (luckyBtn) luckyBtn.style.background = dexQualLucky ? 'var(--surf2)' : 'var(--bg)';
+  document.getElementById('dex-qual-shiny')?.classList.toggle('dex-filter-active', dexQualShiny);
+  document.getElementById('dex-qual-lucky')?.classList.toggle('dex-filter-active', dexQualLucky);
   // Type pills
   document.querySelectorAll('.dex-type-pill').forEach(btn => {
     btn.classList.toggle('dex-type-pill-active', dexTypes.has(btn.textContent));
@@ -899,26 +902,35 @@ function renderDexHaveView(body, filteredSpecies) {
   // p.pokeNum is a raw CSV string; s.pokedex_number is a Supabase integer — convert for comparison
   const speciesNums = new Set(filteredSpecies.map(s => s.pokedex_number));
 
-  let have = allPokemon.filter(p => speciesNums.has(Number(p.pokeNum)));
-  if (dexQualShiny && dexQualLucky) have = have.filter(p => p.isShiny && p.isLucky);
-  else if (dexQualShiny)            have = have.filter(p => p.isShiny);
-  else if (dexQualLucky)            have = have.filter(p => p.isLucky);
+  let matched = allPokemon.filter(p => speciesNums.has(Number(p.pokeNum)));
+  if (dexQualShiny && dexQualLucky) matched = matched.filter(p => p.isShiny && p.isLucky);
+  else if (dexQualShiny)            matched = matched.filter(p => p.isShiny);
+  else if (dexQualLucky)            matched = matched.filter(p => p.isLucky);
 
-  document.getElementById('dex-modal-sub').textContent = have.length + ' Pokémon';
+  // Group by species (one row per species, not per individual Pokémon)
+  const bySpecies = new Map(); // pokedex_number → [pokemon, ...]
+  matched.forEach(p => {
+    const n = Number(p.pokeNum);
+    if (!bySpecies.has(n)) bySpecies.set(n, []);
+    bySpecies.get(n).push(p);
+  });
 
-  if (!have.length) {
+  const speciesCount = bySpecies.size;
+
+  // Subtitle with context (Fix 4)
+  const qualLabel = dexQualShiny && dexQualLucky ? ' with shiny + lucky'
+    : dexQualShiny ? ' with shinies'
+    : dexQualLucky ? ' with lucky'
+    : '';
+  const catLabel = dexCat !== 'all' ? dexCat.toLowerCase() + ' ' : '';
+  document.getElementById('dex-modal-sub').textContent = `${speciesCount} ${catLabel}species${qualLabel}`;
+
+  if (!speciesCount) {
     body.innerHTML = '<div class="pv-modal-empty">No Pokémon match the current filters</div>';
     return;
   }
 
-  // Count shinies per species (keyed by integer) for solo-shiny detection
-  const shinyCountBySpecies = {};
-  have.filter(p => p.isShiny).forEach(p => {
-    const n = Number(p.pokeNum);
-    shinyCountBySpecies[n] = (shinyCountBySpecies[n] || 0) + 1;
-  });
-
-  // Group by category: Legendary → Mythical → Ultra Beast → Regular
+  // Group species by category: Legendary → Mythical → Ultra Beast → Regular
   const CAT_ORDER = ['Legendary','Mythical','Ultra Beast','Regular'];
   const speciesByCat = {};
   filteredSpecies.forEach(s => {
@@ -927,32 +939,36 @@ function renderDexHaveView(body, filteredSpecies) {
 
   let html = '';
   for (const cat of CAT_ORDER) {
-    const catNums = new Set((speciesByCat[cat] || []).map(s => s.pokedex_number));
-    const catPokemon = have.filter(p => catNums.has(Number(p.pokeNum)));
-    if (!catPokemon.length) continue;
+    const catSpecies = (speciesByCat[cat] || []).filter(s => bySpecies.has(s.pokedex_number));
+    if (!catSpecies.length) continue;
 
-    catPokemon.sort((a, b) => {
-      const aSolo = a.isShiny && (shinyCountBySpecies[Number(a.pokeNum)] || 0) === 1 && !a.isLucky ? 0 : 1;
-      const bSolo = b.isShiny && (shinyCountBySpecies[Number(b.pokeNum)] || 0) === 1 && !b.isLucky ? 0 : 1;
-      if (aSolo !== bSolo) return aSolo - bSolo;
-      return (a.name || '').localeCompare(b.name || '');
+    // Solo (count=1) first, then alphabetical
+    catSpecies.sort((a, b) => {
+      const aCount = bySpecies.get(a.pokedex_number).length;
+      const bCount = bySpecies.get(b.pokedex_number).length;
+      if (aCount === 1 && bCount !== 1) return -1;
+      if (bCount === 1 && aCount !== 1) return 1;
+      return a.name.localeCompare(b.name);
     });
 
     if (cat !== 'Regular') html += `<div class="dex-cat-header">${cat}</div>`;
 
-    html += catPokemon.map(p => {
-      const pNum = Number(p.pokeNum);
-      const sp = filteredSpecies.find(s => s.pokedex_number === pNum);
-      const type2str = sp?.type2 ? `/${sp.type2}` : '';
-      const isSoloShiny = p.isShiny && (shinyCountBySpecies[pNum] || 0) === 1 && !p.isLucky;
-      const numStr = String(pNum || 0).padStart(3, '0');
+    html += catSpecies.map(s => {
+      const count = bySpecies.get(s.pokedex_number).length;
+      const type2str = s.type2 ? `/${s.type2}` : '';
+      const numStr = String(s.pokedex_number).padStart(3, '0');
+      const safeName = s.name.replace(/'/g, "\\'");
+      const isSolo = count === 1;
+      const rightHtml = isSolo
+        ? `<span class="dex-solo-notice">⚠ Only one — Lucky/Mirror trade only</span><span class="dex-count">×1</span>`
+        : `<span class="dex-count">×${count}</span>`;
       return `<div class="dex-row">
   <div class="dex-row-main">
     <span class="dex-num">#${numStr}</span>
-    <span class="dex-name">${p.name}</span>
-    <span class="dex-types">${sp?.type1 || ''}${type2str}</span>
-    <span class="dex-meta">CP:${p.cp || '?'} IV:${p.atkIV || 0}/${p.defIV || 0}/${p.staIV || 0}${p.isShiny ? ' ✨' : ''}${p.isLucky ? ' 🍀' : ''}</span>
-  </div>${isSoloShiny ? '\n  <div class="dex-solo-notice">⚠ Only one — Lucky/Mirror trade only</div>' : ''}
+    <button class="dex-name-link" onclick="dexNavigate('${safeName}')">${s.name}</button>
+    <span class="dex-types">${s.type1}${type2str}</span>
+    ${rightHtml}
+  </div>
 </div>`;
     }).join('');
   }
@@ -962,6 +978,10 @@ function renderDexHaveView(body, filteredSpecies) {
 
 function renderDexMissingView(body, filteredSpecies) {
   // p.pokeNum is a raw CSV string; convert to number before comparing with s.pokedex_number (integer)
+  // Pre-build owned set and species name map for efficient per-row lookup
+  const ownedNums    = new Set(allPokemon.map(p => Number(p.pokeNum)));
+  const speciesNameMap = new Map(allSpecies.map(s => [s.pokedex_number, s.name]));
+
   let missing;
   if (dexQualShiny && dexQualLucky) {
     missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number && p.isShiny && p.isLucky));
@@ -973,13 +993,15 @@ function renderDexMissingView(body, filteredSpecies) {
     missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number));
   }
 
-  // Sort: in-GO first, then alphabetical; not-in-GO after
+  // Sort: in-GO first alphabetical, then not-in-GO
   missing.sort((a, b) => {
     if (a.is_in_go !== b.is_in_go) return (b.is_in_go ? 1 : 0) - (a.is_in_go ? 1 : 0);
     return a.name.localeCompare(b.name);
   });
 
-  document.getElementById('dex-modal-sub').textContent = missing.length + ' missing';
+  const qualLabel = dexQualShiny && dexQualLucky ? ' shiny + lucky' : dexQualShiny ? ' shiny' : dexQualLucky ? ' lucky' : '';
+  const catLabel  = dexCat !== 'all' ? dexCat.toLowerCase() + ' ' : '';
+  document.getElementById('dex-modal-sub').textContent = `${missing.length} ${catLabel}${qualLabel ? qualLabel.trim() + ' ' : ''}missing`;
 
   if (!missing.length) {
     body.innerHTML = '<div class="pv-modal-empty">No missing Pokémon — collection complete! 🎉</div>';
@@ -988,20 +1010,32 @@ function renderDexMissingView(body, filteredSpecies) {
 
   body.innerHTML = missing.map(s => {
     const type2str = s.type2 ? `/${s.type2}` : '';
-    const num = String(s.pokedex_number).padStart(3, '0');
+    const numStr   = String(s.pokedex_number).padStart(3, '0');
+    const safeName = s.name.replace(/'/g, "\\'");
+
+    // Status notice (left of count area)
     let noticeHtml = '';
     if (!s.is_in_go) {
       noticeHtml = '<span class="dex-notice-grey">Not in GO</span>';
     } else if (dexQualShiny && !s.is_shiny_available) {
       noticeHtml = '<span class="dex-notice-amber">No shiny in GO ✨</span>';
     }
-    const safeName = s.name.replace(/'/g, "\\'");
+
+    // Can-evolve indicator: player owns the pre-evolution
+    let canEvolveHtml = '';
+    if (s.evolves_from && ownedNums.has(s.evolves_from)) {
+      const parentName = speciesNameMap.get(s.evolves_from) || 'pre-evolution';
+      canEvolveHtml = `<span class="dex-can-evolve">✓ Evolve from ${parentName}!</span>`;
+    }
+
+    // Row click copies GO search string; name link navigates main view
     return `<div class="dex-row dex-row-missing${!s.is_in_go ? ' dex-not-in-go' : ''}" onclick="navigator.clipboard?.writeText('${safeName}')" title="Tap to copy GO search string">
   <div class="dex-row-main">
-    <span class="dex-num">#${num}</span>
-    <span class="dex-name">${s.name}</span>
+    <span class="dex-num">#${numStr}</span>
+    <button class="dex-name-link" onclick="event.stopPropagation();dexNavigate('${safeName}')">${s.name}</button>
     <span class="dex-types">${s.type1}${type2str}</span>
     ${noticeHtml}
+    ${canEvolveHtml}
   </div>
 </div>`;
   }).join('');
