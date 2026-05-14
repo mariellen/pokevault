@@ -6,20 +6,26 @@
 |---|---|
 | S3 bucket | `pokevault.mariellen.com.au` (ap-southeast-2) |
 | CloudFront distribution ID | `E2IMCPUABUXY1Y` |
-| Live URL | `https://pokevault.mariellen.com.au/pokevault-refactor/` |
+| Live URL | `https://pokevault.mariellen.com.au/` |
 | IAM deploy user | `pokevault-deploy` |
 | AWS access key | `AKIA43QQLXVS4KBTEANO` (stored in `~/.aws/credentials` as `[default]`) |
 | AWS region | `ap-southeast-2` |
 
 ## What lives where
 
-The S3 bucket root contains the full `pokevault-refactor/` directory. The live app is served from:
+The contents of `pokevault-refactor/` are deployed directly to the **S3 bucket root**. The live app is at:
 
 ```
-s3://pokevault.mariellen.com.au/pokevault-refactor/
+https://pokevault.mariellen.com.au/
 ```
 
-The root `js/` and `index.html` at the bucket root are stale — ignore them.
+> ⚠️ **IMPORTANT** — always sync to the **bucket root**, not to `/pokevault-refactor/`.
+> The `/pokevault-refactor/` S3 prefix is a stale redirect — deploying there will NOT update the live site.
+
+Source → S3 mapping:
+- `pokevault-refactor/index.html` → `s3://pokevault.mariellen.com.au/index.html`
+- `pokevault-refactor/js/app.js` → `s3://pokevault.mariellen.com.au/js/app.js`
+- etc.
 
 ## Prerequisites
 
@@ -43,7 +49,7 @@ output = json
 Run from the repo root (`C:\ClaudeCode\pokevault\`):
 
 ```bash
-aws s3 sync pokevault-refactor/ s3://pokevault.mariellen.com.au/pokevault-refactor/ \
+aws s3 sync pokevault-refactor/ s3://pokevault.mariellen.com.au/ \
   --exclude "*.md" \
   --exclude "node_modules/*" \
   --exclude "tests/*" \
@@ -55,6 +61,8 @@ aws cloudfront create-invalidation \
   --paths "/*"
 ```
 
+Note the target is `s3://pokevault.mariellen.com.au/` — **no subfolder**.
+
 CloudFront invalidation takes 30–60 seconds. Hard-reload the browser (`Ctrl+Shift+R`) after it completes.
 
 ## Single-file deploy (faster, targeted)
@@ -63,11 +71,11 @@ To deploy only changed JS files (e.g. `auth.js` and `supabase.js`):
 
 ```bash
 aws s3 cp pokevault-refactor/js/auth.js \
-  s3://pokevault.mariellen.com.au/pokevault-refactor/js/auth.js \
+  s3://pokevault.mariellen.com.au/js/auth.js \
   --content-type "application/javascript"
 
 aws s3 cp pokevault-refactor/js/supabase.js \
-  s3://pokevault.mariellen.com.au/pokevault-refactor/js/supabase.js \
+  s3://pokevault.mariellen.com.au/js/supabase.js \
   --content-type "application/javascript"
 
 aws cloudfront create-invalidation \
@@ -80,17 +88,18 @@ Note: CloudFront requires paths to start with `/`. Single-path invalidations lik
 
 ## Common files to deploy
 
-| File | S3 path |
+| Local path | S3 path (bucket root) |
 |---|---|
-| `js/auth.js` | `pokevault-refactor/js/auth.js` |
-| `js/supabase.js` | `pokevault-refactor/js/supabase.js` |
-| `js/app.js` | `pokevault-refactor/js/app.js` |
-| `js/analyse.js` | `pokevault-refactor/js/analyse.js` |
-| `js/render.js` | `pokevault-refactor/js/render.js` |
-| `js/config.js` | `pokevault-refactor/js/config.js` |
-| `js/data.js` | `pokevault-refactor/js/data.js` |
-| `index.html` | `pokevault-refactor/index.html` |
-| `css/styles.css` | `pokevault-refactor/css/styles.css` |
+| `pokevault-refactor/js/auth.js` | `js/auth.js` |
+| `pokevault-refactor/js/supabase.js` | `js/supabase.js` |
+| `pokevault-refactor/js/app.js` | `js/app.js` |
+| `pokevault-refactor/js/analyse.js` | `js/analyse.js` |
+| `pokevault-refactor/js/render.js` | `js/render.js` |
+| `pokevault-refactor/js/config.js` | `js/config.js` |
+| `pokevault-refactor/js/data.js` | `js/data.js` |
+| `pokevault-refactor/js/pokemon_go_base_stats.js` | `js/pokemon_go_base_stats.js` |
+| `pokevault-refactor/index.html` | `index.html` |
+| `pokevault-refactor/css/styles.css` | `css/styles.css` |
 
 ## IAM permissions
 
@@ -101,7 +110,7 @@ The `pokevault-deploy` user has least-privilege access:
 
 To verify a file uploaded correctly:
 ```bash
-aws s3 ls s3://pokevault.mariellen.com.au/pokevault-refactor/js/
+aws s3 ls s3://pokevault.mariellen.com.au/js/
 ```
 
 ## Supabase
