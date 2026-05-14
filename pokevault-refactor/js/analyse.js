@@ -216,10 +216,14 @@ function buildNickname(p, slot, convention) {
       else if (t1 && dustForSlot >= t1) suf += '$';
     }
   }
-  // Shadow purification suffix — omit only if shadow already holds its OWN league slot
-  // (the purify slot itself doesn't count — it IS the reason for the p flag)
+  // Shadow purification suffix — omit only if shadow holds a CONFIRMED own-league slot
+  // (the purify slot itself doesn't count; tentative slots below keepThreshold don't count)
   if (p.isShadow && p.purifyLeague) {
-    const hasShadowOwnSlot = p.slots.some(s => ['L','G','U','M'].includes(s) && s !== p.purifyLeague);
+    const hasShadowOwnSlot = p.slots.some(s => {
+      if (!['L','G','U','M'].includes(s) || s === p.purifyLeague) return false;
+      const r = s==='L'?(p.rankPctL||0):s==='G'?(p.rankPctG||0):s==='U'?(p.rankPctU||0):(p.ivAvg||0);
+      return r >= RULES.keepThreshold;
+    });
     if (!hasShadowOwnSlot) suf += p.purifyHundo ? 'p✪' : 'p';
   }
   if (p.isPurified) suf += '*';
@@ -242,7 +246,11 @@ function buildNickname(p, slot, convention) {
   } else if (slot==='review') {
     // Shadow purify: use purify league symbol + purifyRankPct when no own-league slot
     if (p.isShadow && p.purifyLeague) {
-      const ownSlotExists = p.slots.some(s => ['L','G','U','M'].includes(s) && s !== p.purifyLeague);
+      const ownSlotExists = p.slots.some(s => {
+        if (!['L','G','U','M'].includes(s) || s === p.purifyLeague) return false;
+        const r = s==='L'?(p.rankPctL||0):s==='G'?(p.rankPctG||0):s==='U'?(p.rankPctU||0):(p.ivAvg||0);
+        return r >= RULES.keepThreshold;
+      });
       if (!ownSlotExists) {
         const pv = Math.round(p.purifyRankPct || 0);
         return fitName(p.name, (LC[p.purifyLeague]||LC.R) + String(pv), nickSuf, 12);
@@ -419,51 +427,68 @@ function formatDust(n){return n>=1000?(n/1000).toFixed(0)+'k':String(n);}
 
 // PURIFICATION SIMULATION
 // ═══════════════════════════════════════════════
-function simulatePurify(p, allRows) {
+function normSpeciesId(name) {
+  return (name || '').toLowerCase()
+    .replace(/['.♀♂:é]/g, s => s === 'é' ? 'e' : '')
+    .replace(/[\s\-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/, '');
+}
+
+function simulatePurify(p) {
   if (!p.isShadow) return;
-  // +2 to each IV capped at 15
   const pAtk = Math.min(15, (p.atkIV||0)+2);
   const pDef = Math.min(15, (p.defIV||0)+2);
   const pSta = Math.min(15, (p.staIV||0)+2);
   p.purifyHundo = pAtk===15 && pDef===15 && pSta===15;
 
-  // Re-evaluate league ranks with purified IVs
-  // We can't recalculate PvP rank from scratch without the full ranking table
-  // But we can use a heuristic: if original rank% is close, purified will be higher
-  // Better: check if any league rank% when adjusted for IV improvement would cross 90%
-  // Since we don't have the full rank table, use IV average improvement as proxy
-  // Purified IV avg
   const purifyIvAvg = ((pAtk+pDef+pSta)/45)*100;
-
-  // Check each league - if purified IVs would likely rank well
-  // Use the existing rank data but scale it: if original is within 5% of threshold
-  // and purified IVs are significantly better, flag it
-  // More accurately: check if min(ivs) >= 13 for hundo, or use rank% + improvement
   const improvement = purifyIvAvg - (p.ivAvg||0);
+  const purifiedMinLevel = Math.max(p.level||1, 25);
+  const hasBaseStats = typeof GO_BASE_STATS_BY_NAME !== 'undefined' && typeof CP_MULTIPLIERS !== 'undefined';
 
-  // For each league, estimate purified rank
   const leagueChecks = [
-    {lg:'L', rank:p.rankPctL||0, evo:p.evolvedNameL||p.name},
-    {lg:'G', rank:p.rankPctG||0, evo:p.evolvedNameG||p.name},
-    {lg:'U', rank:p.rankPctU||0, evo:p.evolvedNameU||p.name},
-    {lg:'M', rank:purifyIvAvg, evo:p.evolvedNameU||p.evolvedNameG||p.name},
+    {lg:'L', cap:500,      rank:p.rankPctL||0, evo:p.evolvedNameL||p.name},
+    {lg:'G', cap:1500,     rank:p.rankPctG||0, evo:p.evolvedNameG||p.name},
+    {lg:'U', cap:2500,     rank:p.rankPctU||0, evo:p.evolvedNameU||p.name},
+    {lg:'M', cap:Infinity, rank:p.ivAvg||0,    evo:p.evolvedNameU||p.evolvedNameG||p.name},
   ];
 
-  // Find best league where purified version would qualify
-  // Heuristic: if current rank + (improvement * 0.5) >= 90, likely qualifies
   let bestLeague='', bestPct=0;
-  leagueChecks.forEach(({lg, rank, evo}) => {
+  leagueChecks.forEach(({lg, cap, rank, evo}) => {
     if (rank <= 0) return;
-    if (rank >= RULES.keepThreshold) return; // already qualifies as shadow — no need to purify
-    const estimatedPurified = Math.min(100, rank + improvement * 0.4);
-    if (estimatedPurified >= RULES.keepThreshold && estimatedPurified > bestPct) {
-      const leagueCap = LEAGUE_CAPS[lg] ?? 99999;
-      if (leagueCap < 99999) {
-        const estimatedPurifiedCP = Math.round((p.cp||0) * 1.07);
-        if (estimatedPurifiedCP > leagueCap) return; // purified CP would bust the cap
+    if (rank >= RULES.keepThreshold) return;
+    const estimatedPurified = lg==='M' ? purifyIvAvg : Math.min(100, rank + improvement * 0.4);
+    if (estimatedPurified < RULES.keepThreshold) return;
+
+    if (cap < Infinity) {
+      let exceedsCap;
+      if (hasBaseStats) {
+        const evoId = normSpeciesId(evo);
+        const evoStats = GO_BASE_STATS_BY_NAME[evoId] || GO_BASE_STATS_BY_DEX[p.pokeNum] || null;
+        if (evoStats) {
+          const cpm = CP_MULTIPLIERS[purifiedMinLevel];
+          if (cpm) {
+            const cp = Math.max(10, Math.floor(
+              (evoStats.atk+pAtk) * Math.sqrt(evoStats.def+pDef) * Math.sqrt(evoStats.sta+pSta) * cpm * cpm / 10
+            ));
+            exceedsCap = cp > cap;
+          } else {
+            exceedsCap = Math.round((p.cp||0)*1.07) > cap;
+          }
+        } else {
+          console.warn('[PurifyCalc] Missing base stats for', evo, '(dex', p.pokeNum+') — using heuristic');
+          exceedsCap = Math.round((p.cp||0)*1.07) > cap;
+        }
+      } else {
+        exceedsCap = Math.round((p.cp||0)*1.07) > cap;
       }
-      bestPct = estimatedPurified;
+      if (exceedsCap) return;
+    }
+
+    if (estimatedPurified > bestPct) {
       bestLeague = lg;
+      bestPct = estimatedPurified;
       p.purifyEvo = evo;
     }
   });
@@ -528,6 +553,7 @@ function analyse(rows) {
       standaloneEvoL:!!(r['Name (L)'] && r['Name (L)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (L)'])),
       dustG,dustU,dustL,dustMin,dustCostBest:dustMin,
       catchDate:r['Catch Date']||'', catchDateMs:parseCatchDate(r['Catch Date']),
+      scanDate:r['Scan Date']||'',
       originalScanDate:r['Original Scan Date']||'',
       pvpTag:r['Marked for PvP use']||'',
       moveKnown:mv.known, hasAllBestMoves:mv.hasAllBestMoves, hasBestMoves:mv.hasBestMoves,
@@ -573,7 +599,7 @@ function analyse(rows) {
 
   // Simulate purification for shadows
   parsed.forEach(p => {
-    simulatePurify(p, rows);
+    simulatePurify(p);
     // If shadow qualifies when purified, assign purify league as a slot
     // so it gets e.g. GurdurrⒼ92p instead of Ⓡ73p
     if (p.isShadow && p.purifyLeague && p.purifyRankPct >= RULES.keepThreshold) {
@@ -640,11 +666,17 @@ function analyse(rows) {
             // Master league: only the final evolution (must BE stageName, not just evolve to it)
             // Exception 1: hundo pre-evos always allowed — will be evolved, and 15/15/15 beats any evolved form
             // Exception 2: best-IV pre-evo allowed when no evolved form is available in the group
+            // Exception 3: best-IV pre-evo allowed when it strictly outranks ALL final evos (unevolved high-IV)
             if (lg === 'M' && p.name !== stageName) {
               const isHundo = p.atkIV === 15 && p.defIV === 15 && p.staIV === 15;
               if (isHundo) return true;
-              const hasFinalEvoInGroup = group.some(m => m.name === stageName);
-              if (hasFinalEvoInGroup) return false;
+              const finalEvosInGroup = group.filter(m => m.name === stageName);
+              if (finalEvosInGroup.length > 0) {
+                const bestFinalEvoIV = Math.max(...finalEvosInGroup.map(m => m.ivAvg || 0));
+                if ((p.ivAvg || 0) <= bestFinalEvoIV) return false;
+                const maxPreEvoIV = Math.max(...group.filter(m => m.name !== stageName).map(m => m.ivAvg || 0));
+                return (p.ivAvg || 0) >= maxPreEvoIV;
+              }
               const maxIV = Math.max(...group.map(m => m.ivAvg || 0));
               return (p.ivAvg || 0) >= maxIV;
             }
@@ -990,11 +1022,10 @@ function analyse(rows) {
       p.isCheaperAlternative = cyanLeagues.some(cl => leagueSlots.includes(cl));
       p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStarExpensive;
 
-      // Force keep + green/gold star for special overrides — never red star
-      if (p.isDynamax || p.isGigantamax || p.isShiny) {
-        p.decision = 'keep';
-        p.suggestStar = true;
-      }
+      // Force keep for special overrides. Shinies never get red star (pokemonStarRank guards it).
+      // Duplicate shinies are resolved in the post-processing pass below.
+      if (p.isDynamax || p.isGigantamax) { p.decision = 'keep'; p.suggestStar = true; }
+      if (p.isShiny) p.decision = 'keep'; // suggestStar left as computed — shinies earn stars normally
       // Hundos always keep regardless of slot routing
       if (p.atkIV === 15 && p.defIV === 15 && p.staIV === 15) {
         p.decision = 'keep';
@@ -1251,6 +1282,26 @@ function analyse(rows) {
         const cap=ls==='L'?500:ls==='G'?1500:ls==='U'?2500:null;
         if(cap&&(p.cp||0)<cap) p.belowCapNote='Max CP below '+RULES.leagueNames[ls]+' cap ('+p.cp+' max) - hundo is optimal';
       }
+    });
+
+    // Shiny duplicate reconciliation: keeper = highest ivAvg (prefer isFavorite if tied),
+    // all others → trade. Runs when overrides are pre-loaded (returning session).
+    const shinyBySpecies = {};
+    members.filter(p => p.isShiny).forEach(p => {
+      (shinyBySpecies[p.name] = shinyBySpecies[p.name] || []).push(p);
+    });
+    Object.values(shinyBySpecies).forEach(shinies => {
+      if (shinies.length <= 1) return;
+      const keeper = shinies.reduce((best, p) => {
+        if ((p.ivAvg||0) > (best.ivAvg||0)) return p;
+        if ((p.ivAvg||0) === (best.ivAvg||0) && p.isFavorite && !best.isFavorite) return p;
+        return best;
+      });
+      shinies.forEach(p => {
+        if (p === keeper) return;
+        p.decision = 'trade';
+        p.reason = `Shiny duplicate — ${keeper.name} ${Math.round(keeper.ivAvg||0)}% IV is keeper`;
+      });
     });
   });
 

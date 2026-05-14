@@ -34,7 +34,7 @@ const SHIMS = `
 module.exports.createEnv = function({ supabaseFetch = async () => ({}), updateSyncStatus = () => {} } = {}) {
   const factory = new Function(
     'supabaseFetch', 'updateSyncStatus',
-    SHIMS + stripped + '\nreturn { saveCollectionToCloud };'
+    SHIMS + stripped + '\nreturn { saveCollectionToCloud, loadCollectionFromCloud, COLLECTION_DB_FIELDS };'
   );
   return factory(supabaseFetch, updateSyncStatus);
 };

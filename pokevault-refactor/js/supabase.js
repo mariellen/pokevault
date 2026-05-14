@@ -90,6 +90,18 @@ let cloudCollectionDate = null;
 
 const BATCH_SIZE = 200;
 
+// Explicit list of fields written to pokemon_collection — used by schema validation tests
+const COLLECTION_DB_FIELDS = [
+  'pokemon_index','name','form','pokemon_num','cp','atk_iv','def_iv','sta_iv','iv_avg','level',
+  'rank_pct_g','rank_pct_u','rank_pct_l','rank_num_g','rank_num_u','rank_num_l',
+  'dust_g','dust_u','dust_l','quick_move','charge_move1','charge_move2',
+  'is_lucky','is_shadow','is_purified','is_favorite',
+  'catch_date','scan_date','pvp_tag',
+  'evolved_name_g','evolved_name_u','evolved_name_l',
+  'imported_at','user_id'
+];
+if (typeof module !== 'undefined') module.exports = { COLLECTION_DB_FIELDS };
+
 async function saveCollectionToCloud(pokemon, onProgress) {
   const userId = await getCurrentUserId();
   if (!userId) {
@@ -104,6 +116,7 @@ async function saveCollectionToCloud(pokemon, onProgress) {
   // Create sync session — degrade gracefully if it fails
   let sessionId = null;
   const sessionRows = await supabaseFetch('POST', 'sync_sessions', {
+    user_id: userId,
     total_records: pokemon.length,
     status: 'in_progress',
     csv_hash: csvHash,
@@ -152,6 +165,7 @@ async function saveCollectionToCloud(pokemon, onProgress) {
     is_purified: p.isPurified||false,
     is_favorite: p.isFavorite||false,
     catch_date: p.catchDate||'',
+    scan_date: p.scanDate||'',
     pvp_tag: p.pvpTag||'',
     evolved_name_g: p.evolvedNameG||'',
     evolved_name_u: p.evolvedNameU||'',
@@ -188,6 +202,7 @@ async function saveCollectionToCloud(pokemon, onProgress) {
 
     cloudCollectionDate = new Date().toISOString();
     localStorage.setItem('pokevault_last_cloud_save', cloudCollectionDate);
+    localStorage.setItem('pokevault_last_cloud_save_count', slim.length);
     updateSyncStatus('✓ Collection saved to cloud (' + slim.length + ' Pokémon)', 'ok');
 
   } catch (err) {
@@ -291,6 +306,13 @@ function applyOverridesToPokemon() {
     if (newTr) tr.replaceWith(newTr);
     if (ovRow && ovRow.classList.contains('override-row') && newOvRow) ovRow.replaceWith(newOvRow);
   });
+  // Reconcile duplicate shiny decisions now that isShiny flags are correct
+  if (typeof reconcileShinyDecisions === 'function') reconcileShinyDecisions(allPokemon);
+  // Re-render dex modal if open — overrides affect shiny/dmax/gmax counts in the dex view
+  const dexModal = document.getElementById('dex-modal');
+  if (dexModal && dexModal.style.display !== 'none' && typeof renderDexModal === 'function') {
+    renderDexModal();
+  }
 }
 
 async function saveOverride(pokemonIdx, fields) {

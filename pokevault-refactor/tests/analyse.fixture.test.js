@@ -992,3 +992,65 @@ describe('Group 23 — Cross-evo-target slot routing', () => {
     expect(p.starType).not.toBe('red');
   });
 });
+
+// ─── Group 24 — Purify modal: exact CP cap prevents level-25 bust ─────────────
+// Shadow Venonat CP:207 (level 8, IVs 8/10/14).
+// Old heuristic: 89 + 11.1*0.4 = 93.4% → falsely qualifies for Little League.
+// New code: purified level=25, evo=Venomoth, exact CP=1443 > 500 cap → excluded.
+
+// ─── Group 25 — Squirtle: high-IV pre-evo wins ML over lower-IV final evo ──────
+// Bug: hasFinalEvoInGroup always blocked pre-evos from ML even when they had
+// better IVs than the Blastoise already in the collection. Starred 97.8% Squirtle
+// was red (no slot) while 53.3% Blastoise was green (tentative ML) → Cull blocked.
+// Fix: allow pre-evo when it strictly outranks ALL final evos in the group.
+
+describe('Group 25 — Squirtle: high-IV pre-evo wins ML when unevolved beats final evo', () => {
+  it('Squirtle CP:496 (97.8% IV, fav=1) wins Master League slot over 53.3% Blastoise', () => {
+    const p = find('Squirtle', 496);
+    expect(p).toBeDefined();
+    expect(p.isFavorite).toBe(true);
+    expect(p.slots).toContain('M');
+  });
+
+  it('Squirtle CP:496 (fav=1, wins ML) is gold-starred — not red', () => {
+    const p = find('Squirtle', 496);
+    expect(p.starType).toBe('gold');
+    expect(p.starType).not.toBe('red');
+  });
+
+  it('Blastoise CP:1943 (53.3% IV, outclassed) has no slots and is not green-starred', () => {
+    const p = find('Blastoise', 1943);
+    expect(p).toBeDefined();
+    expect(p.suggestStar).toBe(false);
+    expect(p.starType).not.toBe('green');
+  });
+
+  it('Squirtle/Blastoise family has gold star + no green/blue/cyan — qualifies for Cull modal', () => {
+    const fam = findFam('Squirtle');
+    expect(fam).toBeDefined();
+    const m = fam.members;
+    expect(m.some(p => p.isFavorite && (p.suggestStar || p.suggestStarExpensive))).toBe(true);
+    expect(m.some(p => !p.isFavorite && p.suggestStar)).toBe(false);
+    expect(m.some(p => p.suggestStarExpensive && !p.isFavorite)).toBe(false);
+    expect(m.some(p => p.suggestStarCheaper && !p.isFavorite)).toBe(false);
+  });
+});
+
+describe('Group 24 — Purify modal: exact CP cap prevents level-25 bust', () => {
+  it('shadow Venonat CP:207 (level 8) does NOT qualify for Little League purify — level-25 Venomoth exceeds 500CP', () => {
+    const p = find('Venonat', 207);
+    expect(p).toBeDefined();
+    expect(p.isShadow).toBe(true);
+    expect(p.purifyLeague).not.toBe('L');
+  });
+
+  it('shadow Venonat CP:207 has no qualifying purify league at all', () => {
+    const p = find('Venonat', 207);
+    expect(p.purifyLeague).toBe('');
+  });
+
+  it('shadow Venonat CP:207 purifyHundo is false (purified IVs 10/12/15, not 15/15/15)', () => {
+    const p = find('Venonat', 207);
+    expect(p.purifyHundo).toBe(false);
+  });
+});

@@ -5,6 +5,10 @@
 // ═══════════════════════════════════════════════
 'use strict';
 
+// Capture deep link hash immediately — applyFilters() → updateHash() overwrites
+// window.location.hash before applyHashState() can read it on first cloud load.
+let initialHash = window.location.hash;
+
 // ═══════════════════════════════════════════════
 // STAR PRIORITY (0=gold … 5=none)
 // ═══════════════════════════════════════════════
@@ -13,8 +17,38 @@ function pokemonStarRank(p) {
   if (p.suggestStar && !p.isFavorite) return 1;
   if (p.suggestStarCheaper) return 2;
   if (p.suggestStarExpensive) return 3;
-  if (p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper) return 4;
+  if (!p.isShiny && p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper) return 4;
   return 5;
+}
+
+// Returns the shiny keeper for a group (highest ivAvg, prefer isFavorite if tied).
+// Returns null if no shinies in group.
+function shinyKeeperOf(group) {
+  const shinies = group.filter(p => p.isShiny);
+  if (!shinies.length) return null;
+  return shinies.reduce((best, p) => {
+    if ((p.ivAvg||0) > (best.ivAvg||0)) return p;
+    if ((p.ivAvg||0) === (best.ivAvg||0) && p.isFavorite && !best.isFavorite) return p;
+    return best;
+  });
+}
+
+// Identifies duplicate shinies in allPokemon and marks them trade.
+// Called after overrides are applied (fresh session) or after analyse() (returning session).
+function reconcileShinyDecisions(pokemon) {
+  const shinyBySpecies = {};
+  pokemon.filter(p => p.isShiny).forEach(p => {
+    (shinyBySpecies[p.name] = shinyBySpecies[p.name] || []).push(p);
+  });
+  Object.values(shinyBySpecies).forEach(shinies => {
+    if (shinies.length <= 1) return;
+    const keeper = shinyKeeperOf(shinies);
+    shinies.forEach(p => {
+      if (p === keeper) return;
+      p.decision = 'trade';
+      p.reason = `Shiny duplicate — ${keeper.name} ${Math.round(keeper.ivAvg||0)}% IV is keeper`;
+    });
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -274,7 +308,7 @@ function applyFilters(){
       const em=incEvos&&fam.members.some(p=>p.name.toLowerCase().includes(term));
       if(!nm&&!evoMatch&&!em) return false;
     }
-    if(decFilter==='hundo'&&!fam.members.some(p=>p.isHundo)) return false;
+    if(decFilter==='hundo'&&!fam.members.some(p=>p.isHundo&&(hundoMode===1||(hundoMode===2&&pokemonStarRank(p)===0)||(hundoMode===3&&pokemonStarRank(p)>=1&&pokemonStarRank(p)<=2)))) return false;
     else if(decFilter==='canEvolve'&&!fam.members.some(p=>p.canEvolve)) return false;
     else if(decFilter==='neverEvolved'&&!fam.members.some(p=>p.neverEvolved)) return false;
     else if(!['all','hundo','canEvolve','neverEvolved'].includes(decFilter)&&!fam.members.some(p=>p.decision===decFilter)) return false;
@@ -297,6 +331,7 @@ function applyFilters(){
     filteredFamilies.sort((a,b)=>a.primaryName.localeCompare(b.primaryName));
   }
   renderPage();
+  updateHash();
 }
 
 function renderPage(){
@@ -318,7 +353,7 @@ function renderPage(){
       if(activeLeagueArr.length>0){
         f.members.forEach(p=>{
           let qualifies=!p.hidden&&activeLeagueArr.some(lg=>(p[rankMap[lg]]||0)>=RULES.keepThreshold);
-          if(decFilter==='hundo') qualifies=qualifies&&p.isHundo;
+          if(decFilter==='hundo') qualifies=qualifies&&p.isHundo&&(hundoMode===1||(hundoMode===2&&pokemonStarRank(p)===0)||(hundoMode===3&&pokemonStarRank(p)>=1&&pokemonStarRank(p)<=2));
           if(decFilter==='canEvolve') qualifies=qualifies&&p.canEvolve;
           if(decFilter==='neverEvolved') qualifies=qualifies&&p.neverEvolved;
           p._leagueFiltered=!qualifies;
@@ -326,9 +361,9 @@ function renderPage(){
       } else {
         f.members.forEach(p=>p._leagueFiltered=false);
       }
-      // Auto-open if league filter active and family has qualifying rows
+      // Auto-open if league filter active, hundo filter active, or ≤3 families
       const hasQualifying=activeLeagueArr.length===0||f.members.some(p=>!p._leagueFiltered&&!p.hidden);
-      const open=(autoOpen&&i===0)||activeLeagueArr.length>0;
+      const open=(autoOpen&&i===0)||activeLeagueArr.length>0||decFilter==='hundo';
       return renderFamilyFiltered(f,open&&hasQualifying,activeLeagueArr,rankMap);
     }).join('');
   }
@@ -558,10 +593,30 @@ function setDecFilter(f,btn){
   // Toggle off if clicking the already-active filter
   if(decFilter===f){ decFilter='all'; document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected')); applyFilters(); return; }
   decFilter=f;
+  // Reset hundo cycle when switching to a different filter
+  if(f!=='hundo'){hundoMode=0;const hb=document.getElementById('hundoBtn');if(hb)hb.textContent='✚ Hundos';}
   document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected'));
   document.querySelectorAll('.sum-card').forEach(c=>c.classList.remove('active'));
   if(btn){const cls=f==='trade'?'act-trade':f==='review'?'act-review':f==='protected'?'act-protected':'active';btn.classList.add(cls);}
   applyFilters();
+}
+
+function cycleHundoFilter(btn){
+  hundoMode=(hundoMode+1)%4;
+  // Clear other filter buttons and sum-card highlights
+  document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected'));
+  document.querySelectorAll('.sum-card').forEach(c=>c.classList.remove('active'));
+  if(hundoMode===0){
+    decFilter='all';
+    btn.classList.remove('active');
+    btn.textContent='✚ Hundos';
+    applyFilters();
+  } else {
+    decFilter='hundo';
+    btn.classList.add('active');
+    btn.textContent=['✚ Hundos','✚ Hundos','★ Hundos','✦ Hundos'][hundoMode];
+    applyFilters();
+  }
 }
 
 function toggleLeague(l,btn){
@@ -800,6 +855,110 @@ let dexQualLucky = false;
 let dexTypes     = new Set(); // selected type pills
 let dexTypesOpen = false;
 let allSpecies   = null;      // cached from Supabase pokemon_species
+let dexSolo      = false;     // Have view: only species with count=1
+let dexSpare     = false;     // Have view: only species with count≥2
+let dexExcludeEvolvable = false; // Missing view: hide species player can evolve to
+let dexExcludeLucky = false;  // Have view: hide species where all are lucky (untradeable)
+let dexExcludeKeeps = false;  // Have view: hide species where trade count = 0 after luckies + starred
+
+// ── Deep Links (hash-based state) ────────────────────────────────────
+function encodeStateToHash() {
+  const dexEl = document.getElementById('dex-modal');
+  const dexOpen = dexEl && dexEl.style.display === 'flex';
+  const params = new URLSearchParams();
+
+  if (dexOpen) {
+    params.set('view', dexView);
+    if (dexCat !== 'all') params.set('category', dexCat);
+    if (dexQualShiny) params.set('shiny', 'true');
+    if (dexQualLucky) params.set('lucky', 'true');
+    if (dexTypes.size) params.set('types', [...dexTypes].join(','));
+    if (dexSolo)  params.set('solo', 'true');
+    if (dexSpare) params.set('spare', 'true');
+    if (dexExcludeEvolvable) params.set('noevolve', 'true');
+    if (dexExcludeLucky) params.set('nolucky', 'true');
+    if (dexExcludeKeeps) params.set('nokeeps', 'true');
+    return '#dex?' + params.toString();
+  }
+
+  if (searchTerm) params.set('search', searchTerm);
+  if (decFilter !== 'all') params.set('decision', decFilter);
+  if (leagueFilters.size) params.set('leagues', [...leagueFilters].join(','));
+  const qs = params.toString();
+  return qs ? '#results?' + qs : '#';
+}
+
+function updateHash() {
+  history.replaceState(null, '', encodeStateToHash());
+}
+
+function applyHashState() {
+  const hash = window.location.hash;
+  if (!hash || hash === '#') return;
+
+  const qIdx = hash.indexOf('?');
+  const prefix = qIdx === -1 ? hash.slice(1) : hash.slice(1, qIdx);
+  const params = new URLSearchParams(qIdx === -1 ? '' : hash.slice(qIdx + 1));
+
+  if (prefix === 'dex') {
+    const v = params.get('view');
+    if (v === 'have' || v === 'missing') dexView = v;
+    const cat = params.get('category');
+    if (cat) dexCat = cat;
+    dexQualShiny = params.get('shiny') === 'true';
+    dexQualLucky = params.get('lucky') === 'true';
+    const types = params.get('types');
+    if (types) dexTypes = new Set(types.split(',').filter(Boolean));
+    dexSolo  = params.get('solo')  === 'true';
+    dexSpare = params.get('spare') === 'true';
+    if (dexSolo && dexSpare) dexSpare = false; // mutual exclusion safety
+    dexExcludeEvolvable = params.get('noevolve') === 'true';
+    dexExcludeLucky = params.get('nolucky') === 'true';
+    dexExcludeKeeps = params.get('nokeeps') === 'true';
+    openDexModal();
+    return;
+  }
+
+  if (prefix === 'modal') {
+    const m = params.get('modal');
+    const openers = {purify:openPurifyModal, shinies:openShinyModal, merge:openMergeModal, special:openSpecialModal};
+    if (m && openers[m]) openers[m]();
+    return;
+  }
+
+  if (prefix === 'results') {
+    const s = params.get('search');
+    if (s) {
+      searchTerm = s.slice(0, 100).toLowerCase();
+      const box = document.getElementById('searchBox');
+      if (box) { box.value = s.slice(0, 100); document.getElementById('searchClear')?.classList.add('visible'); }
+    }
+    const d = params.get('decision');
+    if (d && d !== 'all') {
+      decFilter = d;
+      const btn = document.querySelector(`[data-f="${d}"]`);
+      if (btn) {
+        const cls = d==='trade'?'act-trade':d==='review'?'act-review':d==='protected'?'act-protected':'active';
+        btn.classList.add(cls);
+      }
+    }
+    const ls = params.get('leagues');
+    if (ls) {
+      ls.split(',').filter(l => ['L','G','U','M'].includes(l)).forEach(l => {
+        leagueFilters.add(l);
+        document.querySelector(`[data-l="${l}"]`)?.classList.add('active');
+      });
+    }
+    applyFilters();
+  }
+}
+
+function copyCurrentLink() {
+  const url = window.location.origin + window.location.pathname + encodeStateToHash();
+  navigator.clipboard.writeText(url)
+    .then(() => showToast('Link copied!'))
+    .catch(() => showToast('Copy failed — use Ctrl+C'));
+}
 
 async function openDexModal() {
   const modal = document.getElementById('dex-modal');
@@ -821,6 +980,7 @@ async function openDexModal() {
 
 function closeDexModal() {
   document.getElementById('dex-modal').style.display = 'none';
+  updateHash();
 }
 
 function dexNavigate(name) {
@@ -861,6 +1021,18 @@ function updateDexFilterButtons() {
   // Qualifiers
   document.getElementById('dex-qual-shiny')?.classList.toggle('dex-filter-active', dexQualShiny);
   document.getElementById('dex-qual-lucky')?.classList.toggle('dex-filter-active', dexQualLucky);
+  // Solo / Spare / Exclude evolvable
+  document.getElementById('dex-solo')?.classList.toggle('dex-filter-active', dexSolo);
+  document.getElementById('dex-spare')?.classList.toggle('dex-filter-active', dexSpare);
+  document.getElementById('dex-excl-evolve')?.classList.toggle('dex-filter-active', dexExcludeEvolvable);
+  document.getElementById('dex-excl-lucky')?.classList.toggle('dex-filter-active', dexExcludeLucky);
+  document.getElementById('dex-excl-keeps')?.classList.toggle('dex-filter-active', dexExcludeKeeps);
+  // Solo/Spares/Excl.Lucky/Excl.Keeps are Have-view concepts — hide them in Missing view
+  const haveOnlyIds = ['dex-solo', 'dex-spare', 'dex-excl-lucky', 'dex-excl-keeps'];
+  haveOnlyIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = dexView === 'missing' ? 'none' : '';
+  });
   // Type pills
   document.querySelectorAll('.dex-type-pill').forEach(btn => {
     btn.classList.toggle('dex-type-pill-active', dexTypes.has(btn.textContent));
@@ -896,6 +1068,7 @@ function renderDexModal() {
   } else {
     renderDexMissingView(body, filteredSpecies);
   }
+  updateHash();
 }
 
 function renderDexHaveView(body, filteredSpecies) {
@@ -915,15 +1088,27 @@ function renderDexHaveView(body, filteredSpecies) {
     bySpecies.get(n).push(p);
   });
 
-  const speciesCount = bySpecies.size;
+  // Apply solo/spare filter
+  let displaySpecies = bySpecies;
+  if (dexSolo)  displaySpecies = new Map([...displaySpecies].filter(([,arr]) => arr.length === 1));
+  if (dexSpare) displaySpecies = new Map([...displaySpecies].filter(([,arr]) => arr.length >= 2));
+  if (dexExcludeLucky) displaySpecies = new Map([...displaySpecies].filter(([,arr]) => arr.some(p => !p.isLucky)));
+  if (dexExcludeKeeps) displaySpecies = new Map([...displaySpecies].filter(([,arr]) => {
+    const keeper = shinyKeeperOf(arr);
+    const nonTradeable = arr.filter(p => p.isLucky || pokemonStarRank(p) < 3 || p === keeper).length;
+    return arr.length - nonTradeable > 0;
+  }));
 
-  // Subtitle with context (Fix 4)
+  const speciesCount = displaySpecies.size;
+
+  // Subtitle with context
   const qualLabel = dexQualShiny && dexQualLucky ? ' with shiny + lucky'
     : dexQualShiny ? ' with shinies'
     : dexQualLucky ? ' with lucky'
     : '';
+  const soloLabel = dexSolo ? ' (solo only)' : dexSpare ? ' (spares only)' : '';
   const catLabel = dexCat !== 'all' ? dexCat.toLowerCase() + ' ' : '';
-  document.getElementById('dex-modal-sub').textContent = `${speciesCount} ${catLabel}species${qualLabel}`;
+  document.getElementById('dex-modal-sub').textContent = `${speciesCount} ${catLabel}species${qualLabel}${soloLabel}`;
 
   if (!speciesCount) {
     body.innerHTML = '<div class="pv-modal-empty">No Pokémon match the current filters</div>';
@@ -939,13 +1124,13 @@ function renderDexHaveView(body, filteredSpecies) {
 
   let html = '';
   for (const cat of CAT_ORDER) {
-    const catSpecies = (speciesByCat[cat] || []).filter(s => bySpecies.has(s.pokedex_number));
+    const catSpecies = (speciesByCat[cat] || []).filter(s => displaySpecies.has(s.pokedex_number));
     if (!catSpecies.length) continue;
 
     // Solo (count=1) first, then alphabetical
     catSpecies.sort((a, b) => {
-      const aCount = bySpecies.get(a.pokedex_number).length;
-      const bCount = bySpecies.get(b.pokedex_number).length;
+      const aCount = displaySpecies.get(a.pokedex_number).length;
+      const bCount = displaySpecies.get(b.pokedex_number).length;
       if (aCount === 1 && bCount !== 1) return -1;
       if (bCount === 1 && aCount !== 1) return 1;
       return a.name.localeCompare(b.name);
@@ -954,14 +1139,23 @@ function renderDexHaveView(body, filteredSpecies) {
     if (cat !== 'Regular') html += `<div class="dex-cat-header">${cat}</div>`;
 
     html += catSpecies.map(s => {
-      const count = bySpecies.get(s.pokedex_number).length;
+      const group = displaySpecies.get(s.pokedex_number);
+      const count = group.length;
+      const luckyCount = group.filter(p => p.isLucky).length;
+      const starCount = group.filter(p => pokemonStarRank(p) < 3).length;
+      const keeper = shinyKeeperOf(group);
+      const nonTradeable = group.filter(p => p.isLucky || pokemonStarRank(p) < 3 || p === keeper).length;
+      const tradeCount = count - nonTradeable;
       const type2str = s.type2 ? `/${s.type2}` : '';
       const numStr = String(s.pokedex_number).padStart(3, '0');
       const safeName = s.name.replace(/'/g, "\\'");
       const isSolo = count === 1;
-      const rightHtml = isSolo
-        ? `<span class="dex-solo-notice">⚠ Only one — Lucky/Mirror trade only</span><span class="dex-count">×1</span>`
-        : `<span class="dex-count">×${count}</span>`;
+      const luckyHtml = luckyCount > 0 ? `<span class="dex-lucky">🍀${luckyCount}</span>` : '';
+      const starHtml = starCount > 0 ? `<span class="dex-starred">⭐${starCount}</span>` : '';
+      const tradeHtml = `<span class="dex-trade">Trade: ${tradeCount}</span>`;
+      const rightHtml = (isSolo && tradeCount > 0)
+        ? `<span class="dex-solo-notice">⚠ Only one — Lucky/Mirror trade only</span><span class="dex-count">×1</span>${luckyHtml}${starHtml}${tradeHtml}`
+        : `<span class="dex-count">×${count}</span>${luckyHtml}${starHtml}${tradeHtml}`;
       return `<div class="dex-row">
   <div class="dex-row-main">
     <span class="dex-num">#${numStr}</span>
@@ -976,11 +1170,25 @@ function renderDexHaveView(body, filteredSpecies) {
   body.innerHTML = html;
 }
 
+// Walk evolves_from chain; return true if any ancestor (or self) has is_shiny_available.
+// Bulbapedia only lists base evolutions — evolved forms inherit shiny availability.
+function isShinyAvailableInChain(s, speciesById) {
+  let cur = s;
+  for (let i = 0; i < 6; i++) {
+    if (cur.is_shiny_available) return true;
+    if (!cur.evolves_from) return false;
+    cur = speciesById.get(cur.evolves_from);
+    if (!cur) return false;
+  }
+  return false;
+}
+
 function renderDexMissingView(body, filteredSpecies) {
   // p.pokeNum is a raw CSV string; convert to number before comparing with s.pokedex_number (integer)
   // Pre-build owned set and species name map for efficient per-row lookup
   const ownedNums    = new Set(allPokemon.map(p => Number(p.pokeNum)));
   const speciesNameMap = new Map(allSpecies.map(s => [s.pokedex_number, s.name]));
+  const speciesById    = new Map(allSpecies.map(s => [s.pokedex_number, s]));
 
   let missing;
   if (dexQualShiny && dexQualLucky) {
@@ -993,6 +1201,11 @@ function renderDexMissingView(body, filteredSpecies) {
     missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number));
   }
 
+  // Apply exclude-evolvable filter
+  if (dexExcludeEvolvable) {
+    missing = missing.filter(s => !(s.evolves_from && ownedNums.has(s.evolves_from)));
+  }
+
   // Sort: in-GO first alphabetical, then not-in-GO
   missing.sort((a, b) => {
     if (a.is_in_go !== b.is_in_go) return (b.is_in_go ? 1 : 0) - (a.is_in_go ? 1 : 0);
@@ -1001,7 +1214,8 @@ function renderDexMissingView(body, filteredSpecies) {
 
   const qualLabel = dexQualShiny && dexQualLucky ? ' shiny + lucky' : dexQualShiny ? ' shiny' : dexQualLucky ? ' lucky' : '';
   const catLabel  = dexCat !== 'all' ? dexCat.toLowerCase() + ' ' : '';
-  document.getElementById('dex-modal-sub').textContent = `${missing.length} ${catLabel}${qualLabel ? qualLabel.trim() + ' ' : ''}missing`;
+  const evolveLabel = dexExcludeEvolvable ? ' (excl. evolvable)' : '';
+  document.getElementById('dex-modal-sub').textContent = `${missing.length} ${catLabel}${qualLabel ? qualLabel.trim() + ' ' : ''}missing${evolveLabel}`;
 
   if (!missing.length) {
     body.innerHTML = '<div class="pv-modal-empty">No missing Pokémon — collection complete! 🎉</div>';
@@ -1017,7 +1231,7 @@ function renderDexMissingView(body, filteredSpecies) {
     let noticeHtml = '';
     if (!s.is_in_go) {
       noticeHtml = '<span class="dex-notice-grey">Not in GO</span>';
-    } else if (dexQualShiny && !s.is_shiny_available) {
+    } else if (dexQualShiny && !isShinyAvailableInChain(s, speciesById)) {
       noticeHtml = '<span class="dex-notice-amber">No shiny in GO ✨</span>';
     }
 
@@ -1048,13 +1262,14 @@ function openCullModal(){
   const body=document.getElementById('cull-modal-body');
   const sub=document.getElementById('cull-modal-sub');
 
-  // Qualify: has ≥1 gold star, and no unresolved green/blue/cyan stars
+  // Qualify: has ≥1 gold star (regular or expensive-winner), and no UNRESOLVED green/blue/cyan stars.
+  // Expensive-winner golds (suggestStarExpensive && isFavorite) count as resolved — user has already starred them.
   const qualifying=families.filter(fam=>{
     const m=fam.members;
-    return m.some(p=>p.isFavorite&&p.suggestStar)
+    return m.some(p=>p.isFavorite&&(p.suggestStar||p.suggestStarExpensive))
       &&!m.some(p=>!p.isFavorite&&p.suggestStar)
-      &&!m.some(p=>p.suggestStarExpensive)
-      &&!m.some(p=>p.suggestStarCheaper);
+      &&!m.some(p=>p.suggestStarExpensive&&!p.isFavorite)
+      &&!m.some(p=>p.suggestStarCheaper&&!p.isFavorite);
   });
 
   const countNonGold=fam=>fam.members.filter(p=>!(p.isFavorite&&p.suggestStar)).length;
@@ -1190,8 +1405,69 @@ function closeMergeModal(){
 
 // ── Cleanup / Special modals ──────────────────
 let cleanupSortMode='stable';
+let cleanupFromDate='';
+let cleanupToDate='';
 let specialSortMode='date';
 let specialFilterSpecies='';
+let specialFromDate='';
+let specialToDate='';
+let specialIncludeMarked=false;
+
+function getSortDate(p){return p.scanDate||p.catchDate||p.originalScanDate||'';}
+
+// Converts "DD/MM/YYYY H:MM:SS AM/PM" (Pokégenie format) → "YYYY-MM-DDTHH:MM"
+function parsePokegenieDate(s){
+  if(!s||!s.trim()) return '';
+  const t=s.trim();
+  // YYYY-MM-DD HH:MM (Pokégenie scan date format)
+  if(/^\d{4}-\d{2}-\d{2}/.test(t)) return t.replace(' ','T').slice(0,16);
+  // DD/MM/YYYY H:MM:SS AM/PM (legacy catch date format)
+  const m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?)?$/i);
+  if(!m) return '';
+  let [,d,mo,y,h='0',mn='0',ampm='']=m;
+  h=parseInt(h); mn=parseInt(mn);
+  if(ampm.toUpperCase()==='PM'&&h<12) h+=12;
+  if(ampm.toUpperCase()==='AM'&&h===12) h=0;
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}T${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}`;
+}
+
+function matchesDateRange(p,fromDate,toDate){
+  const d=getSortDate(p);
+  if(!d) return !(fromDate||toDate);
+  const pDate=parsePokegenieDate(d);
+  if(!pDate) return !(fromDate||toDate);
+  if(fromDate&&pDate<fromDate) return false;
+  if(toDate&&pDate>toDate) return false;
+  return true;
+}
+
+function selectAllSpecial(field,checked){
+  const map={
+    shiny:{cls:'special-cb-shiny',prop:'isShiny',db:'is_shiny'},
+    gmax: {cls:'special-cb-gmax', prop:'isGigantamax',db:'is_gigantamax'},
+    dmax: {cls:'special-cb-dmax', prop:'isDynamax',   db:'is_dynamax'}
+  };
+  const {cls,prop,db}=map[field];
+  document.querySelectorAll('.'+cls).forEach(cb=>{
+    cb.checked=checked;
+    const key=cb.dataset.key;
+    setOverride(key,db,checked);
+    const p=allPokemon.find(x=>x.stableKey===key);
+    if(p) p[prop]=checked;
+  });
+}
+
+function updateSelectAllHeader(field){
+  const cls={shiny:'special-cb-shiny',gmax:'special-cb-gmax',dmax:'special-cb-dmax'}[field];
+  const hid={shiny:'sa-shiny',gmax:'sa-gmax',dmax:'sa-dmax'}[field];
+  const cbs=[...document.querySelectorAll('.'+cls)];
+  if(!cbs.length) return;
+  const n=cbs.filter(c=>c.checked).length;
+  const h=document.getElementById(hid);
+  if(!h) return;
+  h.checked=n===cbs.length;
+  h.indeterminate=n>0&&n<cbs.length;
+}
 
 function openCleanupModal(){
   if(!allPokemon.length){alert('Load your collection first');return;}
@@ -1200,7 +1476,8 @@ function openCleanupModal(){
   const sub=document.getElementById('cleanup-modal-sub');
 
   const NEEDS_FORM=new Set(Object.keys(FORM_DROPDOWNS||{}));
-  const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!p.specialForm&&!p.vivillonPattern)
+  const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!p.specialForm&&!p.vivillonPattern
+      &&matchesDateRange(p,cleanupFromDate,cleanupToDate))
     .sort((a,b)=>{
       if(cleanupSortMode==='cp') return (b.cp||0)-(a.cp||0);
       if(cleanupSortMode==='iv') return (b.ivAvg||0)-(a.ivAvg||0);
@@ -1209,14 +1486,23 @@ function openCleanupModal(){
       return a.name.localeCompare(b.name);
     });
 
+  const dateActive=cleanupFromDate||cleanupToDate;
   sub.textContent=needsForm.length+' Pokémon need form/pattern set'
-    +' ('+needsForm.filter(p=>p.catchDate).length+' with stable IDs)';
+    +(dateActive?' in date range':' ('+needsForm.filter(p=>p.catchDate).length+' with stable IDs)');
 
-  const sortBtns=`<div style="display:flex;gap:6px;margin-bottom:12px;font-size:11px">
+  const clearBtnStyle=`background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--muted);cursor:pointer;font-size:11px`;
+  const sortBtns=`<div style="display:flex;gap:6px;margin-bottom:4px;font-size:11px;flex-wrap:wrap;align-items:center">
     <span style="color:var(--muted)">Sort:</span>
     <button onclick="cleanupSortMode='stable';openCleanupModal()" style="background:${cleanupSortMode==='stable'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='stable'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">Stable ID</button>
     <button onclick="cleanupSortMode='cp';openCleanupModal()" style="background:${cleanupSortMode==='cp'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='cp'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">CP ↓</button>
     <button onclick="cleanupSortMode='iv';openCleanupModal()" style="background:${cleanupSortMode==='iv'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='iv'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">IV% ↓</button>
+  </div>
+  <div class="mark-special-date-row">
+    <span>From:</span>
+    <input type="datetime-local" value="${cleanupFromDate}" onchange="cleanupFromDate=this.value;openCleanupModal()">
+    <span>To:</span>
+    <input type="datetime-local" value="${cleanupToDate}" onchange="cleanupToDate=this.value;openCleanupModal()">
+    <button onclick="cleanupFromDate='';cleanupToDate='';openCleanupModal()" style="${clearBtnStyle}">Clear</button>
   </div>`;
 
   body.innerHTML=!needsForm.length
@@ -1248,49 +1534,79 @@ function openSpecialModal(){
   const sub=document.getElementById('special-modal-sub');
 
   const allSpeciesWithCounts={};
-  allPokemon.filter(p=>!p.isShiny&&!p.isDynamax&&!p.isGigantamax&&!p.isCostumed)
+  allPokemon.filter(p=>specialIncludeMarked||(!p.isShiny&&!p.isDynamax&&!p.isGigantamax&&!p.isCostumed))
     .forEach(p=>{allSpeciesWithCounts[p.name]=(allSpeciesWithCounts[p.name]||0)+1;});
   const speciesList=Object.entries(allSpeciesWithCounts).filter(([,c])=>c>=5)
-    .sort((a,b)=>b[1]-a[1]).map(([n])=>n);
+    .sort((a,b)=>a[0].localeCompare(b[0])).map(([n])=>n);
 
   const candidates=allPokemon
-    .filter(p=>!p.isShiny&&!p.isDynamax&&!p.isGigantamax&&!p.isCostumed
-      &&(!specialFilterSpecies||p.name===specialFilterSpecies))
+    .filter(p=>{
+      if(!specialIncludeMarked&&(p.isShiny||p.isDynamax||p.isGigantamax||p.isCostumed)) return false;
+      if(specialFilterSpecies&&p.name!==specialFilterSpecies) return false;
+      return matchesDateRange(p,specialFromDate,specialToDate);
+    })
     .sort((a,b)=>{
       if(specialSortMode==='cp') return (b.cp||0)-(a.cp||0);
       if(specialSortMode==='iv') return (b.ivAvg||0)-(a.ivAvg||0);
-      if(a.scanDate&&b.scanDate) return b.scanDate.localeCompare(a.scanDate);
-      if(a.scanDate) return -1;
-      if(b.scanDate) return 1;
-      return a.name.localeCompare(b.name);
+      return getSortDate(b).localeCompare(getSortDate(a));
     }).slice(0,200);
 
-  sub.textContent='Newest 200 unmarked Pokémon — tick any that are Shiny, Gigantamax or Dynamax';
+  const dateActive=specialFromDate||specialToDate;
+  sub.textContent=dateActive
+    ? `${candidates.length} Pokémon in date range${specialIncludeMarked?' (including already marked)':''}`
+    : specialIncludeMarked
+      ? 'Newest 200 Pokémon (including already marked)'
+      : 'Newest 200 unmarked Pokémon — tick any that are Shiny, Gigantamax or Dynamax';
+
   const speciesOpts=['<option value="">All species</option>',
     ...speciesList.map(n=>`<option value="${n}" ${specialFilterSpecies===n?'selected':''}>${n} (${allSpeciesWithCounts[n]})</option>`)
   ].join('');
 
-  const sortBtns=`<div style="display:flex;gap:6px;margin-bottom:12px;font-size:11px;flex-wrap:wrap;align-items:center">
+  const btnStyle=(active)=>`background:${active?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${active?'#000':'var(--muted)'};cursor:pointer;font-size:11px`;
+  const clearBtnStyle=`background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--muted);cursor:pointer;font-size:11px`;
+
+  const controls=`<div style="display:flex;gap:6px;margin-bottom:4px;font-size:11px;flex-wrap:wrap;align-items:center">
     <select onchange="specialFilterSpecies=this.value;openSpecialModal()" style="background:var(--surf2);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);font-size:11px;cursor:pointer">${speciesOpts}</select>
     <span style="color:var(--muted);margin-left:4px">Sort:</span>
-    <button onclick="specialSortMode='date';openSpecialModal()" style="background:${specialSortMode==='date'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${specialSortMode==='date'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">Newest</button>
-    <button onclick="specialSortMode='cp';openSpecialModal()" style="background:${specialSortMode==='cp'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${specialSortMode==='cp'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">CP ↓</button>
-    <button onclick="specialSortMode='iv';openSpecialModal()" style="background:${specialSortMode==='iv'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${specialSortMode==='iv'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">IV% ↓</button>
+    <button onclick="specialSortMode='date';openSpecialModal()" style="${btnStyle(specialSortMode==='date')}">Newest</button>
+    <button onclick="specialSortMode='cp';openSpecialModal()" style="${btnStyle(specialSortMode==='cp')}">CP ↓</button>
+    <button onclick="specialSortMode='iv';openSpecialModal()" style="${btnStyle(specialSortMode==='iv')}">IV% ↓</button>
+  </div>
+  <div class="mark-special-date-row">
+    <span>From:</span>
+    <input type="datetime-local" value="${specialFromDate}" onchange="specialFromDate=this.value;openSpecialModal()">
+    <span>To:</span>
+    <input type="datetime-local" value="${specialToDate}" onchange="specialToDate=this.value;openSpecialModal()">
+    <button onclick="specialFromDate='';specialToDate='';openSpecialModal()" style="${clearBtnStyle}">Clear</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text);cursor:pointer;margin-left:8px">
+      <input type="checkbox" id="includeMarkedToggle" ${specialIncludeMarked?'checked':''} onchange="specialIncludeMarked=this.checked;openSpecialModal()">
+      Include already marked
+    </label>
+  </div>`;
+
+  const selectAllRow=`<div class="pv-modal-row" style="border-bottom:2px solid var(--border);padding-bottom:6px;margin-bottom:2px">
+    <div class="pv-modal-info" style="color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Select all</div>
+    <div class="pv-modal-controls">
+      <label class="pv-modal-cb"><input type="checkbox" id="sa-shiny" onchange="selectAllSpecial('shiny',this.checked)"> ✨ Shiny</label>
+      <label class="pv-modal-cb"><input type="checkbox" id="sa-gmax" onchange="selectAllSpecial('gmax',this.checked)"> Gmax</label>
+      <label class="pv-modal-cb"><input type="checkbox" id="sa-dmax" onchange="selectAllSpecial('dmax',this.checked)"> Dmax</label>
+    </div>
   </div>`;
 
   body.innerHTML=!candidates.length
-    ? sortBtns+'<div class="pv-modal-empty">No unmarked Pokémon found</div>'
-    : sortBtns+candidates.map(p=>{
+    ? controls+`<div class="pv-modal-empty">No ${specialIncludeMarked?'':'unmarked '}Pokémon found</div>`
+    : controls+selectAllRow+candidates.map(p=>{
         const isCostumable=COSTUME_SPECIES&&COSTUME_SPECIES.has(p.name);
+        const displayDate=getSortDate(p)||'no date';
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
-            <div class="pv-modal-name">${p.name}</div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${p.atkIV}/${p.defIV}/${p.staIV} · ${Math.round(p.ivAvg)}% IV · ${p.catchDate||p.scanDate||'no date'}</div>
+            <div class="pv-modal-name"><a href="#" onclick="event.preventDefault();specialNavigate('${p.name}')" style="color:inherit;text-decoration:underline;cursor:pointer">${p.name}</a></div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${p.atkIV}/${p.defIV}/${p.staIV} · ${Math.round(p.ivAvg)}% IV · ${displayDate}</div>
           </div>
           <div class="pv-modal-controls">
-            <label class="pv-modal-cb"><input type="checkbox" ${p.isShiny?'checked':''} onchange="setOverride('${p.stableKey}','is_shiny',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isShiny=this.checked;"> ✨ Shiny</label>
-            <label class="pv-modal-cb"><input type="checkbox" ${p.isGigantamax?'checked':''} onchange="setOverride('${p.stableKey}','is_gigantamax',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isGigantamax=this.checked;"> Gmax</label>
-            <label class="pv-modal-cb"><input type="checkbox" ${p.isDynamax?'checked':''} onchange="setOverride('${p.stableKey}','is_dynamax',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isDynamax=this.checked;"> Dmax</label>
+            <label class="pv-modal-cb"><input type="checkbox" class="special-cb-shiny" data-key="${p.stableKey}" ${p.isShiny?'checked':''} onchange="setOverride('${p.stableKey}','is_shiny',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isShiny=this.checked;updateSelectAllHeader('shiny')"> ✨ Shiny</label>
+            <label class="pv-modal-cb"><input type="checkbox" class="special-cb-gmax" data-key="${p.stableKey}" ${p.isGigantamax?'checked':''} onchange="setOverride('${p.stableKey}','is_gigantamax',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isGigantamax=this.checked;updateSelectAllHeader('gmax')"> Gmax</label>
+            <label class="pv-modal-cb"><input type="checkbox" class="special-cb-dmax" data-key="${p.stableKey}" ${p.isDynamax?'checked':''} onchange="setOverride('${p.stableKey}','is_dynamax',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isDynamax=this.checked;updateSelectAllHeader('dmax')"> Dmax</label>
             ${isCostumable?`<label class="pv-modal-cb"><input type="checkbox" ${p.isCostumed?'checked':''} onchange="setOverride('${p.stableKey}','is_costumed',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isCostumed=this.checked;"> 🎃 Costume</label>`:''}
           </div>
         </div>`;
@@ -1299,6 +1615,15 @@ function openSpecialModal(){
 }
 
 function closeSpecialModal(){document.getElementById('special-modal').classList.remove('open');}
+
+function specialNavigate(name){
+  closeSpecialModal();
+  const box=document.getElementById('searchBox');
+  if(box) box.value=name;
+  searchTerm=name.toLowerCase();
+  applyFilters();
+  document.getElementById('searchClear')?.classList.add('visible');
+}
 
 // ═══════════════════════════════════════════════
 // COPY SUGGESTED NICKS
@@ -1344,10 +1669,16 @@ function processCloudRows(rows) {
     'Rank # (L)': String(r.rank_num_l||''),
     'Dust Cost (L)': String(r.dust_l||''),
     'Candy Cost (G)':'','Candy Cost (U)':'','Candy Cost (L)':'',
-    'Original Scan Date':'','Scan Date':'','Catch Date':r.catch_date||'',
+    'Original Scan Date':r.original_scan_date||'','Scan Date':r.scan_date||'','Catch Date':r.catch_date||'',
     'Weight':'','Height':'','Dust':'0','Gender':'',
     'Pokemon Number': r.pokemon_num||''
   }));
+  // Task 3: count verification — warn if loaded count is much lower than last save
+  const lastCount = parseInt(localStorage.getItem('pokevault_last_cloud_save_count') || '0', 10);
+  if (lastCount && rows.length < lastCount * 0.9) {
+    showToast(`⚠ Only ${rows.length.toLocaleString()} Pokémon loaded — expected ~${lastCount.toLocaleString()}. Your last save may be incomplete.`, 8000);
+  }
+
   document.getElementById('upload-section').style.display='none';
   document.getElementById('loading-section').style.display='block';
   setProgress('ANALYSING CLOUD DATA...', 45);
@@ -1364,11 +1695,17 @@ function processCloudRows(rows) {
         document.getElementById('loading-section').style.display='none';
         document.getElementById('dashboard').style.display='block';
         renderSummary(allPokemon); applyFilters();
+        if (initialHash && initialHash !== '#' && initialHash !== '') {
+          history.replaceState(null, '', initialHash);
+          initialHash = '';
+        }
+        applyHashState();
         const filenameEl=document.getElementById('csvFilename');
         if(filenameEl){filenameEl.textContent='';filenameEl.style.display='none';}
         document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
         document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
         loadOverrides();
+        clearIncompleteWarningIfHealthy(rows.length);
       },50);
     } catch(err) {
       showError('Cloud load failed', err.message);
@@ -1587,6 +1924,9 @@ function exportCSV(){
 function parseCSV(text){
   const lines=text.split(/\r?\n/);
   const headers=parseLine(lines[0]);
+  // Strip UTF-8 BOM from first header — iOS Safari FileReader prepends
+  // which makes the first column key unreadable (e.g. "﻿Index" not "Index")
+  headers[0]=headers[0].replace(/^﻿/,'');
   const out=[];
   for(let i=1;i<lines.length;i++){
     if(!lines[i].trim()) continue;
@@ -1623,6 +1963,8 @@ function setProgress(msg,pct){
 
 function handleFile(file){
   if(!file.name.toLowerCase().endsWith('.csv')){showError('Wrong file type',`Expected .csv, got: ${file.name}`);return;}
+  const MAX_MB=10;
+  if(file.size>MAX_MB*1024*1024){showToast(`File too large (${(file.size/1024/1024).toFixed(1)}MB) — max ${MAX_MB}MB. Pokégenie exports are typically under 5MB.`);return;}
   document.getElementById('upload-section').style.display='none';
   document.getElementById('loading-section').style.display='block';
   const watchdog=setTimeout(()=>showError('Timed out after 60s','The file may be too large for this device. Try cleaning up Pokégenie first and re-exporting a smaller file.'),60000);
@@ -1650,10 +1992,15 @@ function handleFile(file){
               document.getElementById('loading-section').style.display='none';
               document.getElementById('dashboard').style.display='block';
               renderSummary(allPokemon);applyFilters();
+              if (initialHash && initialHash !== '#' && initialHash !== '') {
+                history.replaceState(null, '', initialHash);
+                initialHash = '';
+              }
+              applyHashState();
               const filenameEl=document.getElementById('csvFilename');
               if(filenameEl){filenameEl.textContent=' · '+file.name;filenameEl.style.display='inline';}
               loadOverrides();
-              saveCollectionToCloud(allPokemon);  // guards on auth internally
+              handleCloudSave(allPokemon);  // guards on auth internally
               document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
               document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
             },50);
@@ -1665,6 +2012,104 @@ function handleFile(file){
   reader.readAsText(file);
 }
 
+// ─── Toast notification ─────────────────────────────
+let _toastTimer = null;
+function showToast(msg, duration=3500) {
+  let el = document.getElementById('pv-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pv-toast';
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:10px 18px;font-size:13px;color:var(--text);z-index:99999;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  el.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) translateY(8px)';
+  }, duration);
+}
+
+// ─── Cloud save with blocking overlay ───────────────
+async function handleCloudSave(pokemon) {
+  const overlay = document.getElementById('saveOverlay');
+  if (!overlay) {
+    console.error('Save overlay element missing from DOM — continuing save without overlay');
+  }
+  const fill    = document.getElementById('saveProgressFill');
+  const countEl = document.getElementById('saveOverlayCount');
+  const textEl  = document.getElementById('saveProgressText');
+  const total   = pokemon.length;
+
+  if (overlay) overlay.style.display = 'flex';
+  if (countEl) countEl.textContent = '0';
+  if (textEl)  textEl.textContent = `of ${total.toLocaleString()} Pokémon`;
+  if (fill)    fill.style.width = '0%';
+
+  try {
+    await saveCollectionToCloud(pokemon, (saved, tot) => {
+      const pct = Math.round((saved / tot) * 100);
+      if (fill) fill.style.width = pct + '%';
+      if (countEl) countEl.textContent = saved.toLocaleString();
+      if (textEl) textEl.textContent = `of ${tot.toLocaleString()} Pokémon`;
+    });
+    showToast(`✓ Saved ${total.toLocaleString()} Pokémon to cloud`);
+  } catch (err) {
+    showToast('Save failed — check sync status');
+    console.error('handleCloudSave error:', err);
+  } finally {
+    if (overlay) overlay.style.display = 'none';
+  }
+}
+
+// ─── Incomplete save detection ───────────────────────
+async function checkForIncompleteSave() {
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+  const sessions = await supabaseFetch('GET',
+    `sync_sessions?user_id=eq.${userId}&status=eq.in_progress&order=id.desc&limit=1`);
+  if (!sessions?.length) return;
+  const s = sessions[0];
+  // Guard: ignore if saved_records >= total_records (unlikely but safe)
+  if (s.saved_records >= s.total_records) return;
+  showIncompleteSaveWarning(s);
+}
+
+// Called after a successful cloud load. Removes stale warning banner and patches
+// the in_progress session to 'complete' so it doesn't re-appear on next load.
+async function clearIncompleteWarningIfHealthy(loadedCount) {
+  document.getElementById('incomplete-save-banner')?.remove();
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+  const sessions = await supabaseFetch('GET',
+    `sync_sessions?user_id=eq.${userId}&status=eq.in_progress&order=id.desc&limit=1`);
+  if (!sessions?.length) return;
+  const s = sessions[0];
+  const threshold = s.total_records ? Math.floor(s.total_records * 0.9) : 0;
+  if (!threshold || loadedCount >= threshold) {
+    supabaseFetch('PATCH', `sync_sessions?id=eq.${s.id}`, {
+      status: 'complete',
+      completed_at: new Date().toISOString(),
+      saved_records: loadedCount
+    });
+  }
+}
+
+function showIncompleteSaveWarning(session) {
+  if (document.getElementById('incomplete-save-banner')) return;
+  const saved = session.saved_records ?? '?';
+  const total = session.total_records ?? '?';
+  const banner = document.createElement('div');
+  banner.id = 'incomplete-save-banner';
+  banner.className = 'warning-banner';
+  banner.innerHTML = `⚠ Your last cloud save may be incomplete (${Number(saved).toLocaleString()} of ${Number(total).toLocaleString()} Pokémon saved).
+    <button onclick="document.getElementById('incomplete-save-banner').remove()">Dismiss</button>
+    <button onclick="document.getElementById('incomplete-save-banner').remove();document.getElementById('csvFileInput').click()">Re-import CSV</button>`;
+  document.body.prepend(banner);
+}
+
 // Initialise auth + evolution chains on page load, then auto-load cloud collection
 window.addEventListener('load', async () => {
   await initAuth();  // sets auth state; calls loadOverrides() when logged in
@@ -1674,6 +2119,7 @@ window.addEventListener('load', async () => {
   // Auto-load from cloud for all users (anon read policy allows this).
   // Falls back silently to the CSV import screen if cloud is empty or unavailable.
   if (allPokemon.length === 0) autoLoadFromCloud();
+  checkForIncompleteSave();
 });
 
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
@@ -1689,3 +2135,5 @@ const dz=document.getElementById('dropZone');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+
+window.addEventListener('popstate',()=>{if(allPokemon.length)applyHashState();});

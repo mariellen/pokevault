@@ -9,10 +9,11 @@ const path = require('path');
 const jsDir = path.join(__dirname, '..', 'js');
 const read = name => fs.readFileSync(path.join(jsDir, name), 'utf8');
 
-// Load in the same order as index.html: config → data → analyse
+// Load in the same order as index.html: config → data → pokemon_go_base_stats → analyse
 const combined = [
   read('config.js'),
   read('data.js'),
+  read('pokemon_go_base_stats.js'),
   read('analyse.js'),
 ].join('\n\n');
 
