@@ -213,6 +213,7 @@ tr.row-hidden{display:none;}
 .star-red{color:var(--red);font-size:18px;font-weight:900;}
 .star-blue{color:#4da6ff;font-size:18px;font-weight:900;}
 .star-cyan{color:#00e5cc;font-size:18px;font-weight:900;}
+.star-visibility{color:#c084fc;font-size:18px;font-weight:900;}
 .star-none{color:var(--dim);font-size:14px;}
 .evo-ind{font-size:11px;font-weight:700;margin-right:2px;}
 .evo-gold{color:var(--gold);}

@@ -651,6 +651,7 @@ function analyse(rows) {
         const stageName = groupKey.split('|')[0];
         // Master league: only final evolution
         if (lg==='M') {
+          if (isLegendary) return; // Legendaries skip ML — handled by best_overall
           const hasHigherEvo = members.some(m =>
             m.name === stageName && (
               (m.evolvedNameG && m.evolvedNameG !== stageName) ||
@@ -795,7 +796,7 @@ function analyse(rows) {
 
         // Always promote the best candidate — threshold determines if it's confirmed or tentative
         const isConfirmed = bestRank2 >= RULES.keepThreshold;
-        if (bestRank2 >= 70 || isLegendary) { // Only skip truly weak candidates
+        if (bestRank2 >= 70) { // Only skip truly weak candidates
           if (!best2.slots.includes(lg)) best2.slots.push(lg);
           best2.targetEvo = stageName !== best2.name ? stageName : '';
           best2.slotConfirmed = isConfirmed || !!best2.slotConfirmed; // purify loop may have already confirmed
@@ -859,9 +860,6 @@ function analyse(rows) {
 
           // Second runner-up: if another candidate also qualifies at 90%+
           // assign them to remaining open leagues (handled by league loop)
-        } else if (isLegendary && !eligible.some(m=>(m[rankField]||0)>=RULES.keepThreshold)) {
-          if (!best2.slots.includes(lg)) best2.slots.push(lg);
-          best2.targetEvo = stageName !== best2.name ? stageName : '';
         }
       });
     });
@@ -875,8 +873,43 @@ function analyse(rows) {
     if(purified.length) purified[0].slots.push('purified');
     members.filter(p=>p.isLucky).forEach(p=>p.slots.push('lucky'));
     members.filter(p=>p.isNundo).forEach(p=>p.slots.push('nundo'));
-    members.filter(p=>p.isDynamax&&!p.slots.includes('dynamax')).forEach(p=>p.slots.push('dynamax'));
-    members.filter(p=>p.isGigantamax&&!p.slots.includes('gigantamax')).forEach(p=>p.slots.push('gigantamax'));
+    // Dynamax: best-IV per species → 'dynamax' slot; dupes get nothing (will trade)
+    const dmaxBySpecies = {};
+    members.filter(p => p.isDynamax).forEach(p => {
+      const k = p.name;
+      if (!dmaxBySpecies[k] || (p.ivAvg||0) > (dmaxBySpecies[k].ivAvg||0) ||
+        ((p.ivAvg||0) === (dmaxBySpecies[k].ivAvg||0) && p.isFavorite && !dmaxBySpecies[k].isFavorite))
+        dmaxBySpecies[k] = p;
+    });
+    Object.values(dmaxBySpecies).forEach(best => {
+      if (!best.slots.some(s => RULES.leagues.includes(s)) && !best.slots.includes('dynamax'))
+        best.slots.push('dynamax');
+    });
+    // Gigantamax: best-IV per species → 'gigantamax' slot; dupes get nothing (will trade)
+    const gmaxBySpecies = {};
+    members.filter(p => p.isGigantamax).forEach(p => {
+      const k = p.name;
+      if (!gmaxBySpecies[k] || (p.ivAvg||0) > (gmaxBySpecies[k].ivAvg||0) ||
+        ((p.ivAvg||0) === (gmaxBySpecies[k].ivAvg||0) && p.isFavorite && !gmaxBySpecies[k].isFavorite))
+        gmaxBySpecies[k] = p;
+    });
+    Object.values(gmaxBySpecies).forEach(best => {
+      if (!best.slots.some(s => RULES.leagues.includes(s)) && !best.slots.includes('gigantamax'))
+        best.slots.push('gigantamax');
+    });
+    // Legendary: best-IV per species (no league slot, no Dmax/Gmax) → 'best_overall' slot
+    if (isLegendary) {
+      const legendBySpecies = {};
+      members.filter(p => !p.isDynamax && !p.isGigantamax && !p.slots.some(s => RULES.leagues.includes(s))).forEach(p => {
+        const k = p.name;
+        if (!legendBySpecies[k] || (p.ivAvg||0) > (legendBySpecies[k].ivAvg||0) ||
+          ((p.ivAvg||0) === (legendBySpecies[k].ivAvg||0) && p.isFavorite && !legendBySpecies[k].isFavorite))
+          legendBySpecies[k] = p;
+      });
+      Object.values(legendBySpecies).forEach(best => {
+        if (!best.slots.includes('best_overall')) best.slots.push('best_overall');
+      });
+    }
 
     // Set decisions and nicknames
     members.forEach(p=>{
@@ -937,22 +970,19 @@ function analyse(rows) {
         p.decision='keep'; p.reason='Shiny — always favourite';
         p.nickname=buildNickname(p,'shiny');
       } else if (p.slots.includes('dynamax')) {
-        p.decision='keep'; p.reason='Dynamax — always keep';
+        p.decision='keep'; p.reason='Best Dynamax — keep';
         p.nickname=buildNickname(p,'dynamax');
       } else if (p.slots.includes('gigantamax')) {
-        p.decision='keep'; p.reason='Gigantamax — always keep';
+        p.decision='keep'; p.reason='Best Gigantamax — keep';
         p.nickname=buildNickname(p,'gigantamax');
+      } else if (p.slots.includes('best_overall')) {
+        p.decision='keep'; p.reason='Best Legendary — keep';
+        p.nickname=buildNickname(p,'lucky');
       } else if (p.slots.includes('shadow')) {
         p.decision='keep'; p.reason='Best shadow — keep for raids/Master League';
         p.nickname=buildNickname(p,'lucky'); // NameⓇIV format — same as Lucky no-league
       } else if (p.slots.includes('purified')) {
         p.decision='keep'; p.reason='Best purified';
-        p.nickname=buildNickname(p,'review');
-      } else if (isLegendary&&p.slots.length===0&&qualifiesAny) {
-        p.decision='protected'; p.reason='Legendary — best available';
-        p.nickname=buildNickname(p,'review');
-      } else if (isLegendary&&p.slots.length===0) {
-        p.decision='protected'; p.reason='Legendary — keep until better found';
         p.nickname=buildNickname(p,'review');
       } else if (qualifiesAny) {
         p.decision='review'; p.reason='≥90% but not best in family — review';
@@ -1017,7 +1047,8 @@ function analyse(rows) {
             p.slots.includes('shadow') ||
             p.slots.includes('purified') ||
             p.slots.includes('dynamax') ||
-            p.slots.includes('gigantamax')
+            p.slots.includes('gigantamax') ||
+            p.slots.includes('best_overall')
           )) ||
           isProtectedBest ||
           (p.isLucky) ||
@@ -1031,7 +1062,6 @@ function analyse(rows) {
 
       // Force keep for special overrides. Shinies never get red star (pokemonStarRank guards it).
       // Duplicate shinies are resolved in the post-processing pass below.
-      if (p.isDynamax || p.isGigantamax) { p.decision = 'keep'; p.suggestStar = true; }
       if (p.isShiny) p.decision = 'keep'; // suggestStar left as computed — shinies earn stars normally
       // Hundos always keep regardless of slot routing
       if (p.atkIV === 15 && p.defIV === 15 && p.staIV === 15) {
@@ -1054,6 +1084,10 @@ function analyse(rows) {
       else if (!p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper && p.isFavorite) p.starType = 'red';
       else if (p.evolutionUnknown && Math.max(p.rankPctG||0,p.rankPctU||0,p.rankPctL||0,p.rankPctM||0) >= 90) p.starType = 'swirl';
       else p.starType = 'none';
+      // Visibility star: tradeable Dmax/Gmax/Legendary dupes — display-only, no impact on counts
+      if (p.decision === 'trade' && (p.isDynamax || p.isGigantamax || isLegendary)) {
+        p.starType = 'visibility';
+      }
     });
     // Fix dustCostBest to use the dust for the assigned league slot
     members.forEach(p=>{

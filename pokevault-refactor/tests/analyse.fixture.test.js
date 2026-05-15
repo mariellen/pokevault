@@ -1166,3 +1166,185 @@ describe('Group 26 — Nick Symbol Overhaul', () => {
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
 });
+
+// ─── Group 27 — Brief B: Dmax/Gmax/Legendary normalisation ──────────────────
+// Rows 62–69 added to fixture for these tests.
+// Dmax/Gmax: best-IV per species → keep slot; all dupes → trade + visibility star.
+// Legendary (non-Dmax/Gmax, no league slot): best-IV → 'best_overall' → keep; dupes → trade + visibility.
+
+// 27a: Two Dmax Entei — best keeps, dupe trades with visibility star
+describe('Group 27a — Dmax Entei: best-IV keeps, dupe gets visibility star', () => {
+  let g27aResult;
+  const g27aFind = (name, cp) => g27aResult.pokemon.find(p => p.name === name && p.cp === cp);
+
+  beforeAll(() => {
+    const csv = loadCSV(FIXTURE_PATH);
+    const overrides = {
+      '244|||13|14|13|2026-03-01': { is_dynamax: true },  // Entei CP:2900 88.9% — best
+      '244|||11|11|12|2026-03-02': { is_dynamax: true },  // Entei CP:2800 75.6% — dupe
+    };
+    g27aResult = loader.createWithOverrides(overrides).analyse(csv);
+  });
+
+  it('Entei CP:2900 (best Dmax, 88.9%) → decision=keep, slots includes dynamax', () => {
+    const p = g27aFind('Entei', 2900);
+    expect(p).toBeDefined();
+    expect(p.isDynamax).toBe(true);
+    expect(p.decision).toBe('keep');
+    expect(p.slots).toContain('dynamax');
+  });
+
+  it('Entei CP:2900 (best Dmax) → nickname is EnteiⓇ89Ⓓ', () => {
+    const p = g27aFind('Entei', 2900);
+    expect(p.nickname).toBe('EnteiⓇ89Ⓓ');
+  });
+
+  it('Entei CP:2800 (dupe Dmax, 75.6%) → decision=trade', () => {
+    const p = g27aFind('Entei', 2800);
+    expect(p).toBeDefined();
+    expect(p.isDynamax).toBe(true);
+    expect(p.decision).toBe('trade');
+  });
+
+  it('Entei CP:2800 (dupe Dmax) → starType is visibility', () => {
+    const p = g27aFind('Entei', 2800);
+    expect(p.starType).toBe('visibility');
+  });
+
+  it('Entei CP:2800 (visibility star dupe) → decision is trade, not keep', () => {
+    const p = g27aFind('Entei', 2800);
+    expect(p.decision).not.toBe('keep');
+  });
+});
+
+// 27b: Gmax Snorlax — best (with Ultra rank ≥90) keeps with Ⓧ in nick, dupe trades with visibility
+describe('Group 27b — Gmax Snorlax: best-IV keeps (Ⓧ in nick), dupe gets visibility star', () => {
+  let g27bResult;
+  const g27bFind = (name, cp) => g27bResult.pokemon.find(p => p.name === name && p.cp === cp);
+
+  beforeAll(() => {
+    const csv = loadCSV(FIXTURE_PATH);
+    const overrides = {
+      '143|||15|14|15|2026-03-03': { is_gigantamax: true },  // Snorlax CP:2448 97.8% — best Gmax
+      '143|||11|10|11|2026-03-04': { is_gigantamax: true },  // Snorlax CP:200 71.1% — dupe
+    };
+    g27bResult = loader.createWithOverrides(overrides).analyse(csv);
+  });
+
+  it('Snorlax CP:2448 (best Gmax, 97.8%) → decision=keep', () => {
+    const p = g27bFind('Snorlax', 2448);
+    expect(p).toBeDefined();
+    expect(p.isGigantamax).toBe(true);
+    expect(p.decision).toBe('keep');
+  });
+
+  it('Snorlax CP:2448 (best Gmax) → nickname contains Ⓧ and is SnorlaxⓂ98Ⓧ', () => {
+    // CP:2448 wins ML slot (best non-lucky Snorlax, ivAvg=97.8) → nick via ML handler + Ⓧ suffix
+    const p = g27bFind('Snorlax', 2448);
+    expect(p.nickname).toContain('Ⓧ');
+    expect(p.nickname).toBe('SnorlaxⓂ98Ⓧ');
+    expect(p.nickname.length).toBeLessThanOrEqual(12);
+  });
+
+  it('Snorlax CP:200 (dupe Gmax, 71.1%) → decision=trade', () => {
+    const p = g27bFind('Snorlax', 200);
+    expect(p).toBeDefined();
+    expect(p.isGigantamax).toBe(true);
+    expect(p.decision).toBe('trade');
+  });
+
+  it('Snorlax CP:200 (dupe Gmax) → starType is visibility', () => {
+    const p = g27bFind('Snorlax', 200);
+    expect(p.starType).toBe('visibility');
+  });
+});
+
+// 27c: Raikou Legendary (no overrides) — best keeps with best_overall, dupe trades with visibility
+describe('Group 27c — Raikou Legendary: best keeps (best_overall), dupe gets visibility star', () => {
+  // Uses global result — Raikou rows auto-classified as Legendary (no Dmax/Gmax)
+
+  it('Raikou CP:2900 (best, 93.3%) → decision=keep, slots includes best_overall', () => {
+    const p = find('Raikou', 2900);
+    expect(p).toBeDefined();
+    expect(p.decision).toBe('keep');
+    expect(p.slots).toContain('best_overall');
+  });
+
+  it('Raikou CP:2900 (best Legendary) → nickname is RaikouⓇ93', () => {
+    const p = find('Raikou', 2900);
+    expect(p.nickname).toBe('RaikouⓇ93');
+  });
+
+  it('Raikou CP:2700 (dupe, 77.8%) → decision=trade', () => {
+    const p = find('Raikou', 2700);
+    expect(p).toBeDefined();
+    expect(p.decision).toBe('trade');
+  });
+
+  it('Raikou CP:2700 (dupe Legendary) → starType is visibility', () => {
+    const p = find('Raikou', 2700);
+    expect(p.starType).toBe('visibility');
+  });
+});
+
+// 27d: Dmax+shiny Entei CP:2901 — only Dmax in run, keeps with nick containing Ⓡ, Ⓓ, ※
+describe('Group 27d — Dmax+shiny Entei: keeps with Ⓡ, Ⓓ, ※ in nick', () => {
+  let g27dResult;
+  const g27dFind = (name, cp) => g27dResult.pokemon.find(p => p.name === name && p.cp === cp);
+
+  beforeAll(() => {
+    const csv = loadCSV(FIXTURE_PATH);
+    const overrides = {
+      '244|||13|14|13|2026-03-07': { is_dynamax: true, is_shiny: true },  // Entei CP:2901 shiny Dmax
+    };
+    g27dResult = loader.createWithOverrides(overrides).analyse(csv);
+  });
+
+  it('Entei CP:2901 (only Dmax in run, shiny) → decision=keep, slots includes dynamax', () => {
+    const p = g27dFind('Entei', 2901);
+    expect(p).toBeDefined();
+    expect(p.isDynamax).toBe(true);
+    expect(p.isShiny).toBe(true);
+    expect(p.decision).toBe('keep');
+    expect(p.slots).toContain('dynamax');
+  });
+
+  it('Entei CP:2901 (Dmax+shiny) → nickname contains Ⓡ, Ⓓ, and ※', () => {
+    const p = g27dFind('Entei', 2901);
+    expect(p.nickname).toContain('Ⓡ');
+    expect(p.nickname).toContain('Ⓓ');
+    expect(p.nickname).toContain('※');
+    expect(p.nickname.length).toBeLessThanOrEqual(12);
+  });
+});
+
+// 27e: Dmax hundo Entei CP:3200 — keeps with nick EnteiⓇ100ⒹⒽ
+describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
+  let g27eResult;
+  const g27eFind = (name, cp) => g27eResult.pokemon.find(p => p.name === name && p.cp === cp);
+
+  beforeAll(() => {
+    const csv = loadCSV(FIXTURE_PATH);
+    const overrides = {
+      '244|||15|15|15|2026-03-08': { is_dynamax: true },  // Entei CP:3200 hundo Dmax
+    };
+    g27eResult = loader.createWithOverrides(overrides).analyse(csv);
+  });
+
+  it('Entei CP:3200 (Dmax hundo, 15/15/15) → decision=keep, slots includes dynamax', () => {
+    const p = g27eFind('Entei', 3200);
+    expect(p).toBeDefined();
+    expect(p.isDynamax).toBe(true);
+    expect(p.atkIV).toBe(15);
+    expect(p.defIV).toBe(15);
+    expect(p.staIV).toBe(15);
+    expect(p.decision).toBe('keep');
+    expect(p.slots).toContain('dynamax');
+  });
+
+  it('Entei CP:3200 (Dmax hundo) → nickname is EnteiⓂ100ⒹⒽ', () => {
+    // rankPctM=ivAvg=100 >= 90 → dynamax handler picks Ⓜ as best league proxy
+    const p = g27eFind('Entei', 3200);
+    expect(p.nickname).toBe('EnteiⓂ100ⒹⒽ');
+  });
+});

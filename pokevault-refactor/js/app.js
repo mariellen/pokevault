@@ -9,8 +9,12 @@
 // window.location.hash before applyHashState() can read it on first cloud load.
 let initialHash = window.location.hash;
 
+// Dmax/Gmax filter flags (independent toggles, can be active simultaneously)
+let showDynamaxOnly = false;
+let showGigantamaxOnly = false;
+
 // ═══════════════════════════════════════════════
-// STAR PRIORITY (0=gold … 5=none)
+// STAR PRIORITY (0=gold … 6=none)
 // ═══════════════════════════════════════════════
 function pokemonStarRank(p) {
   if (p.suggestStar && p.isFavorite) return 0;
@@ -18,7 +22,8 @@ function pokemonStarRank(p) {
   if (p.suggestStarCheaper) return 2;
   if (p.suggestStarExpensive) return 3;
   if (!p.isShiny && p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper) return 4;
-  return 5;
+  if (p.starType === 'visibility') return 5;
+  return 6;
 }
 
 // Returns the shiny keeper for a group (highest ivAvg, prefer isFavorite if tied).
@@ -312,6 +317,8 @@ function applyFilters(){
     else if(decFilter==='canEvolve'&&!fam.members.some(p=>p.canEvolve)) return false;
     else if(decFilter==='neverEvolved'&&!fam.members.some(p=>p.neverEvolved)) return false;
     else if(!['all','hundo','canEvolve','neverEvolved'].includes(decFilter)&&!fam.members.some(p=>p.decision===decFilter)) return false;
+    if(showDynamaxOnly&&!fam.members.some(p=>p.isDynamax)) return false;
+    if(showGigantamaxOnly&&!fam.members.some(p=>p.isGigantamax)) return false;
     if(leagueFilters.size>0){
       // Row-level: does any member qualify for ALL selected leagues
       const ok=[...leagueFilters].some(lg=>fam.members.some(p=>(p[rankMap[lg]]||0)>=RULES.keepThreshold));
@@ -573,8 +580,9 @@ function getNickSlot(p) {
   }
   if (p.slots.includes('lucky') || p.isLucky) return 'lucky';
   if (p.slots.includes('shiny') || p.slots.includes('shiny_lower')) return 'shiny';
-  if (p.slots.includes('dynamax') || p.isDynamax) return 'dynamax';
-  if (p.slots.includes('gigantamax') || p.isGigantamax) return 'gigantamax';
+  if (p.slots.includes('dynamax')) return 'dynamax';
+  if (p.slots.includes('gigantamax')) return 'gigantamax';
+  if (p.slots.includes('best_overall')) return 'lucky';
   if (p.slots.includes('shadow')) return 'lucky';
   if (p.slots.includes('purified')) return 'review';
   if (p.decision === 'trade') return 'trade';
@@ -598,6 +606,18 @@ function setDecFilter(f,btn){
   document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected'));
   document.querySelectorAll('.sum-card').forEach(c=>c.classList.remove('active'));
   if(btn){const cls=f==='trade'?'act-trade':f==='review'?'act-review':f==='protected'?'act-protected':'active';btn.classList.add(cls);}
+  applyFilters();
+}
+
+function toggleDmaxFilter(btn){
+  showDynamaxOnly=!showDynamaxOnly;
+  btn.classList.toggle('active',showDynamaxOnly);
+  applyFilters();
+}
+
+function toggleGmaxFilter(btn){
+  showGigantamaxOnly=!showGigantamaxOnly;
+  btn.classList.toggle('active',showGigantamaxOnly);
   applyFilters();
 }
 

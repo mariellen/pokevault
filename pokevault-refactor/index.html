@@ -254,10 +254,10 @@
     </div>
     <label class="evo-toggle"><input type="checkbox" id="evoToggle"> Include evolutions</label>
     <button class="btn active" data-f="all" onclick="setDecFilter('all',this)">All</button>
-    <button class="btn" data-f="keep" onclick="setDecFilter('keep',this)">✓ Keep</button>
     <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)" style="display:none">↗ Trade</button>
     <button class="btn" data-f="review" onclick="setDecFilter('review',this)" style="display:none">⚠ Review</button>
-    <button class="btn" data-f="protected" onclick="setDecFilter('protected',this)">🛡 Protected</button>
+    <button class="btn" id="dmaxFilterBtn" onclick="toggleDmaxFilter(this)">Ⓓ Dynamax</button>
+    <button class="btn" id="gmaxFilterBtn" onclick="toggleGmaxFilter(this)">Ⓧ Gigantamax</button>
     <button class="league-btn btn lb-L" data-l="L" onclick="toggleLeague('L',this)">Little</button>
     <button class="league-btn btn lb-G" data-l="G" onclick="toggleLeague('G',this)">Great</button>
     <button class="league-btn btn lb-U" data-l="U" onclick="toggleLeague('U',this)">Ultra</button>

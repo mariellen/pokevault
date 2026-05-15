@@ -286,8 +286,16 @@ function applyOverridesToPokemon() {
     const nickAffected = ov.is_shiny || ov.is_dynamax || ov.is_gigantamax
                       || ov.special_form || ov.vivillon_pattern;
     if (ov.is_shiny) { p.isShiny = true; if (!p.slots.includes('shiny')) p.slots.push('shiny'); }
-    if (ov.is_dynamax) p.isDynamax = true;
-    if (ov.is_gigantamax) p.isGigantamax = true;
+    if (ov.is_dynamax) {
+      p.isDynamax = true;
+      if (!p.slots.includes('dynamax')) p.slots.push('dynamax');
+      if (!['keep','protected'].includes(p.decision)) p.decision = 'keep';
+    }
+    if (ov.is_gigantamax) {
+      p.isGigantamax = true;
+      if (!p.slots.includes('gigantamax')) p.slots.push('gigantamax');
+      if (!['keep','protected'].includes(p.decision)) p.decision = 'keep';
+    }
     if (ov.is_costumed) p.isCostumed = true;
     if (ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
     if (ov.special_form) p.specialForm = ov.special_form;
