@@ -301,7 +301,12 @@ function applyOverridesToPokemon() {
     if (ov.special_form) p.specialForm = ov.special_form;
     if (ov.manual_decision) p.manualDecision = ov.manual_decision;
     if (ov.notes) p.notes = ov.notes;
-    if (nickAffected) toRerender.push(p);
+    if (nickAffected) {
+      if (typeof buildNickname === 'function' && typeof getNickSlot === 'function') {
+        p.nickname = buildNickname(p, getNickSlot(p));
+      }
+      toRerender.push(p);
+    }
   });
   // Re-render rows where nick-affecting overrides were applied
   toRerender.forEach(p => {
