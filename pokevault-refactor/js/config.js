@@ -19,9 +19,10 @@ const LC = {
 };
 
 // ── Nickname special symbols ──────────────────────────────
-const PERFECT  = '100'; // Shown when rank rounds to 100% (✪ fails in GO after circled letters)
-const NUNDO    = '⓪';  // 0/0/0 Pokémon
+const PERFECT   = '100'; // Shown when rank rounds to 100% (✪ fails in GO after circled letters)
+const NUNDO     = '⓪';  // 0/0/0 Pokémon
 const SHINY_SFX = '※'; // Shiny suffix
+const HUNDO_SFX = 'Ⓗ'; // Appended to ANY nick where IVs are 15/15/15
 
 // ── League caps (CP) ─────────────────────────────────────
 const LEAGUE_CAPS = { L: 500, G: 1500, U: 2500, M: Infinity };

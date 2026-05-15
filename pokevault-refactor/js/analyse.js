@@ -148,6 +148,7 @@ function buildNickname(p, slot, convention) {
   const iv = Math.round(p.ivAvg||0);
   const atkIV=p.atkIV||0, defIV=p.defIV||0, staIV=p.staIV||0;
   const isNundo = atkIV===0&&defIV===0&&staIV===0;
+  const isHundo = atkIV===15&&defIV===15&&staIV===15;
 
   // Target name for this slot
   let base = p.name;
@@ -192,11 +193,11 @@ function buildNickname(p, slot, convention) {
   if (!hasSlot) {
     // Lucky: always Ⓡ format regardless of rank (includes any co-occurring special suffixes)
     if (p.isLucky) {
-      const specSuf = (p.isDynamax ? 'Ⓓ' : '') + (p.isGigantamax ? 'Ⓧ' : '') + (p.isShiny ? SHINY_SFX : '');
+      const specSuf = (p.isDynamax ? 'Ⓓ' : '') + (p.isGigantamax ? 'Ⓧ' : '') + (isHundo ? HUNDO_SFX : '') + (p.isShiny ? SHINY_SFX : '');
       return fitName(p.name, LC.R + String(iv), specSuf, 12);
     }
-    // Shiny with no slot: Ⓡ + iv + ※ — never holding format, never wrong league symbol
-    if (p.isShiny) return fitName(p.name, LC.R + String(iv), SHINY_SFX, 12);
+    // Shiny with no slot: Ⓡ + iv + [Ⓗ] + ※
+    if (p.isShiny) return fitName(p.name, LC.R + String(iv), (isHundo ? HUNDO_SFX : '') + SHINY_SFX, 12);
     // Dynamax/Gigantamax: redirect to slot handlers that pick best qualifying league
     if (p.isDynamax) slot = 'dynamax';
     else if (p.isGigantamax) slot = 'gigantamax';
@@ -205,15 +206,17 @@ function buildNickname(p, slot, convention) {
   // Build suffix first so we know how many chars it needs
   let suf='';
 
-  // Dust dollars — only shown above affordable threshold, using per-league tiers
-  const lgThresh = DUST_THRESHOLDS[slot] || null;
-  if (lgThresh && lgThresh.tiers.length) {
-    const dustForSlot = slot==='L'?p.dustL:slot==='G'?p.dustG:slot==='U'?p.dustU:0;
-    if (dustForSlot && dustForSlot > lgThresh.affordable) {
-      const [t1,t2,t3] = lgThresh.tiers;
-      if (t3 && dustForSlot >= t3) suf += '$$$';
-      else if (t2 && dustForSlot >= t2) suf += '$$';
-      else if (t1 && dustForSlot >= t1) suf += '$';
+  // Dust dollars — only shown above affordable threshold; suppressed entirely for hundos
+  if (!isHundo) {
+    const lgThresh = DUST_THRESHOLDS[slot] || null;
+    if (lgThresh && lgThresh.tiers.length) {
+      const dustForSlot = slot==='L'?p.dustL:slot==='G'?p.dustG:slot==='U'?p.dustU:0;
+      if (dustForSlot && dustForSlot > lgThresh.affordable) {
+        const [t1,t2,t3] = lgThresh.tiers;
+        if (t3 && dustForSlot >= t3) suf += '$$$';
+        else if (t2 && dustForSlot >= t2) suf += '$$';
+        else if (t1 && dustForSlot >= t1) suf += '$';
+      }
     }
   }
   // Shadow purification suffix — omit only if shadow holds a CONFIRMED own-league slot
@@ -229,6 +232,7 @@ function buildNickname(p, slot, convention) {
   if (p.isPurified) suf += '*';
   if (p.isDynamax) suf += 'Ⓓ';
   if (p.isGigantamax) suf += 'Ⓧ';
+  if (isHundo) suf += HUNDO_SFX;
 
   // Move flags
   if (p.hasAllBestMoves) suf+='☆';
@@ -293,7 +297,8 @@ function buildNickname(p, slot, convention) {
     return fitName(p.name, mid, nickSuf, 12);
   } else if (slot==='M') {
     const pv=Math.round(p.rankPctM||p.ivAvg||0);
-    mid=LC.R+(pv===100?PERFECT:String(pv));
+    // Lucky uses Ⓡ (best-overall indicator); confirmed ML slot uses Ⓜ
+    mid=(p.isLucky ? LC.R : LC.M)+(pv===100?PERFECT:String(pv));
     return fitName(base, mid, nickSuf, 12);
   } else if (['L','G','U'].includes(slot)) {
     const pv = (p.isPurifySlot && slot === p.purifyLeague)
@@ -322,6 +327,8 @@ function buildNickname(p, slot, convention) {
     else { mid=LC.R+String(iv); }
     return fitName(p.name, mid, nickSuf, 12); // nickSuf has Ⓧ from suf
   } else if (slot==='lucky') {
+    // Pure hundo with no league slot (not actually lucky): standalone Ⓗ only
+    if (isHundo && !p.isLucky) return fitName(p.name, HUNDO_SFX, '', 12);
     // Lucky with no league slot: NameⓇIV (Master/level-up candidate)
     const pv=Math.round(p.rankPctM||p.ivAvg||0);
     mid=LC.R+String(pv);
@@ -346,11 +353,11 @@ function buildNickname(p, slot, convention) {
 }
 
 // Fit as many chars of name as possible: name + mid + suf <= maxLen
-// mid = the league symbol + number (e.g. Ⓖ96), suf = trailing flags (S, b, ☆, $)
+// mid = the league symbol + number (e.g. Ⓖ96), suf = trailing flags (Ⓗ, b, ☆, $, ※)
 function fitName(name, mid, suf, maxLen) {
   const available = maxLen - mid.length - suf.length;
-  const truncated = available > 0 ? name.substring(0, available) : '';
-  return (truncated + mid + suf).substring(0, maxLen);
+  const nm = available > 0 ? name.slice(0, available) : '';
+  return (nm + mid + suf).substring(0, maxLen);
 }
 
 // ═══════════════════════════════════════════════

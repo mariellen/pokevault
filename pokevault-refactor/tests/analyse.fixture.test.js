@@ -864,11 +864,11 @@ describe('Group 21 — Hundo (15/15/15) always gets decision=keep', () => {
     quickMove: '', chargeMove1: '',
   });
 
-  it('hundo nick slot=lucky → NameⓇ100 format', () => {
+  it('hundo nick slot=lucky (not actually lucky) → NameⒽ format (standalone hundo indicator)', () => {
     const p = makeHundoP();
     const nick = buildNickname(p, 'lucky');
-    expect(nick).toContain('Ⓡ');
-    expect(nick).toContain('100');
+    expect(nick).toContain('Ⓗ');
+    expect(nick).not.toContain('Ⓡ');
     expect(nick.length).toBeLessThanOrEqual(12);
   });
 });
@@ -956,9 +956,10 @@ describe('Group 23 — Cross-evo-target slot routing', () => {
     expect(mienfoo.decision).toBe('keep');
   });
 
-  it('Mienfoo hundo nick shows ML format (Ⓡ) not GL format (Ⓖ) after deconfliction', () => {
+  it('Mienfoo hundo nick shows ML format (Ⓜ) and hundo Ⓗ, not GL format (Ⓖ)', () => {
     const mienfoo = find('Mienfoo', 793);
-    expect(mienfoo.nickname).toMatch(/Ⓡ/);
+    expect(mienfoo.nickname).toMatch(/Ⓜ/);
+    expect(mienfoo.nickname).toContain('Ⓗ');
     expect(mienfoo.nickname).not.toMatch(/Ⓖ/);
   });
 
@@ -1052,5 +1053,116 @@ describe('Group 24 — Purify modal: exact CP cap prevents level-25 bust', () =>
   it('shadow Venonat CP:207 purifyHundo is false (purified IVs 10/12/15, not 15/15/15)', () => {
     const p = find('Venonat', 207);
     expect(p.purifyHundo).toBe(false);
+  });
+});
+
+// ─── Group 26 — Nick Symbol Overhaul (Ⓜ ML, Ⓗ hundo indicator) ──────────────
+
+describe('Group 26 — Nick Symbol Overhaul', () => {
+  const makeP = (overrides) => Object.assign({
+    name: 'Mewtwo', form: '', specialForm: '', vivillonPattern: '',
+    isDynamax: false, isGigantamax: false, isShiny: false,
+    isShadow: false, isPurified: false, isLucky: false, isNundo: false,
+    ivAvg: 100, atkIV: 15, defIV: 15, staIV: 15,
+    rankPctG: 0, rankPctU: 0, rankPctL: 0, rankPctM: 100,
+    slots: [], purifyLeague: '', isPurifySlot: false,
+    hasAllBestMoves: false, hasBestMoves: false, hasTwoMoves: false,
+    dustG: 0, dustU: 0, dustL: 0,
+    evolvedNameG: '', evolvedNameU: '', evolvedNameL: '',
+    quickMove: '', chargeMove1: '',
+  }, overrides);
+
+  // 1. Hundo + capped league slot → Ⓗ appended
+  it('15/15/15 + Ultra slot → nick contains Ⓤ100Ⓗ', () => {
+    const p = makeP({ slots: ['U'], rankPctU: 100 });
+    const nick = buildNickname(p, 'U');
+    expect(nick).toContain('Ⓤ');
+    expect(nick).toContain('100');
+    expect(nick).toContain('Ⓗ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  // 2. Hundo + Master League → Ⓜ not Ⓡ, with Ⓗ
+  it('15/15/15 + Master slot → nick contains Ⓜ100Ⓗ (not Ⓡ)', () => {
+    const p = makeP({ slots: ['M'] });
+    const nick = buildNickname(p, 'M');
+    expect(nick).toContain('Ⓜ');
+    expect(nick).toContain('100');
+    expect(nick).toContain('Ⓗ');
+    expect(nick).not.toContain('Ⓡ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  // 3. Hundo, no league slot (slot='lucky', not actually lucky) → NameⒽ
+  it('15/15/15, no slot (slot=lucky, not lucky) → nick is NameⒽ only', () => {
+    const p = makeP({ slots: ['hundo'] });
+    const nick = buildNickname(p, 'lucky');
+    expect(nick).toContain('Ⓗ');
+    expect(nick).not.toContain('Ⓡ');
+    expect(nick).not.toContain('Ⓜ');
+    expect(nick).not.toMatch(/\d/); // no IV number
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  // 4. Lucky + hundo, no qualifying capped league (slot=review → !hasSlot lucky path) → Ⓡ100Ⓗ
+  it('15/15/15 + lucky, no slot (slot=review) → nick contains Ⓡ100Ⓗ', () => {
+    const p = makeP({ isLucky: true, slots: [] });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).toContain('100');
+    expect(nick).toContain('Ⓗ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  // 5. Hundo + shiny, no slot → nick contains Ⓗ※ at end
+  it('15/15/15 + shiny, no slot (slot=review) → nick ends with Ⓗ※', () => {
+    const p = makeP({ isShiny: true, slots: [] });
+    const nick = buildNickname(p, 'review');
+    expect(nick).toContain('Ⓡ');
+    expect(nick).toContain('Ⓗ');
+    expect(nick.endsWith('Ⓗ※')).toBe(true);
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  // 6. Non-hundo → no Ⓗ in nick
+  it('Non-hundo (14/15/15) + Ultra slot → no Ⓗ in nick', () => {
+    const p = makeP({ atkIV: 14, ivAvg: 97.8, slots: ['U'], rankPctU: 97 });
+    const nick = buildNickname(p, 'U');
+    expect(nick).toContain('Ⓤ');
+    expect(nick).not.toContain('Ⓗ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  // 7. fitName maximises name: long name + Ⓤ100Ⓗ suffix
+  it('fitName via buildNickname: long name gets max chars, total ≤ 12', () => {
+    const p = makeP({ name: 'Whimsicott', slots: ['U'], rankPctU: 100 });
+    const nick = buildNickname(p, 'U');
+    // 'Ⓤ100Ⓗ' = 5 chars suffix → 7 chars for name → 'Whimsic'
+    expect(nick.length).toBeLessThanOrEqual(12);
+    expect(nick).toContain('Ⓤ');
+    expect(nick).toContain('Ⓗ');
+    const nameChars = nick.indexOf('Ⓤ');
+    expect(nameChars).toBe(7); // 7 chars of name before suffix
+  });
+
+  // 8. $$ suppressed on hundo nick even when dust is expensive
+  it('hundo with expensive dust → no $$ in nick', () => {
+    const p = makeP({ slots: ['U'], rankPctU: 100, dustU: 400000 });
+    const nick = buildNickname(p, 'U');
+    expect(nick).not.toContain('$');
+    expect(nick).toContain('Ⓗ');
+    expect(nick.length).toBeLessThanOrEqual(12);
+  });
+
+  // 9. Feraligatr (fixture hundo) + Ultra slot → nick has Ⓗ
+  it('Feraligatr CP:2498 (hundo fixture) → nick contains Ⓤ and Ⓗ', () => {
+    const p = find('Feraligatr', 2498);
+    expect(p).toBeDefined();
+    expect(p.atkIV).toBe(15);
+    expect(p.defIV).toBe(15);
+    expect(p.staIV).toBe(15);
+    expect(p.nickname).toContain('Ⓤ');
+    expect(p.nickname).toContain('Ⓗ');
+    expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
 });
