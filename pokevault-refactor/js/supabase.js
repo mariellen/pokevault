@@ -96,7 +96,7 @@ const COLLECTION_DB_FIELDS = [
   'rank_pct_g','rank_pct_u','rank_pct_l','rank_num_g','rank_num_u','rank_num_l',
   'dust_g','dust_u','dust_l','quick_move','charge_move1','charge_move2',
   'is_lucky','is_shadow','is_purified','is_favorite',
-  'catch_date','scan_date','pvp_tag',
+  'catch_date','scan_date','original_scan_date','gender','pvp_tag',
   'evolved_name_g','evolved_name_u','evolved_name_l',
   'imported_at','user_id'
 ];
@@ -166,6 +166,8 @@ async function saveCollectionToCloud(pokemon, onProgress) {
     is_favorite: p.isFavorite||false,
     catch_date: p.catchDate||'',
     scan_date: p.scanDate||'',
+    original_scan_date: p.originalScanDate||'',
+    gender: p.gender||'',
     pvp_tag: p.pvpTag||'',
     evolved_name_g: p.evolvedNameG||'',
     evolved_name_u: p.evolvedNameU||'',

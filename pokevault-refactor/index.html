@@ -179,7 +179,8 @@
       <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
       <button id="dex-solo"        class="dex-filter-btn" onclick="dexSolo=!dexSolo;if(dexSolo)dexSpare=false;renderDexModal()" title="Have view: species you own only one of">👤 Solo</button>
       <button id="dex-spare"       class="dex-filter-btn" onclick="dexSpare=!dexSpare;if(dexSpare)dexSolo=false;renderDexModal()" title="Have view: species you own 2 or more of">📦 Spares</button>
-      <button id="dex-excl-evolve" class="dex-filter-btn" onclick="dexExcludeEvolvable=!dexExcludeEvolvable;renderDexModal()" title="Missing view: hide species you can get by evolving">✗ Evolvable</button>
+      <button id="dex-excl-evolve"  class="dex-filter-btn" onclick="dexExcludeEvolvable=!dexExcludeEvolvable;renderDexModal()" title="Missing view: hide species you can get by evolving">✗ Evolvable</button>
+      <button id="dex-excl-family" class="dex-filter-btn" onclick="dexExcludeFamily=!dexExcludeFamily;renderDexModal()" title="Missing+Lucky view: hide species where any family member is lucky">🍀 Excl. Family</button>
       <button id="dex-excl-lucky"  class="dex-filter-btn" onclick="dexExcludeLucky=!dexExcludeLucky;renderDexModal()" title="Have view: hide species where all are lucky (untradeable)">🍀 Excl. Lucky</button>
       <button id="dex-excl-keeps"  class="dex-filter-btn" onclick="dexExcludeKeeps=!dexExcludeKeeps;renderDexModal()" title="Have view: hide species with nothing tradeable after luckies and starred">⭐ Excl. Keeps</button>
     </div>

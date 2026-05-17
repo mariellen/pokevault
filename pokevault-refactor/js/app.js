@@ -878,6 +878,7 @@ let allSpecies   = null;      // cached from Supabase pokemon_species
 let dexSolo      = false;     // Have view: only species with count=1
 let dexSpare     = false;     // Have view: only species with count≥2
 let dexExcludeEvolvable = false; // Missing view: hide species player can evolve to
+let dexExcludeFamily = false;    // Missing+Lucky view: hide species where any family member is lucky
 let dexExcludeLucky = false;  // Have view: hide species where all are lucky (untradeable)
 let dexExcludeKeeps = false;  // Have view: hide species where trade count = 0 after luckies + starred
 
@@ -896,6 +897,7 @@ function encodeStateToHash() {
     if (dexSolo)  params.set('solo', 'true');
     if (dexSpare) params.set('spare', 'true');
     if (dexExcludeEvolvable) params.set('noevolve', 'true');
+    if (dexExcludeFamily) params.set('nofamily', 'true');
     if (dexExcludeLucky) params.set('nolucky', 'true');
     if (dexExcludeKeeps) params.set('nokeeps', 'true');
     return '#dex?' + params.toString();
@@ -933,6 +935,7 @@ function applyHashState() {
     dexSpare = params.get('spare') === 'true';
     if (dexSolo && dexSpare) dexSpare = false; // mutual exclusion safety
     dexExcludeEvolvable = params.get('noevolve') === 'true';
+    dexExcludeFamily = params.get('nofamily') === 'true';
     dexExcludeLucky = params.get('nolucky') === 'true';
     dexExcludeKeeps = params.get('nokeeps') === 'true';
     openDexModal();
@@ -1045,6 +1048,7 @@ function updateDexFilterButtons() {
   document.getElementById('dex-solo')?.classList.toggle('dex-filter-active', dexSolo);
   document.getElementById('dex-spare')?.classList.toggle('dex-filter-active', dexSpare);
   document.getElementById('dex-excl-evolve')?.classList.toggle('dex-filter-active', dexExcludeEvolvable);
+  document.getElementById('dex-excl-family')?.classList.toggle('dex-filter-active', dexExcludeFamily);
   document.getElementById('dex-excl-lucky')?.classList.toggle('dex-filter-active', dexExcludeLucky);
   document.getElementById('dex-excl-keeps')?.classList.toggle('dex-filter-active', dexExcludeKeeps);
   // Solo/Spares/Excl.Lucky/Excl.Keeps are Have-view concepts — hide them in Missing view
@@ -1052,6 +1056,12 @@ function updateDexFilterButtons() {
   haveOnlyIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = dexView === 'missing' ? 'none' : '';
+  });
+  // Excl.Family and Excl.Evolvable are Missing-view concepts — hide them in Have view
+  const missingOnlyIds = ['dex-excl-evolve', 'dex-excl-family'];
+  missingOnlyIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = dexView === 'have' ? 'none' : '';
   });
   // Type pills
   document.querySelectorAll('.dex-type-pill').forEach(btn => {
@@ -1142,6 +1152,10 @@ function renderDexHaveView(body, filteredSpecies) {
     (speciesByCat[s.category] = speciesByCat[s.category] || []).push(s);
   });
 
+  // Needed for Task 4 solo evolve-from notice
+  const speciesById = new Map(allSpecies.map(s => [s.pokedex_number, s]));
+  const ownedNums   = new Set(allPokemon.map(p => Number(p.pokeNum)));
+
   let html = '';
   for (const cat of CAT_ORDER) {
     const catSpecies = (speciesByCat[cat] || []).filter(s => displaySpecies.has(s.pokedex_number));
@@ -1156,6 +1170,8 @@ function renderDexHaveView(body, filteredSpecies) {
       return a.name.localeCompare(b.name);
     });
 
+    // Each category wrapped in a section div — provides visual close after UB before Regular rows
+    html += `<div class="dex-cat-section">`;
     if (cat !== 'Regular') html += `<div class="dex-cat-header">${cat}</div>`;
 
     html += catSpecies.map(s => {
@@ -1173,7 +1189,10 @@ function renderDexHaveView(body, filteredSpecies) {
       const luckyHtml = luckyCount > 0 ? `<span class="dex-lucky">🍀${luckyCount}</span>` : '';
       const starHtml = starCount > 0 ? `<span class="dex-starred">⭐${starCount}</span>` : '';
       const tradeHtml = `<span class="dex-trade">Trade: ${tradeCount}</span>`;
-      const rightHtml = (isSolo && tradeCount > 0)
+      const soloEvolveFrom = (isSolo && tradeCount > 0) ? findOwnedAncestor(s, speciesById, ownedNums) : null;
+      const rightHtml = soloEvolveFrom
+        ? `<span class="dex-evolve-notice">Evolve from ${soloEvolveFrom}</span><span class="dex-count">×1</span>${luckyHtml}${starHtml}${tradeHtml}`
+        : (isSolo && tradeCount > 0)
         ? `<span class="dex-solo-notice">⚠ Only one — Lucky/Mirror trade only</span><span class="dex-count">×1</span>${luckyHtml}${starHtml}${tradeHtml}`
         : `<span class="dex-count">×${count}</span>${luckyHtml}${starHtml}${tradeHtml}`;
       return `<div class="dex-row">
@@ -1185,9 +1204,43 @@ function renderDexHaveView(body, filteredSpecies) {
   </div>
 </div>`;
     }).join('');
+
+    html += `</div>`; // close dex-cat-section
   }
 
   body.innerHTML = html;
+}
+
+// Return a Set of all pokedex_numbers in the same evolution family as s.
+// Walks up to the root via evolves_from, then BFS down using the evolvesInto map.
+function getFullFamilyNums(s, speciesById, evolvesInto) {
+  let root = s;
+  while (root.evolves_from && speciesById.has(root.evolves_from)) {
+    root = speciesById.get(root.evolves_from);
+  }
+  const family = new Set();
+  const queue = [root.pokedex_number];
+  while (queue.length) {
+    const num = queue.shift();
+    family.add(num);
+    for (const child of (evolvesInto.get(num) || [])) queue.push(child);
+  }
+  return family;
+}
+
+// Walk evolves_from chain; return name of the closest owned ancestor, or null.
+// "Closest" = immediate pre-evo first, then pre-evo's pre-evo.
+// Covers 3-stage chains (max depth in Pokémon GO).
+function findOwnedAncestor(s, speciesById, ownedNums) {
+  let cur = s;
+  for (let i = 0; i < 4; i++) {
+    if (!cur.evolves_from) return null;
+    const parent = speciesById.get(cur.evolves_from);
+    if (!parent) return null;
+    if (ownedNums.has(parent.pokedex_number)) return parent.name || 'pre-evolution';
+    cur = parent;
+  }
+  return null;
 }
 
 // Walk evolves_from chain; return true if any ancestor (or self) has is_shiny_available.
@@ -1205,10 +1258,36 @@ function isShinyAvailableInChain(s, speciesById) {
 
 function renderDexMissingView(body, filteredSpecies) {
   // p.pokeNum is a raw CSV string; convert to number before comparing with s.pokedex_number (integer)
-  // Pre-build owned set and species name map for efficient per-row lookup
-  const ownedNums    = new Set(allPokemon.map(p => Number(p.pokeNum)));
-  const speciesNameMap = new Map(allSpecies.map(s => [s.pokedex_number, s.name]));
-  const speciesById    = new Map(allSpecies.map(s => [s.pokedex_number, s]));
+  const ownedNums  = new Set(allPokemon.map(p => Number(p.pokeNum)));
+  const speciesById = new Map(allSpecies.map(s => [s.pokedex_number, s]));
+
+  // evolvesInto: Map<parent_num, child_num[]> — needed for full-family walks
+  const evolvesInto = new Map();
+  for (const s of allSpecies) {
+    if (s.evolves_from) {
+      const arr = evolvesInto.get(s.evolves_from) || [];
+      arr.push(s.pokedex_number);
+      evolvesInto.set(s.evolves_from, arr);
+    }
+  }
+
+  // Lucky counts by pokedex number — for Task 2 family lucky indicator
+  const luckyCountByNum = new Map();
+  if (dexQualLucky) {
+    allPokemon.filter(p => p.isLucky).forEach(p => {
+      const n = Number(p.pokeNum);
+      luckyCountByNum.set(n, (luckyCountByNum.get(n) || 0) + 1);
+    });
+  }
+
+  // Task 3: Excl. Family — build set of ALL pokedex numbers that share a family with any owned lucky
+  const familyLuckyNums = new Set();
+  if (dexQualLucky && dexExcludeFamily) {
+    for (const [num] of luckyCountByNum) {
+      const s = speciesById.get(num);
+      if (s) getFullFamilyNums(s, speciesById, evolvesInto).forEach(n => familyLuckyNums.add(n));
+    }
+  }
 
   let missing;
   if (dexQualShiny && dexQualLucky) {
@@ -1221,9 +1300,14 @@ function renderDexMissingView(body, filteredSpecies) {
     missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number));
   }
 
-  // Apply exclude-evolvable filter
+  // Apply exclude-evolvable filter — walk full chain, not just immediate pre-evo
   if (dexExcludeEvolvable) {
-    missing = missing.filter(s => !(s.evolves_from && ownedNums.has(s.evolves_from)));
+    missing = missing.filter(s => !findOwnedAncestor(s, speciesById, ownedNums));
+  }
+
+  // Task 3: hide missing species where any family member is lucky
+  if (dexQualLucky && dexExcludeFamily) {
+    missing = missing.filter(s => !familyLuckyNums.has(s.pokedex_number));
   }
 
   // Sort: in-GO first alphabetical, then not-in-GO
@@ -1247,7 +1331,7 @@ function renderDexMissingView(body, filteredSpecies) {
     const numStr   = String(s.pokedex_number).padStart(3, '0');
     const safeName = s.name.replace(/'/g, "\\'");
 
-    // Status notice (left of count area)
+    // Status notice
     let noticeHtml = '';
     if (!s.is_in_go) {
       noticeHtml = '<span class="dex-notice-grey">Not in GO</span>';
@@ -1255,14 +1339,27 @@ function renderDexMissingView(body, filteredSpecies) {
       noticeHtml = '<span class="dex-notice-amber">No shiny in GO ✨</span>';
     }
 
-    // Can-evolve indicator: player owns the pre-evolution
-    let canEvolveHtml = '';
-    if (s.evolves_from && ownedNums.has(s.evolves_from)) {
-      const parentName = speciesNameMap.get(s.evolves_from) || 'pre-evolution';
-      canEvolveHtml = `<span class="dex-can-evolve">✓ Evolve from ${parentName}!</span>`;
+    // Can-evolve indicator: walk full chain to find closest owned ancestor
+    const ownedAncestor = findOwnedAncestor(s, speciesById, ownedNums);
+    const canEvolveHtml = ownedAncestor
+      ? `<span class="dex-can-evolve">✓ Evolve from ${ownedAncestor}!</span>`
+      : '';
+
+    // Task 2: family lucky indicator — only shown when Lucky filter active
+    let familyLuckyHtml = '';
+    if (dexQualLucky && luckyCountByNum.size) {
+      const familyNums = getFullFamilyNums(s, speciesById, evolvesInto);
+      const parts = [];
+      for (const num of familyNums) {
+        const count = luckyCountByNum.get(num);
+        if (count) parts.push({ count, name: speciesById.get(num)?.name || String(num) });
+      }
+      if (parts.length) {
+        parts.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+        familyLuckyHtml = `<span class="dex-family-lucky">${parts.map(p => `${p.count}🍀 ${p.name}`).join(', ')}</span>`;
+      }
     }
 
-    // Row click copies GO search string; name link navigates main view
     return `<div class="dex-row dex-row-missing${!s.is_in_go ? ' dex-not-in-go' : ''}" onclick="navigator.clipboard?.writeText('${safeName}')" title="Tap to copy GO search string">
   <div class="dex-row-main">
     <span class="dex-num">#${numStr}</span>
@@ -1270,6 +1367,7 @@ function renderDexMissingView(body, filteredSpecies) {
     <span class="dex-types">${s.type1}${type2str}</span>
     ${noticeHtml}
     ${canEvolveHtml}
+    ${familyLuckyHtml}
   </div>
 </div>`;
   }).join('');
@@ -1650,8 +1748,8 @@ function specialNavigate(name){
 // ═══════════════════════════════════════════════
 
 function processCloudRows(rows) {
-  const csvRows = rows.map(r => ({
-    'Index': r.pokemon_index,
+  const csvRows = rows.map((r, i) => ({
+    'Index': String(i),
     'Name': r.name,
     'Form': r.form||'',
     'Pokemon Number': r.pokemon_num||'',
@@ -1690,7 +1788,7 @@ function processCloudRows(rows) {
     'Dust Cost (L)': String(r.dust_l||''),
     'Candy Cost (G)':'','Candy Cost (U)':'','Candy Cost (L)':'',
     'Original Scan Date':r.original_scan_date||'','Scan Date':r.scan_date||'','Catch Date':r.catch_date||'',
-    'Weight':'','Height':'','Dust':'0','Gender':'',
+    'Weight':'','Height':'','Dust':'0','Gender':r.gender||(r.pokemon_index||'').split('|')[2]||'',
     'Pokemon Number': r.pokemon_num||''
   }));
   // Task 3: count verification — warn if loaded count is much lower than last save

@@ -303,8 +303,10 @@ tr.row-merge-candidate{opacity:0.7;}
 .dex-view-active{background:var(--great)!important;color:#000!important;border-color:var(--great)!important;}
 .dex-filter-btn{border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--text);background:var(--bg);}
 .dex-filter-btn.dex-filter-active{background:var(--great);color:#000;border-color:var(--great);}
-.dex-cat-header{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;padding:10px 0 4px;border-top:1px solid var(--border);margin-top:6px;}
-.dex-cat-header:first-child{margin-top:0;border-top:none;padding-top:2px;}
+.dex-cat-header{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;padding:4px 0;}
+.dex-cat-section+.dex-cat-section{border-top:1px solid var(--border);margin-top:6px;padding-top:4px;}
+.dex-evolve-notice{font-size:10px;color:var(--great);font-weight:500;flex-shrink:0;}
+.dex-family-lucky{font-size:10px;color:var(--muted);flex-shrink:0;white-space:nowrap;}
 .dex-row{padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
 .dex-row:last-child{border-bottom:none;}
 .dex-row-main{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;}
