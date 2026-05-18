@@ -1318,6 +1318,160 @@ describe('Group 27d — Dmax+shiny Entei: keeps with Ⓡ, Ⓓ, ※ in nick', () 
   });
 });
 
+// ─── Group 28 — Deino multi-evo-target multi-league ─────────────────────────
+// Exercises: Bug1 blank-evo guard (GL+LL), deconfliction+nextBest across evo
+// targets, aIsEvolved tiebreaker, dust tiebreaker, two independent GL keeps.
+//
+// Initial slot assignment:
+//   Deino CP:537  GL=99.40%(Zweilous) + UL=95.50%(Hydreigon) → conflict
+//   Deino CP:499  LL=91.80%(Zweilous) — best LL
+//   Hydreigon CP:1498  GL=99.40%(Hydreigon) — independent GL keep
+//
+// After deconfliction: CP:537 releases G(Zweilous), keeps U(Hydreigon)
+// nextBest fills G(Zweilous) → CP:499 (next-best, holds L not G)
+//
+// Final state:
+//   CP:537  → U(Hydreigon) keep
+//   CP:499  → G(Zweilous) + L(Zweilous) keep (two slots, same evo target)
+//   Hydreigon CP:1498  → G(Hydreigon) keep (independent of Zweilous group)
+//   CP:399, CP:93, CP:10  → no slots
+
+describe('Group 28a — Two independent GL keeps from same Deino family', () => {
+  it('Hydreigon CP:1498 (→Hydreigon) holds GL slot and decision=keep', () => {
+    const p = find('Hydreigon', 1498);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.decision).toBe('keep');
+  });
+
+  it('A Deino holds GL slot with targetEvo=Zweilous (nextBest after CP:537 deconfliction)', () => {
+    const zweiGL = result.pokemon.find(p =>
+      p.name === 'Deino' && p.slots.includes('G') && p.targetEvo === 'Zweilous'
+    );
+    expect(zweiGL).toBeDefined();
+    expect(zweiGL.decision).toBe('keep');
+  });
+
+  it('Both GL evo-target groups coexist — Hydreigon GL slot not deconflicted by Zweilous winner', () => {
+    const hdr = find('Hydreigon', 1498);
+    const zweiGL = result.pokemon.find(p =>
+      p.name === 'Deino' && p.slots.includes('G') && p.targetEvo === 'Zweilous'
+    );
+    expect(hdr.slots).toContain('G');
+    expect(zweiGL).toBeDefined();
+  });
+});
+
+describe('Group 28b — Deconfliction releases G(Zweilous), keeps U(Hydreigon); nextBest fills G', () => {
+  it('Deino CP:537 holds U(Hydreigon) after deconfliction', () => {
+    const p = find('Deino', 537);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('U');
+    expect(p.decision).toBe('keep');
+  });
+
+  it('Deino CP:537 does NOT hold G after deconfliction (G(Zweilous) was released)', () => {
+    const p = find('Deino', 537);
+    expect(p.slots).not.toContain('G');
+  });
+
+  it('Deino CP:499 wins G(Zweilous) as nextBest after CP:537 releases it', () => {
+    const p = find('Deino', 499);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+  });
+
+  it('Hydreigon CP:1498 retains G(Hydreigon) independently through deconfliction', () => {
+    expect(find('Hydreigon', 1498).slots).toContain('G');
+  });
+});
+
+describe('Group 28c — Blank evolvedNameG/L guard: unanalysed Deino wins no GL/LL slot', () => {
+  it('Deino CP:10 (blank evo fields) does not hold GL slot', () => {
+    const p = find('Deino', 10);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('G');
+  });
+
+  it('Deino CP:10 (blank evolvedNameL) does not hold LL slot', () => {
+    expect(find('Deino', 10).slots).not.toContain('L');
+  });
+
+  it('Deino CP:10 decision is not keep', () => {
+    expect(find('Deino', 10).decision).not.toBe('keep');
+  });
+});
+
+describe('Group 28d — Dedup does not collapse two different GL evo-target slots', () => {
+  it('Both G|Zweilous and G|Hydreigon winners exist in Deino family after all passes', () => {
+    const famMembers = result.pokemon.filter(p =>
+      ['Deino', 'Zweilous', 'Hydreigon'].includes(p.name)
+    );
+    const glKeepers = famMembers.filter(p => p.slots.includes('G') && p.decision === 'keep');
+    const evoTargets = new Set(glKeepers.map(p => p.targetEvo || p.name));
+    expect(evoTargets.has('Zweilous')).toBe(true);
+    expect(evoTargets.has('Hydreigon')).toBe(true);
+  });
+});
+
+describe('Group 28e — LL competition: Zweilous-evo Deino wins; blank excluded', () => {
+  // CP:499 wins LL(Zweilous) initially. When nextBest assigns G to CP:499,
+  // CP:499's same-evo deconfliction (G+L both Zweilous) releases L and keeps G.
+  // nextBest for L then selects CP:537 (91.20%, next best LL Zweilous).
+  it('A Deino (CP:537, next-best LL Zweilous) holds LL slot after chain', () => {
+    const p = find('Deino', 537);
+    expect(p.slots).toContain('L');
+  });
+
+  it('Deino CP:499 holds GL not LL (was deconflicted from L when it won G via nextBest)', () => {
+    const p = find('Deino', 499);
+    expect(p.slots).toContain('G');
+    expect(p.slots).not.toContain('L');
+  });
+
+  it('Deino CP:10 (blank evolvedNameL, no rank) does not hold LL slot', () => {
+    expect(find('Deino', 10).slots).not.toContain('L');
+  });
+
+  it('Deino CP:93 (blank evolvedNameL, no LL rank) does not hold LL slot', () => {
+    expect(find('Deino', 93).slots).not.toContain('L');
+  });
+});
+
+describe('Group 28f — Dust tiebreaker within same evo target at tied GL rank', () => {
+  // CP:537 (dustG=25000) and CP:499 (dustG=28000) both have GL=99.40% for Zweilous.
+  // Dust tiebreaker selects CP:537 as initial GL winner; it is then deconflicted to U.
+  // CP:499 becomes the GL winner via nextBest.
+  it('CP:537 holds UL (not GL) — confirms it won GL initially via dust tiebreaker, then deconflicted', () => {
+    const p537 = find('Deino', 537);
+    expect(p537.slots).toContain('U');
+    expect(p537.slots).not.toContain('G');
+  });
+
+  it('CP:499 (higher dust) holds GL as nextBest — was second in initial GL due to dust', () => {
+    const p499 = find('Deino', 499);
+    expect(p499.slots).toContain('G');
+  });
+});
+
+describe('Group 28g — aIsEvolved tiebreaker: Hydreigon beats Deino CP:93 at same rounded GL rank', () => {
+  it('Hydreigon CP:1498 and Deino CP:93 share the same GL rank (99.40%)', () => {
+    const hdr = find('Hydreigon', 1498);
+    const d93 = find('Deino', 93);
+    expect(Math.round(hdr.rankPctG)).toBe(99);
+    expect(Math.round(d93.rankPctG)).toBe(99);
+  });
+
+  it('Hydreigon CP:1498 wins GL(Hydreigon) — already-evolved tiebreaker over Deino CP:93', () => {
+    expect(find('Hydreigon', 1498).slots).toContain('G');
+    expect(find('Deino', 93).slots).not.toContain('G');
+  });
+
+  it('Deino CP:93 decision is not keep (lost to Hydreigon in GL(Hydreigon) group)', () => {
+    expect(find('Deino', 93).decision).not.toBe('keep');
+  });
+});
+
 // 27e: Dmax hundo Entei CP:3200 — keeps with nick EnteiⓇ100ⒹⒽ
 describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
   let g27eResult;

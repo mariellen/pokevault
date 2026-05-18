@@ -699,9 +699,12 @@ function analyse(rows) {
             );
             if (d > DUST_EXCLUDE_THRESHOLD && !pIsFinalEvo && !isLegendary && (p[rankField]||0) < RULES.keepThreshold) return false;
 
-            // Pre-evo with no valid Ultra evo path — Kleavor-type filtering may leave
-            // evolvedNameU empty; don't assign a self-referencing Ultra slot for pre-evos
+            // Pre-evo with no valid evo path for this league — don't assign a self-referencing slot.
+            // Rank>0 check: if Pokégenie filled a rank, the evo name may be self-referential (e.g.
+            // Gligar battling GL as itself); exclude only truly unanalysed rows (rank=0, evo blank).
             if (lg === 'U' && !p.evolvedNameU && !pIsFinalEvo && !isLegendary) return false;
+            if (lg === 'G' && !p.evolvedNameG && !(p.rankPctG > 0) && !pIsFinalEvo && !isLegendary) return false;
+            if (lg === 'L' && !p.evolvedNameL && !(p.rankPctL > 0) && !pIsFinalEvo && !isLegendary) return false;
 
             // Committed to a lower league: already powered to cap with 0 dust and favourited
             // Check rankPct to distinguish "powered up" (true 0 dust) from "no data" (empty CSV field → 0)
@@ -1201,7 +1204,22 @@ function analyse(rows) {
             if (ta!==tb) return ta-tb;
             if (Math.abs(ra-rb)>0.1) return rb-ra;
             return eda-edb;
-          })[0];
+          })
+          .find(m => {
+            // Skip candidate if it already holds a higher-priority slot for the same evo target
+            // — it would be immediately deconflicted, leaving this slot unfilled
+            const slPriority = ['M','U','G','L'];
+            const myPri = slPriority.indexOf(s);
+            return !m.slots.some(sl => {
+              const slPri = slPriority.indexOf(sl);
+              if (slPri < 0 || slPri >= myPri) return false;
+              const slEvo = sl==='L'?(m.evolvedNameL||m.name)
+                :sl==='G'?(m.evolvedNameG||m.name)
+                :sl==='U'?(m.evolvedNameU||m.name)
+                :(m.evolvedNameU||m.evolvedNameG||m.name);
+              return slEvo === evoTarget;
+            });
+          });
 
         if (nextBest) {
           if (!nextBest.slots.includes(s)) {
