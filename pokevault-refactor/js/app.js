@@ -9,9 +9,15 @@
 // window.location.hash before applyHashState() can read it on first cloud load.
 let initialHash = window.location.hash;
 
-// Dmax/Gmax filter flags (independent toggles, can be active simultaneously)
+// Dmax/Gmax filter flags (mutually exclusive)
 let showDynamaxOnly = false;
 let showGigantamaxOnly = false;
+
+// Collection Tracker modal qualifier state
+let dexQualDmax    = false;
+let dexQualGmax    = false;
+let dexQualHundo   = false;
+let dexShinyAvailOnly = false;
 
 // ═══════════════════════════════════════════════
 // STAR PRIORITY (0=gold … 6=none)
@@ -368,6 +374,9 @@ function renderPage(){
       } else {
         f.members.forEach(p=>p._leagueFiltered=false);
       }
+      // Row-level dmax/gmax filter (same individual-row semantics as shiny filter)
+      if(showDynamaxOnly)    f.members.forEach(p=>{ if(!p.isDynamax)    p._leagueFiltered=true; });
+      if(showGigantamaxOnly) f.members.forEach(p=>{ if(!p.isGigantamax) p._leagueFiltered=true; });
       // Auto-open if league filter active, hundo filter active, or ≤3 families
       const hasQualifying=activeLeagueArr.length===0||f.members.some(p=>!p._leagueFiltered&&!p.hidden);
       const open=(autoOpen&&i===0)||activeLeagueArr.length>0||decFilter==='hundo';
@@ -611,12 +620,14 @@ function setDecFilter(f,btn){
 
 function toggleDmaxFilter(btn){
   showDynamaxOnly=!showDynamaxOnly;
+  if(showDynamaxOnly){ showGigantamaxOnly=false; document.getElementById('gmaxFilterBtn')?.classList.remove('active'); }
   btn.classList.toggle('active',showDynamaxOnly);
   applyFilters();
 }
 
 function toggleGmaxFilter(btn){
   showGigantamaxOnly=!showGigantamaxOnly;
+  if(showGigantamaxOnly){ showDynamaxOnly=false; document.getElementById('dmaxFilterBtn')?.classList.remove('active'); }
   btn.classList.toggle('active',showGigantamaxOnly);
   applyFilters();
 }
@@ -893,6 +904,10 @@ function encodeStateToHash() {
     if (dexCat !== 'all') params.set('category', dexCat);
     if (dexQualShiny) params.set('shiny', 'true');
     if (dexQualLucky) params.set('lucky', 'true');
+    if (dexQualDmax)  params.set('dmax',  'true');
+    if (dexQualGmax)  params.set('gmax',  'true');
+    if (dexQualHundo) params.set('hundos', 'true');
+    if (dexShinyAvailOnly) params.set('shinyavail', 'true');
     if (dexTypes.size) params.set('types', [...dexTypes].join(','));
     if (dexSolo)  params.set('solo', 'true');
     if (dexSpare) params.set('spare', 'true');
@@ -929,6 +944,11 @@ function applyHashState() {
     if (cat) dexCat = cat;
     dexQualShiny = params.get('shiny') === 'true';
     dexQualLucky = params.get('lucky') === 'true';
+    dexQualDmax  = params.get('dmax')  === 'true';
+    dexQualGmax  = params.get('gmax')  === 'true';
+    if (dexQualDmax && dexQualGmax) dexQualGmax = false; // mutual exclusion safety
+    dexQualHundo = params.get('hundos') === 'true';
+    dexShinyAvailOnly = params.get('shinyavail') === 'true';
     const types = params.get('types');
     if (types) dexTypes = new Set(types.split(',').filter(Boolean));
     dexSolo  = params.get('solo')  === 'true';
@@ -1044,6 +1064,10 @@ function updateDexFilterButtons() {
   // Qualifiers
   document.getElementById('dex-qual-shiny')?.classList.toggle('dex-filter-active', dexQualShiny);
   document.getElementById('dex-qual-lucky')?.classList.toggle('dex-filter-active', dexQualLucky);
+  document.getElementById('dex-qual-dmax')?.classList.toggle('dex-filter-active', dexQualDmax);
+  document.getElementById('dex-qual-gmax')?.classList.toggle('dex-filter-active', dexQualGmax);
+  document.getElementById('dex-qual-hundo')?.classList.toggle('dex-filter-active', dexQualHundo);
+  document.getElementById('dex-shiny-avail')?.classList.toggle('dex-filter-active', dexShinyAvailOnly);
   // Solo / Spare / Exclude evolvable
   document.getElementById('dex-solo')?.classList.toggle('dex-filter-active', dexSolo);
   document.getElementById('dex-spare')?.classList.toggle('dex-filter-active', dexSpare);
@@ -1063,6 +1087,9 @@ function updateDexFilterButtons() {
     const el = document.getElementById(id);
     if (el) el.style.display = dexView === 'have' ? 'none' : '';
   });
+  // "Available only" is only relevant in Missing+Shiny view
+  const shinyAvailEl = document.getElementById('dex-shiny-avail');
+  if (shinyAvailEl) shinyAvailEl.style.display = (dexView === 'missing' && dexQualShiny) ? '' : 'none';
   // Type pills
   document.querySelectorAll('.dex-type-pill').forEach(btn => {
     btn.classList.toggle('dex-type-pill-active', dexTypes.has(btn.textContent));
@@ -1109,6 +1136,9 @@ function renderDexHaveView(body, filteredSpecies) {
   if (dexQualShiny && dexQualLucky) matched = matched.filter(p => p.isShiny && p.isLucky);
   else if (dexQualShiny)            matched = matched.filter(p => p.isShiny);
   else if (dexQualLucky)            matched = matched.filter(p => p.isLucky);
+  if (dexQualDmax)  matched = matched.filter(p => p.isDynamax);
+  if (dexQualGmax)  matched = matched.filter(p => p.isGigantamax);
+  if (dexQualHundo) matched = matched.filter(p => p.isHundo);
 
   // Group by species (one row per species, not per individual Pokémon)
   const bySpecies = new Map(); // pokedex_number → [pokemon, ...]
@@ -1132,10 +1162,13 @@ function renderDexHaveView(body, filteredSpecies) {
   const speciesCount = displaySpecies.size;
 
   // Subtitle with context
-  const qualLabel = dexQualShiny && dexQualLucky ? ' with shiny + lucky'
-    : dexQualShiny ? ' with shinies'
-    : dexQualLucky ? ' with lucky'
-    : '';
+  const qualParts = [];
+  if (dexQualShiny) qualParts.push('shiny');
+  if (dexQualLucky) qualParts.push('lucky');
+  if (dexQualDmax)  qualParts.push('Dynamax');
+  if (dexQualGmax)  qualParts.push('Gigantamax');
+  if (dexQualHundo) qualParts.push('hundo');
+  const qualLabel = qualParts.length ? ' with ' + qualParts.join(' + ') : '';
   const soloLabel = dexSolo ? ' (solo only)' : dexSpare ? ' (spares only)' : '';
   const catLabel = dexCat !== 'all' ? dexCat.toLowerCase() + ' ' : '';
   document.getElementById('dex-modal-sub').textContent = `${speciesCount} ${catLabel}species${qualLabel}${soloLabel}`;
@@ -1271,7 +1304,7 @@ function renderDexMissingView(body, filteredSpecies) {
     }
   }
 
-  // Lucky counts by pokedex number — for Task 2 family lucky indicator
+  // Lucky counts by pokedex number — for family lucky indicator
   const luckyCountByNum = new Map();
   if (dexQualLucky) {
     allPokemon.filter(p => p.isLucky).forEach(p => {
@@ -1280,12 +1313,20 @@ function renderDexMissingView(body, filteredSpecies) {
     });
   }
 
-  // Task 3: Excl. Family — build set of ALL pokedex numbers that share a family with any owned lucky
+  // Excl. Family — build sets of all nums sharing a family with any owned lucky or shiny
   const familyLuckyNums = new Set();
   if (dexQualLucky && dexExcludeFamily) {
     for (const [num] of luckyCountByNum) {
       const s = speciesById.get(num);
       if (s) getFullFamilyNums(s, speciesById, evolvesInto).forEach(n => familyLuckyNums.add(n));
+    }
+  }
+  const familyShinyNums = new Set();
+  if (dexQualShiny && dexExcludeFamily) {
+    const shinyNums = new Set(allPokemon.filter(p => p.isShiny).map(p => Number(p.pokeNum)));
+    for (const num of shinyNums) {
+      const s = speciesById.get(num);
+      if (s) getFullFamilyNums(s, speciesById, evolvesInto).forEach(n => familyShinyNums.add(n));
     }
   }
 
@@ -1299,15 +1340,38 @@ function renderDexMissingView(body, filteredSpecies) {
   } else {
     missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number));
   }
+  // Task 4: Hundos — species with no hundo owned (stacks with shiny/lucky qualifier)
+  if (dexQualHundo) {
+    const haveHundoNums = new Set(allPokemon.filter(p => p.isHundo).map(p => Number(p.pokeNum)));
+    missing = missing.filter(s => !haveHundoNums.has(s.pokedex_number));
+  }
 
   // Apply exclude-evolvable filter — walk full chain, not just immediate pre-evo
   if (dexExcludeEvolvable) {
     missing = missing.filter(s => !findOwnedAncestor(s, speciesById, ownedNums));
   }
 
-  // Task 3: hide missing species where any family member is lucky
+  // Excl. Family: hide missing species where any family member is lucky or shiny
   if (dexQualLucky && dexExcludeFamily) {
     missing = missing.filter(s => !familyLuckyNums.has(s.pokedex_number));
+  }
+  if (dexQualShiny && dexExcludeFamily) {
+    missing = missing.filter(s => !familyShinyNums.has(s.pokedex_number));
+  }
+
+  // Task 5: Dmax/Gmax qualifiers in missing view
+  if (dexQualDmax) {
+    const haveDmaxNums = new Set(allPokemon.filter(p => p.isDynamax).map(p => Number(p.pokeNum)));
+    missing = missing.filter(s => !haveDmaxNums.has(s.pokedex_number));
+  }
+  if (dexQualGmax) {
+    const haveGmaxNums = new Set(allPokemon.filter(p => p.isGigantamax).map(p => Number(p.pokeNum)));
+    missing = missing.filter(s => !haveGmaxNums.has(s.pokedex_number));
+  }
+
+  // Task 5: Available only — hide "No shiny in GO" species when Shiny+Missing+Available only
+  if (dexQualShiny && dexShinyAvailOnly) {
+    missing = missing.filter(s => isShinyAvailableInChain(s, speciesById));
   }
 
   // Sort: in-GO first alphabetical, then not-in-GO
@@ -1316,10 +1380,16 @@ function renderDexMissingView(body, filteredSpecies) {
     return a.name.localeCompare(b.name);
   });
 
-  const qualLabel = dexQualShiny && dexQualLucky ? ' shiny + lucky' : dexQualShiny ? ' shiny' : dexQualLucky ? ' lucky' : '';
+  const missingQualParts = [];
+  if (dexQualShiny) missingQualParts.push('shiny');
+  if (dexQualLucky) missingQualParts.push('lucky');
+  if (dexQualDmax)  missingQualParts.push('Dynamax');
+  if (dexQualGmax)  missingQualParts.push('Gigantamax');
+  if (dexQualHundo) missingQualParts.push('hundo');
+  const qualLabel = missingQualParts.length ? missingQualParts.join(' + ') + ' ' : '';
   const catLabel  = dexCat !== 'all' ? dexCat.toLowerCase() + ' ' : '';
   const evolveLabel = dexExcludeEvolvable ? ' (excl. evolvable)' : '';
-  document.getElementById('dex-modal-sub').textContent = `${missing.length} ${catLabel}${qualLabel ? qualLabel.trim() + ' ' : ''}missing${evolveLabel}`;
+  document.getElementById('dex-modal-sub').textContent = `${missing.length} ${catLabel}${qualLabel}missing${evolveLabel}`;
 
   if (!missing.length) {
     body.innerHTML = '<div class="pv-modal-empty">No missing Pokémon — collection complete! 🎉</div>';
