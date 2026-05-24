@@ -269,7 +269,6 @@ function renderFamily(fam,isOpen){
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
-        <button class="copy-nicks-btn" onclick="event.stopPropagation();copyNicks('${key}',this)" title="Copy starred nicknames">⎘ nicks</button>
         <span class="fam-chevron">▶</span>
       </div>
     </div>
@@ -285,20 +284,15 @@ function renderFamily(fam,isOpen){
 // ═══════════════════════════════════════════════
 function renderSummary(pokemon){
   const t=pokemon.length, k=pokemon.filter(p=>p.decision==='keep').length,
-    tr=pokemon.filter(p=>p.decision==='trade').length,
-    r=pokemon.filter(p=>p.decision==='review').length,
-    pr=pokemon.filter(p=>p.decision==='protected').length;
+    tr=pokemon.filter(p=>p.decision==='trade').length;
   document.getElementById('hdr-stats').innerHTML=
     `<span>Total <strong>${t.toLocaleString()}</strong></span>
      <span style="color:var(--green)">Keep <strong>${k.toLocaleString()}</strong></span>
-     <span style="color:var(--red)">Trade <strong>${tr.toLocaleString()}</strong></span>
-     <span style="color:var(--great)">Review <strong>${r.toLocaleString()}</strong></span>`;
+     <span style="color:var(--red)">Trade <strong>${tr.toLocaleString()}</strong></span>`;
   document.getElementById('summary-strip').innerHTML=`
     <div class="sum-card s-total" onclick="setDecFilter('all',null)"><div class="sum-label">Total</div><div class="sum-val">${t.toLocaleString()}</div></div>
     <div class="sum-card s-keep" onclick="setDecFilter('keep',null)"><div class="sum-label">Keep</div><div class="sum-val">${k.toLocaleString()}</div></div>
-    <div class="sum-card s-trade" onclick="setDecFilter('trade',null)"><div class="sum-label">Trade</div><div class="sum-val">${tr.toLocaleString()}</div></div>
-    <div class="sum-card s-review" onclick="setDecFilter('review',null)"><div class="sum-label">Review</div><div class="sum-val">${r.toLocaleString()}</div></div>
-    <div class="sum-card s-protected" onclick="setDecFilter('protected',null)"><div class="sum-label">Protected</div><div class="sum-val">${pr.toLocaleString()}</div></div>`;
+    <div class="sum-card s-trade" onclick="setDecFilter('trade',null)"><div class="sum-label">Trade</div><div class="sum-val">${tr.toLocaleString()}</div></div>`;
 }
 
 function applyFilters(){
@@ -539,7 +533,6 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
-        <button class="copy-nicks-btn" onclick="event.stopPropagation();copyNicks('${key}',this)" title="Copy starred nicknames">⎘ nicks</button>
         <span class="fam-chevron">▶</span>
       </div>
     </div>
@@ -1664,8 +1657,13 @@ function openCleanupModal(){
   const sub=document.getElementById('cleanup-modal-sub');
 
   const NEEDS_FORM=new Set(Object.keys(FORM_DROPDOWNS||{}));
+  const searchRow=document.getElementById('cleanup-search-row');
+  if(searchRow) searchRow.style.display='';
+  const cleanupSearchTerm=(document.getElementById('cleanupSearch')?.value||'').toLowerCase();
+
   const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!p.specialForm&&!p.vivillonPattern
-      &&matchesDateRange(p,cleanupFromDate,cleanupToDate))
+      &&matchesDateRange(p,cleanupFromDate,cleanupToDate)
+      &&(!cleanupSearchTerm||p.name.toLowerCase().includes(cleanupSearchTerm)))
     .sort((a,b)=>{
       if(cleanupSortMode==='cp') return (b.cp||0)-(a.cp||0);
       if(cleanupSortMode==='iv') return (b.ivAvg||0)-(a.ivAvg||0);
@@ -1674,8 +1672,10 @@ function openCleanupModal(){
       return a.name.localeCompare(b.name);
     });
 
+  const totalNeedsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!p.specialForm&&!p.vivillonPattern
+      &&matchesDateRange(p,cleanupFromDate,cleanupToDate)).length;
   const dateActive=cleanupFromDate||cleanupToDate;
-  sub.textContent=needsForm.length+' Pokémon need form/pattern set'
+  sub.textContent=(cleanupSearchTerm?needsForm.length+' of '+totalNeedsForm:needsForm.length)+' Pokémon need form/pattern set'
     +(dateActive?' in date range':' ('+needsForm.filter(p=>p.catchDate).length+' with stable IDs)');
 
   const clearBtnStyle=`background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--muted);cursor:pointer;font-size:11px`;
@@ -1713,7 +1713,10 @@ function openCleanupModal(){
   modal.classList.add('open');
 }
 
-function closeCleanupModal(){document.getElementById('cleanup-modal').classList.remove('open');}
+function closeCleanupModal(){
+  document.getElementById('cleanup-modal').classList.remove('open');
+  const si=document.getElementById('cleanupSearch'); if(si) si.value='';
+}
 
 function openSpecialModal(){
   if(!allPokemon.length){alert('Load your collection first');return;}

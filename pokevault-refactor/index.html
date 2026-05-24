@@ -95,6 +95,11 @@
       </div>
       <button class="pv-modal-close" onclick="closeCleanupModal()">✕</button>
     </div>
+    <div id="cleanup-search-row" style="display:none;padding:6px 16px;border-bottom:1px solid var(--border)">
+      <input type="text" id="cleanupSearch" placeholder="Search species (e.g. Furfrou)..." autocomplete="off"
+        style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--text);font-family:'Exo 2',sans-serif;font-size:12px;outline:none;box-sizing:border-box"
+        oninput="openCleanupModal()">
+    </div>
     <div class="pv-modal-body" id="cleanup-modal-body">
       <div class="pv-modal-empty">Load your collection first</div>
     </div>
