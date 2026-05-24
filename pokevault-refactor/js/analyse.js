@@ -876,29 +876,37 @@ function analyse(rows) {
     if(purified.length) purified[0].slots.push('purified');
     members.filter(p=>p.isLucky).forEach(p=>p.slots.push('lucky'));
     members.filter(p=>p.isNundo).forEach(p=>p.slots.push('nundo'));
-    // Dynamax: best-IV per species → 'dynamax' slot; dupes get nothing (will trade)
-    const dmaxBySpecies = {};
+    // Dynamax: best-IV per species gets 'dynamax' slot, unless it already holds a league slot.
+    // Tie case: if best-IV holds a league slot, a candidate with the SAME ivAvg (genuine tie)
+    // and no league slot inherits the slot. Lower-IV dupes still trade.
+    const dmaxCandidates = {};
     members.filter(p => p.isDynamax).forEach(p => {
-      const k = p.name;
-      if (!dmaxBySpecies[k] || (p.ivAvg||0) > (dmaxBySpecies[k].ivAvg||0) ||
-        ((p.ivAvg||0) === (dmaxBySpecies[k].ivAvg||0) && p.isFavorite && !dmaxBySpecies[k].isFavorite))
-        dmaxBySpecies[k] = p;
+      if (!dmaxCandidates[p.name]) dmaxCandidates[p.name] = [];
+      dmaxCandidates[p.name].push(p);
     });
-    Object.values(dmaxBySpecies).forEach(best => {
-      if (!best.slots.some(s => RULES.leagues.includes(s)) && !best.slots.includes('dynamax'))
-        best.slots.push('dynamax');
+    Object.values(dmaxCandidates).forEach(cands => {
+      cands.sort((a, b) => (b.ivAvg||0) - (a.ivAvg||0) || (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
+      const best = cands[0]; if (!best) return;
+      const bestIv = best.ivAvg || 0;
+      const target = best.slots.some(s => RULES.leagues.includes(s))
+        ? cands.find(p => (p.ivAvg||0) === bestIv && !p.slots.some(s => RULES.leagues.includes(s)))
+        : best;
+      if (target && !target.slots.includes('dynamax')) target.slots.push('dynamax');
     });
-    // Gigantamax: best-IV per species → 'gigantamax' slot; dupes get nothing (will trade)
-    const gmaxBySpecies = {};
+    // Gigantamax: same tied-IV fall-through logic
+    const gmaxCandidates = {};
     members.filter(p => p.isGigantamax).forEach(p => {
-      const k = p.name;
-      if (!gmaxBySpecies[k] || (p.ivAvg||0) > (gmaxBySpecies[k].ivAvg||0) ||
-        ((p.ivAvg||0) === (gmaxBySpecies[k].ivAvg||0) && p.isFavorite && !gmaxBySpecies[k].isFavorite))
-        gmaxBySpecies[k] = p;
+      if (!gmaxCandidates[p.name]) gmaxCandidates[p.name] = [];
+      gmaxCandidates[p.name].push(p);
     });
-    Object.values(gmaxBySpecies).forEach(best => {
-      if (!best.slots.some(s => RULES.leagues.includes(s)) && !best.slots.includes('gigantamax'))
-        best.slots.push('gigantamax');
+    Object.values(gmaxCandidates).forEach(cands => {
+      cands.sort((a, b) => (b.ivAvg||0) - (a.ivAvg||0) || (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
+      const best = cands[0]; if (!best) return;
+      const bestIv = best.ivAvg || 0;
+      const target = best.slots.some(s => RULES.leagues.includes(s))
+        ? cands.find(p => (p.ivAvg||0) === bestIv && !p.slots.some(s => RULES.leagues.includes(s)))
+        : best;
+      if (target && !target.slots.includes('gigantamax')) target.slots.push('gigantamax');
     });
     // Legendary: best-IV per species (no league slot, no Dmax/Gmax) → 'best_overall' slot
     if (isLegendary) {
