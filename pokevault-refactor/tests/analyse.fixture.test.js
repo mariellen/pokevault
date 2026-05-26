@@ -64,11 +64,11 @@ describe('Group 1 — Glaceon family (evolved preference + committed)', () => {
 // ─── Group 2 — Leafeon family ────────────────────────────────────────────────
 
 describe('Group 2 — Leafeon family (evolved preference)', () => {
-  it('Leafeon CP:1177 wins Great slot (99.58% > Ultra 99.37%) — nick shows Ⓖ', () => {
+  it('Leafeon CP:1177 wins both Great (99.58%) and Ultra (99.37%) — nick shows Ⓖ (higher rank)', () => {
     const p = find('Leafeon', 1177);
     expect(p).toBeDefined();
     expect(p.slots).toContain('G');
-    expect(p.slots).not.toContain('U'); // Bug 1 fix: Great rank wins, Ultra released
+    expect(p.slots).toContain('U'); // Both confirmed (≥90%): dual-league keeper keeps both slots
     expect(p.nickname).toContain('Ⓖ');
     expect(p.isFavorite).toBe(true);
     expect(p.suggestStar).toBe(true);
@@ -93,22 +93,22 @@ describe('Group 2 — Leafeon family (evolved preference)', () => {
 });
 
 // ─── Group 3 — Vaporeon (same-evo slot routing) ──────────────────────────────
-// CP:1497 holds both G (99.90%) and U (99.61%). Bug 1 fix: same-evo multi-slot
-// holders keep only the league with the highest rank. CP:1497 keeps G, releases U.
-// CP:2493 (98.68% Ultra, dustU=0) wins Ultra via nextBest.
+// CP:1497 holds both G (99.90%) and U (99.61%). Both are confirmed (≥90%) for the
+// same evo target (Vaporeon) so both slots are retained as a dual-league keeper.
+// CP:2493 (98.68% Ultra, fav=1, dustU=0) does NOT win Ultra — CP:1497 holds it.
 
 describe('Group 3 — Vaporeon (same-evo slot routing)', () => {
-  it('Vaporeon CP:1497 (G=99.90%, U=99.61%) keeps Great — releases Ultra (lower rank)', () => {
+  it('Vaporeon CP:1497 (G=99.90%, U=99.61%) holds both Great and Ultra — both ≥90%', () => {
     const p = find('Vaporeon', 1497);
     expect(p.slots).toContain('G');
-    expect(p.slots).not.toContain('U');
+    expect(p.slots).toContain('U'); // dual-league keeper: both confirmed, both retained
   });
 
-  it('Vaporeon CP:2493 (fav=1, dustU=0) wins Ultra after CP:1497 releases it — GOLD', () => {
+  it('Vaporeon CP:2493 (fav=1, dustU=0) does NOT win Ultra — CP:1497 retains it', () => {
     const p = find('Vaporeon', 2493);
-    expect(p.slots).toContain('U');
+    expect(p.slots).not.toContain('U');
     expect(p.isFavorite).toBe(true);
-    expect(p.suggestStar).toBe(true); // suggestStar+isFavorite = gold star
+    expect(p.suggestStar).toBe(false); // no confirmed slot — not a star candidate
   });
 });
 
@@ -480,38 +480,33 @@ describe('Group 13 — Standalone evo target suppresses league slot', () => {
   });
 });
 
-// ─── Group 14 — Sawk multi-league deconfliction (Bug 1) ──────────────────────
-// CP:190 (IVs 1/8/13, fav=1) wins G (99.3%), U (75%), and L (98.8%) in initial pass.
-// Bug 1 fix: same-evo multi-slot → keep highest-rank league (G=99.3%), release rest.
-// U (75%) has no nextBest (CP:500 at 65% is below 70% threshold).
-// L (98.8%) nextBest → CP:500 (IVs 5/7/8, 97.9%, dustL=0) wins Little.
+// ─── Group 14 — Sawk multi-league deconfliction ──────────────────────────────
+// CP:190 (IVs 1/8/13, fav=1) wins G (99.3%), U_tentative (75%), and L (98.8%) in
+// initial pass. U (75%) released (below keepThreshold). G (99.3%) and L (98.8%) are
+// both confirmed (≥90%) for the same evo target → dual-league keeper retains both.
+// CP:500 (97.9% LL) does NOT win Little — CP:190 retains it.
 
-describe('Group 14 — Sawk multi-league deconfliction (Bug 1)', () => {
-  it('Sawk CP:190 (G=99.3%, fav=1) wins Great slot only — GOLD star', () => {
+describe('Group 14 — Sawk multi-league deconfliction', () => {
+  it('Sawk CP:190 (G=99.3%, L=98.8%, fav=1) holds both Great and Little — GOLD star', () => {
     const p = find('Sawk', 190);
     expect(p).toBeDefined();
     expect(p.slots).toContain('G');
-    expect(p.slots).not.toContain('U'); // Bug 1 fix: U released (lower rank than G)
+    expect(p.slots).toContain('L'); // both confirmed (≥90%): dual-league keeper retains both
+    expect(p.slots).not.toContain('U'); // U (75%) released — below keepThreshold
     expect(p.isFavorite).toBe(true);
     expect(p.suggestStar).toBe(true); // fav=1 + wins slot = gold
   });
 
-  it('Sawk CP:190 does NOT hold Little slot — released to CP:500', () => {
-    const p = find('Sawk', 190);
+  it('Sawk CP:500 does NOT win Little slot — CP:190 retains it', () => {
+    const p = find('Sawk', 500);
+    expect(p).toBeDefined();
     expect(p.slots).not.toContain('L');
   });
 
-  it('Sawk CP:500 (L=97.9%, dustL=0) wins Little slot', () => {
+  it('Sawk CP:500 has no confirmed slot (no star)', () => {
     const p = find('Sawk', 500);
-    expect(p).toBeDefined();
-    expect(p.slots).toContain('L');
-  });
-
-  it('Sawk CP:500 shows green star (fav=0, wins Little, dustL=0)', () => {
-    const p = find('Sawk', 500);
-    expect(p.isFavorite).toBe(false);
-    expect(p.suggestStar).toBe(true);
-    expect(p.suggestStarExpensive).toBeFalsy();
+    expect(p.suggestStar).toBe(false);
+    expect(p.decision).not.toBe('keep');
   });
 });
 
@@ -1246,16 +1241,16 @@ describe('Group 27b — Gmax Snorlax: best-IV keeps (Ⓧ in nick), dupe gets vis
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
 
-  it('Snorlax CP:200 (dupe Gmax, 71.1%) → decision=trade', () => {
+  it('Snorlax CP:200 (best Gmax without league slot, 71.1%) → decision=keep', () => {
     const p = g27bFind('Snorlax', 200);
     expect(p).toBeDefined();
     expect(p.isGigantamax).toBe(true);
-    expect(p.decision).toBe('trade');
+    expect(p.decision).toBe('keep');
   });
 
-  it('Snorlax CP:200 (dupe Gmax) → starType is visibility', () => {
+  it('Snorlax CP:200 (best Gmax without league slot) → starType is green', () => {
     const p = g27bFind('Snorlax', 200);
-    expect(p.starType).toBe('visibility');
+    expect(p.starType).toBe('green');
   });
 });
 
@@ -1416,17 +1411,17 @@ describe('Group 28d — Dedup does not collapse two different GL evo-target slot
 
 describe('Group 28e — LL competition: Zweilous-evo Deino wins; blank excluded', () => {
   // CP:499 wins LL(Zweilous) initially. When nextBest assigns G to CP:499,
-  // CP:499's same-evo deconfliction (G+L both Zweilous) releases L and keeps G.
-  // nextBest for L then selects CP:537 (91.20%, next best LL Zweilous).
-  it('A Deino (CP:537, next-best LL Zweilous) holds LL slot after chain', () => {
+  // CP:499 holds both G (99.40%) and L (91.80%) for the same Zweilous evo target.
+  // Both are confirmed (≥90%) → dual-league keeper retains both. CP:537 does not win L.
+  it('Deino CP:537 does NOT hold LL slot — CP:499 retains it as dual-league keeper', () => {
     const p = find('Deino', 537);
-    expect(p.slots).toContain('L');
+    expect(p.slots).not.toContain('L');
   });
 
-  it('Deino CP:499 holds GL not LL (was deconflicted from L when it won G via nextBest)', () => {
+  it('Deino CP:499 holds both GL and LL (G=99.40%, L=91.80%, both Zweilous, both ≥90%)', () => {
     const p = find('Deino', 499);
     expect(p.slots).toContain('G');
-    expect(p.slots).not.toContain('L');
+    expect(p.slots).toContain('L');
   });
 
   it('Deino CP:10 (blank evolvedNameL, no rank) does not hold LL slot', () => {
@@ -1500,5 +1495,154 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
     // rankPctM=ivAvg=100 >= 90 → dynamax handler picks Ⓜ as best league proxy
     const p = g27eFind('Entei', 3200);
     expect(p.nickname).toBe('EnteiⓂ100ⒹⒽ');
+  });
+});
+
+// ─── Group 29 — Skwovet UL slot held by CP:750; GL held by CP:496 (100%) ───────
+// Locks in the sameEvoConflicts fix: UL slot retained by the best UL candidate
+// (CP:750 at 98.58%) rather than being released to the runner-up (Greedent CP:1438).
+// GL is won by CP:496 (100%) which beats CP:750 (99.5%) on rank — CP:750 drops to UL only.
+
+describe('Group 29 — Skwovet CP:750 retains UL (98.58%); CP:496 wins GL (100%)', () => {
+  it('Skwovet CP:750 (98.58% UL) → slots contains U', () => {
+    const p = find('Skwovet', 750);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('U');
+  });
+
+  it('Skwovet CP:750 does NOT hold GL — CP:496 (100%) wins it via higher rank', () => {
+    const p = find('Skwovet', 750);
+    expect(p.slots).not.toContain('G');
+  });
+
+  it('Skwovet CP:750 (UL slot) → decision=keep', () => {
+    const p = find('Skwovet', 750);
+    expect(p.decision).toBe('keep');
+  });
+
+  it('Greedent CP:1438 (92.09% UL) → does NOT hold UL slot (Skwovet CP:750 wins it)', () => {
+    const p = find('Greedent', 1438);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('U');
+  });
+});
+
+// ─── Group 30 — Skwovet CP:496 99.78% GL wins against same-family competition ────
+// Regression guard: sameEvoConflicts fix must not displace a top GL winner.
+// CP:496 (99.78% GL, evolvedNameG=Greedent, fav=1, dustG=0) should win GL unconditionally.
+// CP:750 (99.50% GL, 98.58% UL) should NOT displace it — lower rank loses GL.
+// See Group 32 (test 5a/5d) for the evolved-rival (Greedent CP:1300 99.50%) guard.
+
+describe('Group 30 — Skwovet CP:496 (99.78% GL) wins and is kept — regression guard', () => {
+  it('Skwovet CP:496 (99.78% GL, evolvedNameG=Greedent) → slots contains G', () => {
+    const p = find('Skwovet', 496);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+  });
+
+  it('Skwovet CP:496 → decision=keep', () => {
+    const p = find('Skwovet', 496);
+    expect(p.decision).toBe('keep');
+  });
+
+  it('Skwovet CP:496 (99.78% GL, rounds to 100) → nickname contains Ⓖ and 100', () => {
+    const p = find('Skwovet', 496);
+    expect(p.nickname).toContain('Ⓖ');
+    expect(p.nickname).toContain('100');
+  });
+
+  it('Skwovet CP:750 retains UL (98.58%) while CP:496 holds GL — both kept concurrently', () => {
+    const p750 = find('Skwovet', 750);
+    const p496 = find('Skwovet', 496);
+    expect(p496.slots).toContain('G');
+    expect(p750.slots).toContain('U');
+  });
+});
+
+// ─── Group 31 — Mewtwo best_overall: highest-IV wins, lower-IV does NOT ─────────
+// Legendaries skip ML and are assigned best_overall by highest ivAvg per species.
+// CP:2368 (93.3% IV, fav=1) should win; CP:2352 (88.9% IV) should not.
+
+describe('Group 31 — Mewtwo best-IV wins best_overall (Legendary regression guard)', () => {
+  it('Mewtwo CP:2368 (93.3% IV, highest) → slots contains best_overall', () => {
+    const p = find('Mewtwo', 2368);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('best_overall');
+  });
+
+  it('Mewtwo CP:2368 → decision=keep', () => {
+    const p = find('Mewtwo', 2368);
+    expect(p.decision).toBe('keep');
+  });
+
+  it('Mewtwo CP:2368 (best Legendary) → nickname contains Ⓡ and 93', () => {
+    const p = find('Mewtwo', 2368);
+    expect(p.nickname).toContain('Ⓡ');
+    expect(p.nickname).toContain('93');
+  });
+
+  it('Mewtwo CP:2352 (88.9% IV, lower) → does NOT hold best_overall slot', () => {
+    const p = find('Mewtwo', 2352);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('best_overall');
+  });
+});
+
+// ─── Group 32 — Fix 1 regression: actual rank wins before evolved preference ────
+// Rows 78 (Skwovet CP:496, 99.78% GL) and 81 (Greedent CP:1300, 99.50% GL) both
+// round to 100 at GL. Without Fix 1 the evolved form wins; with Fix 1 higher actual
+// rank wins regardless of evo preference.
+
+describe('Group 32 — Fix 1 regression: actual rank wins before evolved preference at equal rounded rank', () => {
+  it('Skwovet CP:496 (99.78% GL, pre-evo) wins GL over Greedent CP:1300 (99.50% GL, evolved)', () => {
+    const p = find('Skwovet', 496);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+  });
+
+  it('Greedent CP:1300 (99.50% GL) does NOT win GL — lower actual rank loses despite evolved preference', () => {
+    const p = find('Greedent', 1300);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('G');
+  });
+});
+
+// ─── Group 33 — Evolved preference still fires on genuine actual-rank tie ───────
+// Rows 1 (Glaceon CP:1500) and 2 (Eevee CP:477) have identical GL rank (99.71%).
+// Fix 1 must NOT suppress evolved-preference when actual ranks are truly equal.
+
+describe('Group 33 — Evolved preference wins on genuine actual-rank tie (Fix 1 regression guard)', () => {
+  it('Glaceon CP:1500 (99.71% GL) wins GL — evolved form takes priority at equal actual rank', () => {
+    const p = find('Glaceon', 1500);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+  });
+
+  it('Eevee CP:477 (99.71% GL identical to Glaceon) does NOT win GL — evolved form takes priority at equal actual rank', () => {
+    const p = find('Eevee', 477);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('G');
+  });
+});
+
+// ─── Group 35 — Variant-key conflict guard: shadow slot gets independent nextBest ─
+// Rows 84 (Regular Gengar CP:1300, 93% GL), 85 (Shadow Gengar CP:1327, 88% GL + 92% UL),
+// 86 (Shadow Gengar CP:1100, 82% GL).
+// Shadow Gengar #85 wins shadow GL + shadow UL. sameEvoConflicts releases shadow GL
+// (88% < 90%). Without Fix 4, slotWinners['G|Gengar'] counts regular + shadow together,
+// so the count stays > 0 and no nextBest is found. With Fix 4, shadow key is independent
+// and Shadow Gengar CP:1100 is correctly assigned the shadow GL slot via nextBest.
+
+describe('Group 35 — Variant-key conflict guard: shadow slot gets independent nextBest (Fix 4 regression guard)', () => {
+  it('Regular Gengar CP:1300 (93% GL) → slots contains G', () => {
+    const p = find('Gengar', 1300);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+  });
+
+  it('Shadow Gengar CP:1100 (82% GL) → slots contains G — shadow slot nextBest found after shadow Gengar #1 releases GL', () => {
+    const p = find('Gengar', 1100);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
   });
 });

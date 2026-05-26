@@ -666,7 +666,7 @@ function analyse(rows) {
         // Dust exclusion: if dust cost for this league exceeds threshold, skip entirely
         // This prevents lower evolutions with prohibitive Ultra/Master dust from
         // blocking their selection in cheaper leagues (Little/Great)
-        const DUST_EXCLUDE_THRESHOLD = 300000; // over 300k = not worth considering
+        const DUST_EXCLUDE_THRESHOLD = RULES.dustExcludeThreshold; // over threshold = not worth considering
         const leagueDust = p => lg==='L'?p.dustL:lg==='G'?p.dustG:lg==='U'?p.dustU:0;
 
         const eligible = (lg==='M' ? group : group.filter(p => (p.cp||0) <= leagueCap * 1.05))
@@ -676,6 +676,8 @@ function analyse(rows) {
             // Exception 2: best-IV pre-evo allowed when no evolved form is available in the group
             // Exception 3: best-IV pre-evo allowed when it strictly outranks ALL final evos (unevolved high-IV)
             if (lg === 'M' && p.name !== stageName) {
+              // Pre-evo committed to Little League: should stay as LL battler, not ML candidate
+              if (p.dustL === 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite && (p.rankPctL||0) >= RULES.keepThreshold) return false;
               const isHundo = p.atkIV === 15 && p.defIV === 15 && p.staIV === 15;
               if (isHundo) return true;
               const finalEvosInGroup = group.filter(m => m.name === stageName);
@@ -699,6 +701,33 @@ function analyse(rows) {
             );
             if (d > DUST_EXCLUDE_THRESHOLD && !pIsFinalEvo && !isLegendary && (p[rankField]||0) < RULES.keepThreshold) return false;
 
+            // Already consumed for evolution in a higher-priority league — can't also battle as itself here.
+            // e.g. Skwovet wins UL-as-Greedent (targetEvo='Greedent'), so it can't also hold a GL-as-Skwovet slot.
+            // ML falls back to p.name but targetEvo is always undefined when ML runs (first in M→U→G→L order).
+            const thisLgEvo = lg==='L'?(p.evolvedNameL||p.name)
+              :lg==='G'?(p.evolvedNameG||p.name)
+              :lg==='U'?(p.evolvedNameU||p.name)
+              :p.name;
+            if (p.targetEvo && p.targetEvo !== p.name && thisLgEvo === p.name) return false;
+
+            // Exclude if already holding a confirmed higher-priority slot for a DIFFERENT evo target.
+            // Such a candidate would win this slot then be deconflicted by diffEvoConflicts, leaving the slot empty.
+            if (lg !== 'M') {
+              const priority = ['M','U','G','L'];
+              const lgPri = priority.indexOf(lg);
+              const hasConflictingConfirmedSlot = p.slots.some(existingSlot => {
+                const esPri = priority.indexOf(existingSlot);
+                if (esPri < 0 || esPri >= lgPri) return false;
+                const esEvo = existingSlot==='L'?(p.evolvedNameL||p.name)
+                  :existingSlot==='G'?(p.evolvedNameG||p.name)
+                  :existingSlot==='U'?(p.evolvedNameU||p.name)
+                  :(p.evolvedNameU||p.evolvedNameG||p.name); // Master: same formula as slotEvo('M')
+                if (esEvo === thisLgEvo) return false; // same evo target — no conflict
+                return (p['rankPct'+existingSlot]||0) >= RULES.keepThreshold;
+              });
+              if (hasConflictingConfirmedSlot) return false;
+            }
+
             // Pre-evo with no valid evo path for this league — don't assign a self-referencing slot.
             // Rank>0 check: if Pokégenie filled a rank, the evo name may be self-referential (e.g.
             // Gligar battling GL as itself); exclude only truly unanalysed rows (rank=0, evo blank).
@@ -710,7 +739,7 @@ function analyse(rows) {
             // Check rankPct to distinguish "powered up" (true 0 dust) from "no data" (empty CSV field → 0)
             const littleQualifies = (p.rankPctL||0) >= RULES.keepThreshold;
             const greatQualifies = (p.rankPctG||0) >= RULES.keepThreshold;
-            if ((lg === 'U' || lg === 'G') && p.dustL === 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite && littleQualifies) return false;
+            if ((lg === 'U' || lg === 'G' || lg === 'M') && p.dustL === 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite && littleQualifies) return false;
             // Low-CP Pokémon committed to Great but not Ultra (dustG=0, dustU≠0) — exclude from Ultra
             if (lg === 'U' && p.dustG === 0 && p.dustU !== 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite && greatQualifies) return false;
             if (lg === 'U' && p.dustG === 0 && (p.cp||0) <= 1500 * 1.05 && (p.cp||0) > 500 * 1.05 && p.isFavorite) return false;
@@ -748,12 +777,12 @@ function analyse(rows) {
           const ra = a[rankField]||0, rb = b[rankField]||0;
           const roundedA = Math.round(ra), roundedB = Math.round(rb);
           if (roundedA !== roundedB) return roundedB - roundedA;
-          // Prefer already-evolved (p.name === stageName) over pre-evos at same rounded rank
+          // Prefer higher actual rank before evolved preference — higher real rank always wins
+          if (Math.abs(ra - rb) > 0.01) return rb - ra;
+          // Prefer already-evolved (p.name === stageName) over pre-evos at tied actual rank
           const aIsEvolved = (a.name === stageName) ? 0 : 1;
           const bIsEvolved = (b.name === stageName) ? 0 : 1;
           if (aIsEvolved !== bIsEvolved) return aIsEvolved - bIsEvolved;
-          // Prefer higher actual rank when rounded ranks tie (avoids stable-sort bias)
-          if (Math.abs(ra - rb) > 0.01) return rb - ra;
           return effectiveDust(a) - effectiveDust(b);
         });
 
@@ -773,6 +802,9 @@ function analyse(rows) {
             :(best.evolvedNameU||best.name);
           const thisEvo = stageName;
           if (lowerEvo === thisEvo) return false; // same evo, no conflict
+          // Pre-evo battles as itself in lower league (evolvedNameG blank → lowerEvo = its own name).
+          // GL-as-Skwovet and UL-as-Greedent are separate commitments — surface both, let user choose.
+          if (lowerEvo === best.name) return false;
           const lowerRank = Math.round(best['rankPct'+ll]||0);
           const thisRank = Math.round(bestRank);
           return lowerRank >= 100 && thisRank < 100; // protect if lower is 100, this isn't
@@ -786,6 +818,7 @@ function analyse(rows) {
               const lowerEvo = ll==='L'?(p.evolvedNameL||p.name)
                 :ll==='G'?(p.evolvedNameG||p.name):(p.evolvedNameU||p.name);
               if (lowerEvo === stageName) return false;
+              if (lowerEvo === p.name) return false; // same rule as above
               const lr = Math.round(p['rankPct'+ll]||0);
               const tr = Math.round(p[rankField]||0);
               return lr >= 100 && tr < 100;
@@ -803,8 +836,8 @@ function analyse(rows) {
           if (!best2.slots.includes(lg)) best2.slots.push(lg);
           best2.targetEvo = stageName !== best2.name ? stageName : '';
           best2.slotConfirmed = isConfirmed || !!best2.slotConfirmed; // purify loop may have already confirmed
-          if (!isConfirmed) best.slots.push(lg+'_tentative');
-          const eDustCheck = effectiveDust(best);
+          if (!isConfirmed) best2.slots.push(lg+'_tentative');
+          const eDustCheck = effectiveDust(best2);
           // Use league-specific evo key so a stage final for Little isn't blocked by a Great evo
           const leagueEvoKey = lg==='L'?'evolvedNameL':lg==='G'?'evolvedNameG':'evolvedNameU';
           const isFinalEvoStage = !members.some(m =>
@@ -848,17 +881,17 @@ function analyse(rows) {
           }
 
           // Flag if a cheaper option exists at same tier
-          const bestTier = rankTier(best);
+          const bestTier = rankTier(best2);
           const cheaperExists = eligible.slice(1).some(p =>
-            rankTier(p) === bestTier && effectiveDust(p) < effectiveDust(best)
+            rankTier(p) === bestTier && effectiveDust(p) < effectiveDust(best2)
           );
-          if (cheaperExists) best.cheaperAvailable = (best.cheaperAvailable||[]);
+          if (cheaperExists) best2.cheaperAvailable = (best2.cheaperAvailable||[]);
           // (cheaperAvailable flag is set on winner to show it could be replaced)
 
           // Check if 200k+ threshold — flag as tentative if over budget
-          const eDust = effectiveDust(best);
+          const eDust = effectiveDust(best2);
           if (eDust > 200000 && bestTier === 0) {
-            best.overBudget100 = true;
+            best2.overBudget100 = true;
           }
 
           // Second runner-up: if another candidate also qualifies at 90%+
@@ -877,8 +910,8 @@ function analyse(rows) {
     members.filter(p=>p.isLucky).forEach(p=>p.slots.push('lucky'));
     members.filter(p=>p.isNundo).forEach(p=>p.slots.push('nundo'));
     // Dynamax: best-IV per species gets 'dynamax' slot, unless it already holds a league slot.
-    // Tie case: if best-IV holds a league slot, a candidate with the SAME ivAvg (genuine tie)
-    // and no league slot inherits the slot. Lower-IV dupes still trade.
+    // Best-without-league-slot: if best-IV holds a league slot, the best remaining candidate
+    // without a league slot inherits the Dmax/Gmax slot (regardless of IV gap — same as shadow).
     const dmaxCandidates = {};
     members.filter(p => p.isDynamax).forEach(p => {
       if (!dmaxCandidates[p.name]) dmaxCandidates[p.name] = [];
@@ -887,13 +920,12 @@ function analyse(rows) {
     Object.values(dmaxCandidates).forEach(cands => {
       cands.sort((a, b) => (b.ivAvg||0) - (a.ivAvg||0) || (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
       const best = cands[0]; if (!best) return;
-      const bestIv = best.ivAvg || 0;
       const target = best.slots.some(s => RULES.leagues.includes(s))
-        ? cands.find(p => (p.ivAvg||0) === bestIv && !p.slots.some(s => RULES.leagues.includes(s)))
+        ? cands.find(p => !p.slots.some(s => RULES.leagues.includes(s)))
         : best;
       if (target && !target.slots.includes('dynamax')) target.slots.push('dynamax');
     });
-    // Gigantamax: same tied-IV fall-through logic
+    // Gigantamax: same best-without-league-slot logic
     const gmaxCandidates = {};
     members.filter(p => p.isGigantamax).forEach(p => {
       if (!gmaxCandidates[p.name]) gmaxCandidates[p.name] = [];
@@ -902,16 +934,15 @@ function analyse(rows) {
     Object.values(gmaxCandidates).forEach(cands => {
       cands.sort((a, b) => (b.ivAvg||0) - (a.ivAvg||0) || (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
       const best = cands[0]; if (!best) return;
-      const bestIv = best.ivAvg || 0;
       const target = best.slots.some(s => RULES.leagues.includes(s))
-        ? cands.find(p => (p.ivAvg||0) === bestIv && !p.slots.some(s => RULES.leagues.includes(s)))
+        ? cands.find(p => !p.slots.some(s => RULES.leagues.includes(s)))
         : best;
       if (target && !target.slots.includes('gigantamax')) target.slots.push('gigantamax');
     });
     // Legendary: best-IV per species (no league slot, no Dmax/Gmax) → 'best_overall' slot
     if (isLegendary) {
       const legendBySpecies = {};
-      members.filter(p => !p.isDynamax && !p.isGigantamax && !p.slots.some(s => RULES.leagues.includes(s))).forEach(p => {
+      members.filter(p => !p.isDynamax && !p.isGigantamax && !p.slots.some(s => RULES.leagues.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)).forEach(p => {
         const k = p.name;
         if (!legendBySpecies[k] || (p.ivAvg||0) > (legendBySpecies[k].ivAvg||0) ||
           ((p.ivAvg||0) === (legendBySpecies[k].ivAvg||0) && p.isFavorite && !legendBySpecies[k].isFavorite))
@@ -932,7 +963,7 @@ function analyse(rows) {
       else if (leagueSlot === 'M') p.dustCostBest = 0;
       else p.dustCostBest = p.dustMin || 0;
 
-      const hasLeagueSlot=p.slots.some(s=>RULES.leagues.includes(s)||s.endsWith('_affordable'));
+      const hasLeagueSlot=p.slots.some(s=>RULES.leagues.includes(s)||s.endsWith('_affordable'))&&!(isLegendary&&p.slots.includes('best_overall')&&!p.slotConfirmed);
       const hasAffordableBackup=p.slots.some(s=>s.endsWith('_affordable'));
       const hasProtectedSlot=isLegendary&&p.slots.length>0;
       const qualifiesAny=RULES.leagues.some(l=>(p[`rankPct${l}`]||0)>=RULES.keepThreshold);
@@ -1127,7 +1158,8 @@ function analyse(rows) {
           :lg==='G'?(p.evolvedNameG||p.name)
           :lg==='U'?(p.evolvedNameU||p.name)
           :(p.evolvedNameU||p.evolvedNameG||p.name);
-        slotWinners[lg+'|'+evo] = (slotWinners[lg+'|'+evo]||0) + 1;
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
+        slotWinners[lg+'|'+evo+vk] = (slotWinners[lg+'|'+evo+vk]||0) + 1;
       });
     });
 
@@ -1150,8 +1182,16 @@ function analyse(rows) {
       const keepSlot = priority.find(s => leagueSlots.includes(s)); // highest-priority league
       const keepEvo = slotEvo(keepSlot);
 
-      // Different evo stage: must release (can't physically be in two evo stages at once)
-      const diffEvoConflicts = leagueSlots.filter(s => s !== keepSlot && slotEvo(s) !== keepEvo);
+      // Different evo stage: must release (can't physically be in two evo stages at once).
+      // Use the highest-priority CONFIRMED slot as the anchor for diffEvo resolution.
+      // If keepSlot is tentative but a lower-priority slot is confirmed with a different evo target,
+      // the confirmed slot wins — don't release it just because it has lower league priority.
+      const confirmedLeagueSlots = leagueSlots.filter(s => (p['rankPct'+s]||0) >= RULES.keepThreshold);
+      const diffEvoAnchor = confirmedLeagueSlots.length > 0
+        ? priority.find(s => confirmedLeagueSlots.includes(s))
+        : keepSlot;
+      const diffEvoAnchorEvo = slotEvo(diffEvoAnchor);
+      const diffEvoConflicts = leagueSlots.filter(s => s !== diffEvoAnchor && slotEvo(s) !== diffEvoAnchorEvo);
 
       // Same evo stage: keep the slot with the highest rank; release the rest
       // (Pokémon should specialise in the league where it has the best rank)
@@ -1161,8 +1201,15 @@ function analyse(rows) {
         const rb = p['rankPct'+best]||0, rs = p['rankPct'+s]||0;
         return rs > rb ? s : best;
       }, keepSlot);
+      // Release same-evo slot only when:
+      //   (a) ML is the best slot (capped leagues always yield to ML for nick/display clarity), OR
+      //   (b) the lower-ranked slot is below the keep threshold.
+      // A Pokémon confirmed (≥90%) in two non-ML leagues for the same evo target
+      // (e.g. GL+UL Greedent) is a genuine dual-league keeper and should hold both slots.
       const sameEvoConflicts = sameEvoSlots.filter(s =>
-        s !== bestRankedSlot && (p['rankPct'+s]||0) < (p['rankPct'+bestRankedSlot]||0)
+        s !== bestRankedSlot &&
+        (p['rankPct'+s]||0) < (p['rankPct'+bestRankedSlot]||0) &&
+        (bestRankedSlot === 'M' || (p['rankPct'+s]||0) < RULES.keepThreshold)
       );
 
       const conflicting = [...diffEvoConflicts, ...sameEvoConflicts];
@@ -1176,7 +1223,8 @@ function analyse(rows) {
         releasedSlotPokemon.add(p);
 
         // Decrement winner count for this stage
-        const wk = s+'|'+evoTarget;
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
+        const wk = s+'|'+evoTarget+vk;
         slotWinners[wk] = Math.max(0, (slotWinners[wk]||1) - 1);
 
         // Only find next best if this evo stage has NO winner left
@@ -1187,6 +1235,9 @@ function analyse(rows) {
         const nextBest = members
           .filter(m => m !== p)
           .filter(m => {
+            // Must match the same variant (shadow/regular/lucky/purified) as the releasing Pokémon
+            const m_vk = m.isShadow ? '|shadow' : m.isPurified ? '|purified' : m.isLucky ? '|lucky' : '';
+            if (m_vk !== vk) return false;
             // Must not already hold this league (even for a different evo target)
             if (m.slots.includes(s)) return false;
             // Candidate's evo target for this league must match the released slot's evo target
@@ -1200,7 +1251,7 @@ function analyse(rows) {
             const d = s==='L'?m.dustL:s==='G'?m.dustG:s==='U'?m.dustU:0;
             const isFinal = !(m.evolvedNameG && m.evolvedNameG !== m.name) &&
                             !(m.evolvedNameU && m.evolvedNameU !== m.name);
-            return (m[rf]||0) >= 70 && (d <= 300000 || isFinal || isLegendary);
+            return (m[rf]||0) >= 70 && (d <= RULES.dustExcludeThreshold || isFinal || isLegendary);
           })
           .sort((a,b) => {
             const ra = a[rf]||0, rb = b[rf]||0;
@@ -1225,7 +1276,7 @@ function analyse(rows) {
                 :sl==='G'?(m.evolvedNameG||m.name)
                 :sl==='U'?(m.evolvedNameU||m.name)
                 :(m.evolvedNameU||m.evolvedNameG||m.name);
-              return slEvo === evoTarget;
+              return slEvo === evoTarget && (m['rankPct'+sl]||0) >= RULES.keepThreshold;
             });
           });
 
@@ -1260,8 +1311,10 @@ function analyse(rows) {
       Object.values(byEvo).forEach(group => {
         if (group.length <= 1) return;
         group.sort((a, b) => {
-          const ra = Math.round(a[rf]||0), rb = Math.round(b[rf]||0);
+          const rawA = a[rf]||0, rawB = b[rf]||0;
+          const ra = Math.round(rawA), rb = Math.round(rawB);
           if (ra !== rb) return rb - ra;
+          if (Math.abs(rawA - rawB) > 0.01) return rawB - rawA;
           const aEvo = lg==='L'?(a.evolvedNameL||a.name):lg==='G'?(a.evolvedNameG||a.name):(a.evolvedNameU||a.name);
           const bEvo = lg==='L'?(b.evolvedNameL||b.name):lg==='G'?(b.evolvedNameG||b.name):(b.evolvedNameU||b.name);
           const aEvolved = a.name === aEvo ? 0 : 1;

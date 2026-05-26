@@ -44,6 +44,10 @@ region = ap-southeast-2
 output = json
 ```
 
+## Pre-deploy checklist
+
+- [ ] **Increment the version number** in `pokevault-refactor/index.html` `<title>` tag (e.g. `PokéVault v3.5.19` → `v3.5.20`) — every deployment must bump the version so users and Claude can tell which build is live.
+
 ## Full deploy (all files)
 
 Run from the repo root (`C:\ClaudeCode\pokevault\`):
