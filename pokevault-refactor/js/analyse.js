@@ -738,11 +738,20 @@ function analyse(rows) {
             // Committed to a lower league: already powered to cap with 0 dust and favourited
             // Check rankPct to distinguish "powered up" (true 0 dust) from "no data" (empty CSV field → 0)
             const littleQualifies = (p.rankPctL||0) >= RULES.keepThreshold;
-            const greatQualifies = (p.rankPctG||0) >= RULES.keepThreshold;
-            if ((lg === 'U' || lg === 'G' || lg === 'M') && p.dustL === 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite && littleQualifies) return false;
+            const greatQualifies  = (p.rankPctG||0) >= RULES.keepThreshold;
+            // "Committed to a lower league" must mean that league is genuinely the Pokémon's BEST role.
+            // Only exclude from the higher league when this league's rank is NOT better than the lower-league
+            // rank it's committed to. A Skwovet maxed for Little (98.83% as itself) that ranks HIGHER in
+            // Great (99.78% as Greedent) belongs in Great — powering up for Little doesn't consume the evo.
+            const EPS = 0.01;
+            const betterInThisLg = (lowerRank) => (p[rankField]||0) > (lowerRank||0) + EPS;
+            if ((lg === 'U' || lg === 'G' || lg === 'M') && p.dustL === 0 && (p.cp||0) <= 500 * 1.05
+                && p.isFavorite && littleQualifies && !betterInThisLg(p.rankPctL)) return false;
             // Low-CP Pokémon committed to Great but not Ultra (dustG=0, dustU≠0) — exclude from Ultra
-            if (lg === 'U' && p.dustG === 0 && p.dustU !== 0 && (p.cp||0) <= 500 * 1.05 && p.isFavorite && greatQualifies) return false;
-            if (lg === 'U' && p.dustG === 0 && (p.cp||0) <= 1500 * 1.05 && (p.cp||0) > 500 * 1.05 && p.isFavorite) return false;
+            if (lg === 'U' && p.dustG === 0 && p.dustU !== 0 && (p.cp||0) <= 500 * 1.05
+                && p.isFavorite && greatQualifies && !betterInThisLg(p.rankPctG)) return false;
+            if (lg === 'U' && p.dustG === 0 && (p.cp||0) <= 1500 * 1.05 && (p.cp||0) > 500 * 1.05
+                && p.isFavorite && !betterInThisLg(p.rankPctG)) return false;
 
             // Set isCommitted flag for display (pokemon at their cap with 0 dust)
             const leagueDustVal = lg==='L'?p.dustL:lg==='G'?p.dustG:lg==='U'?p.dustU:null;

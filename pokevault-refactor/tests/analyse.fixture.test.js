@@ -1607,6 +1607,47 @@ describe('Group 32 — Fix 1 regression: actual rank wins before evolved prefere
   });
 });
 
+// ─── Group 36 — betterInThisLg guard: committed-to-Little filter uses rank comparison ─
+// Review #2 root cause: line ~742 excluded ANY favorited, dustL=0, Little-qualifying Pokémon
+// from Great/Ultra, even when Great rank is higher. Fix: only exclude when NOT better in this lg.
+// 4a: CP:496 (rankG=99.78% > rankL=98.83%) must win Great.
+// 4b: Flaaffy CP:500 (rankG=91.50% < rankL=99.95%) must stay committed to Little.
+// 4c: Mawile CP:500 (rankG=95.00% < rankL=99.00%, final-evo, same-evo) must stay excluded from Great.
+
+describe('Group 36 — betterInThisLg guard (committed-to-Little filter uses rank comparison)', () => {
+  // 4a — exact regression: fav + dustL=0 + qualifying Little rank + higher Great rank → wins Great
+  it('4a: Skwovet CP:496 (rankG=99.78% > rankL=98.83%, fav, dustL=0) still wins Great', () => {
+    const p = find('Skwovet', 496);
+    expect(p.slots).toContain('G');
+  });
+  it('4a: Skwovet CP:496 → decision=keep (not demoted to review when fav + Little-maxed)', () => {
+    const p = find('Skwovet', 496);
+    expect(p.decision).not.toBe('review');
+    expect(p.decision).toBe('keep');
+  });
+  it('4a: Skwovet CP:496 → nickname contains Ⓖ (confirmed Great slot)', () => {
+    const p = find('Skwovet', 496);
+    expect(p.nickname).toContain('Ⓖ');
+  });
+
+  // 4b — contrast: Flaaffy genuinely better in Little (99.95%) than Great (91.50%) → stays committed
+  it('4b: Flaaffy CP:500 (rankG=91.50% < rankL=99.95%) stays committed to Little, not pulled into Great', () => {
+    const fl = find('Flaaffy', 500);
+    expect(fl.slots).toContain('L');
+    expect(fl.slots).not.toContain('G');
+  });
+  it('4b: Mareep CP:120 retains family Great/Ampharos slot (Flaaffy excluded)', () => {
+    const mr = find('Mareep', 120);
+    expect(mr.slots).toContain('G');
+  });
+
+  // 4c — final-evo same-form: Mawile (rankG=95% < rankL=99%, no evo path) stays excluded from Great
+  it('4c: Mawile CP:500 (rankG=95% < rankL=99%, final-evo, fav, dustL=0) excluded from Great', () => {
+    const p = find('Mawile', 500);
+    expect(p.slots).not.toContain('G');
+  });
+});
+
 // ─── Group 33 — Evolved preference still fires on genuine actual-rank tie ───────
 // Rows 1 (Glaceon CP:1500) and 2 (Eevee CP:477) have identical GL rank (99.71%).
 // Fix 1 must NOT suppress evolved-preference when actual ranks are truly equal.
