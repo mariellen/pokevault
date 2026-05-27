@@ -1227,7 +1227,9 @@ function analyse(rows) {
       conflicting.forEach(s => {
         const evoTarget = slotEvo(s);
         p.slots = p.slots.filter(x => x !== s);
-        p.slotConfirmed = p.slots.some(x => RULES.leagues.includes(x));
+        p.slotConfirmed = p.slots.some(x =>
+          RULES.leagues.includes(x) && (p['rankPct'+x]||0) >= RULES.keepThreshold
+        );
         if (p.expensiveForLeague === s) p.isExpensiveWinner = false;
         releasedSlotPokemon.add(p);
 
@@ -1335,7 +1337,9 @@ function analyse(rows) {
         });
         group.slice(1).forEach(p => {
           p.slots = p.slots.filter(s => s !== lg);
-          p.slotConfirmed = p.slots.some(s => RULES.leagues.includes(s));
+          p.slotConfirmed = p.slots.some(s =>
+            RULES.leagues.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold
+          );
         });
       });
     });

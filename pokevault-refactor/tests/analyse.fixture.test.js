@@ -1687,3 +1687,130 @@ describe('Group 35 — Variant-key conflict guard: shadow slot gets independent 
     expect(p.slots).toContain('G');
   });
 });
+
+// ─── Group 37 — Fix A1: slotConfirmed recompute requires rank ≥ keepThreshold ──
+// Bug: lines 1230+1338 set slotConfirmed=true from slot membership alone.
+// A Pokémon winning two tentative slots (<90%) triggers sameEvoConflict; after conflict
+// resolution removes the weaker slot, the remaining tentative 'G' flips slotConfirmed=true.
+// Fix: recompute must also check rankPct >= keepThreshold for each remaining slot.
+// Mismagius CP:1490 wins G (82%) + U (79%) tentatively → sameEvoConflict releases U →
+// remaining G (82%) → slotConfirmed must stay false → decision=review, no circled letter.
+
+describe('Group 37 — Fix A1: tentative-slot slotConfirmed recompute (rank guard)', () => {
+  it('Mismagius CP:1490 (82% G + 79% U, both tentative) → decision=review after sameEvoConflict', () => {
+    const p = find('Mismagius', 1490);
+    expect(p).toBeDefined();
+    expect(p.decision).toBe('review');
+  });
+  it('Mismagius CP:1490 → slotConfirmed is falsy (not promoted by rank-blind recompute)', () => {
+    const p = find('Mismagius', 1490);
+    expect(p.slotConfirmed).toBeFalsy();
+  });
+  it('Mismagius CP:1490 → nickname has no circled league letter (holding nick only)', () => {
+    const p = find('Mismagius', 1490);
+    expect(p.nickname).not.toMatch(/Ⓖ|Ⓤ|Ⓛ|Ⓜ/);
+  });
+});
+
+// ─── Group 38 — B1: dust exclusion is rank-gated (pre-evo + high dust) ──────────
+// dustExcludeThreshold=300k: a pre-evo with dustG>300k is excluded from GL ONLY when
+// rankPctG < keepThreshold (90%). High-rank pre-evos (≥90%) must never be excluded by dust.
+// Snubbull (#209, pre-evo of Granbull) both cases with dustG=350k.
+
+describe('Group 38 — B1: dust exclusion is rank-gated for pre-evos', () => {
+  it('B1a: Snubbull CP:430 (95% GL, dustG=350k) is kept despite high dust — rank ≥ 90% overrides dust exclusion', () => {
+    const p = find('Snubbull', 430);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.decision).toBe('keep');
+  });
+  it('B1b: Snubbull CP:400 (85% GL, dustG=350k) is excluded — rank < 90% + high dust triggers exclusion', () => {
+    const p = find('Snubbull', 400);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('G');
+  });
+});
+
+// ─── Group 39 — B2: lucky half-effective-dust wins tiebreak ─────────────────────
+// Lucky Pokémon pay half effective dust in the slot sort tiebreak.
+// Both Minun are lucky — they compete in the same |lucky variant group for the lucky GL slot.
+// Lucky A (CP:1380, dustG=120k → effective 60k) vs Lucky B (CP:1360, dustG=200k → effective 100k).
+// Same rounded GL rank (95%). Lucky A wins because effective 60k < 100k.
+
+describe('Group 39 — B2: lucky half-dust tiebreak (lower effective dust wins same-rank slot)', () => {
+  it('B2: Lucky Minun CP:1380 (dustG=120k → effective 60k, rank=95.10%) wins lucky-GL over Lucky CP:1360 (dustG=200k → effective 100k)', () => {
+    const a = find('Minun', 1380);
+    const b = find('Minun', 1360);
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    expect(a.slots).toContain('G');
+    expect(b.slots).not.toContain('G');
+  });
+});
+
+// ─── Group 40 — B3: gender-dimorphic species win GL independently ────────────────
+// Frillish (#592) male and female are in separate family groups (GENDER_SPLIT_SPECIES).
+// Both ≥90% GL → both win GL independently; neither displaces the other.
+
+describe('Group 40 — B3: gender-dimorphic Frillish male + female win GL independently', () => {
+  it('B3: Male Frillish CP:1050 (92% GL) wins GL independently', () => {
+    const p = find('Frillish', 1050);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.decision).toBe('keep');
+  });
+  it('B3: Female Frillish CP:1030 (91% GL) wins GL independently', () => {
+    const p = find('Frillish', 1030);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.decision).toBe('keep');
+  });
+  it('B3: Male and female Frillish both held GL simultaneously — gender split is independent', () => {
+    const male = find('Frillish', 1050);
+    const female = find('Frillish', 1030);
+    expect(male.slots).toContain('G');
+    expect(female.slots).toContain('G');
+  });
+});
+
+// ─── Group 41 — B4: shiny+league slot nick order — COVERAGE GAP ──────────────────
+// The test harness calls analyse(csv) with no overridesCache, so isShiny cannot be
+// injected via override. Shiny nick ordering (Ⓖ → IV% → Ⓗ → ※) is untested here.
+// TODO: extend harness to accept an overrides map and add shiny nick assertion.
+
+// ─── Group 42 — B5: shadow purify-'p' suffix toggling ───────────────────────────
+// Shadow with confirmed own-league slot (≥90%) → no 'p' suffix.
+// Shadow Gengar CP:1327 (92% UL shadow slot, confirmed) should NOT have 'p' in nickname.
+// Shadow Gengar CP:1100 (82% GL, tentative only) SHOULD have 'p' if purifyLeague is set.
+
+describe('Group 42 — B5: shadow purify-p suffix toggling', () => {
+  it('B5: Shadow Gengar CP:1327 (92% UL confirmed slot) → nickname does NOT contain purify p suffix', () => {
+    const p = find('Gengar', 1327);
+    expect(p).toBeDefined();
+    // Shadow with confirmed own-league UL slot — purify 'p' suffix must be suppressed
+    expect(p.isShadow).toBe(true);
+    expect(p.slots.some(s => s === 'U')).toBe(true);
+    expect(p.nickname).not.toMatch(/p(?:✪)?$/);
+  });
+});
+
+// ─── Group 43 — B6: expensive GL winner + affordable backup (cyan star) ──────────
+// When the GL winner's effective dust exceeds the affordable threshold (150k for GL),
+// a cheaper backup at the same rounded rank gets G_affordable + cyan star (suggestStarCheaper).
+// Tentacruel CP:1450 (96.10% GL, dustG=200k > 150k) → expensive winner → isExpensiveWinner=true.
+// Tentacruel CP:1420 (96.00% GL, dustG=100k ≤ 150k) → affordable backup → suggestStarCheaper=true.
+
+describe('Group 43 — B6: expensive GL winner + affordable backup pair', () => {
+  it('B6: Tentacruel CP:1450 (dustG=200k, 96% GL) wins GL with isExpensiveWinner flag', () => {
+    const p = find('Tentacruel', 1450);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.isExpensiveWinner).toBe(true);
+  });
+  it('B6: Tentacruel CP:1430 (dustG=100k, 96% GL) is the affordable backup (isAffordableWinner=true, G_affordable slot)', () => {
+    const p = find('Tentacruel', 1430);
+    expect(p).toBeDefined();
+    expect(p.isAffordableWinner).toBe(true);
+    expect(p.slots).toContain('G_affordable');
+  });
+});
