@@ -50,7 +50,7 @@ pokevault-refactor/
 
 - **Hosted:** AWS S3 + CloudFront → `pokevault.mariellen.com.au`
 - **Supabase:** `jsozfpsfvvnnmipsksoh.supabase.co` (overrides + collection sync)
-- **Deploy:** `aws s3 sync pokevault-refactor/ s3://pokevault.mariellen.com.au/pokevault-refactor/ --exclude "*.md"`
+- **Deploy:** `aws s3 sync pokevault-refactor/ s3://pokevault.mariellen.com.au/ --exclude "*.md"` — **ROOT, not /pokevault-refactor/**
 - **Cache bust:** `aws cloudfront create-invalidation --distribution-id E2IMCPUABUXY1Y --paths "/*"`
 
 ---
