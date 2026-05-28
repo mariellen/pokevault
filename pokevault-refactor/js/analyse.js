@@ -739,14 +739,17 @@ function analyse(rows) {
             // Check rankPct to distinguish "powered up" (true 0 dust) from "no data" (empty CSV field → 0)
             const littleQualifies = (p.rankPctL||0) >= RULES.keepThreshold;
             const greatQualifies  = (p.rankPctG||0) >= RULES.keepThreshold;
-            // "Committed to a lower league" must mean that league is genuinely the Pokémon's BEST role.
-            // Only exclude from the higher league when this league's rank is NOT better than the lower-league
-            // rank it's committed to. A Skwovet maxed for Little (98.83% as itself) that ranks HIGHER in
-            // Great (99.78% as Greedent) belongs in Great — powering up for Little doesn't consume the evo.
             const EPS = 0.01;
             const betterInThisLg = (lowerRank) => (p[rankField]||0) > (lowerRank||0) + EPS;
+            // "Committed to a lower league" applies only when the higher-league evo target matches the
+            // Little-league target (same physical form — truly can't serve both simultaneously).
+            // Skwovet-as-Skwovet (Little) vs evolved-to-Greedent (Great/Ultra) are different forms.
+            const littleEvoTarget = p.evolvedNameL || p.name;
+            const lgEvoTarget = lg === 'G' ? (p.evolvedNameG||p.name)
+                              : lg === 'U' ? (p.evolvedNameU||p.name)
+                              : (p.evolvedNameU||p.evolvedNameG||p.name);
             if ((lg === 'U' || lg === 'G' || lg === 'M') && p.dustL === 0 && (p.cp||0) <= 500 * 1.05
-                && p.isFavorite && littleQualifies && !betterInThisLg(p.rankPctL)) return false;
+                && p.isFavorite && littleQualifies && littleEvoTarget === lgEvoTarget) return false;
             // Low-CP Pokémon committed to Great but not Ultra (dustG=0, dustU≠0) — exclude from Ultra
             if (lg === 'U' && p.dustG === 0 && p.dustU !== 0 && (p.cp||0) <= 500 * 1.05
                 && p.isFavorite && greatQualifies && !betterInThisLg(p.rankPctG)) return false;
@@ -841,7 +844,9 @@ function analyse(rows) {
 
         // Always promote the best candidate — threshold determines if it's confirmed or tentative
         const isConfirmed = bestRank2 >= RULES.keepThreshold;
-        if (bestRank2 >= 70) { // Only skip truly weak candidates
+        // ML rank = ivAvg; keep original 70% floor for ML to avoid surfacing every Pokémon
+        const floorForLg = lg === 'M' ? 70 : 0;
+        if (bestRank2 > floorForLg) {
           if (!best2.slots.includes(lg)) best2.slots.push(lg);
           best2.targetEvo = stageName !== best2.name ? stageName : '';
           best2.slotConfirmed = isConfirmed || !!best2.slotConfirmed; // purify loop may have already confirmed
@@ -948,16 +953,29 @@ function analyse(rows) {
         : best;
       if (target && !target.slots.includes('gigantamax')) target.slots.push('gigantamax');
     });
-    // Legendary: best-IV per species (no league slot, no Dmax/Gmax) → 'best_overall' slot
-    if (isLegendary) {
-      const legendBySpecies = {};
-      members.filter(p => !p.isDynamax && !p.isGigantamax && !p.slots.some(s => RULES.leagues.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)).forEach(p => {
+    // All species: best-IV per species without a confirmed league slot → 'best_overall' slot
+    // Non-legendaries: must have a qualifying rank (≥90%) in some league AND the species must have
+    // no confirmed keeper already in the family (prevents same-species losers from piling up).
+    {
+      const speciesWithConfirmedKeeper = new Set(
+        members.filter(p =>
+          RULES.leagues.some(s => p.slots.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)
+        ).map(p => p.name)
+      );
+      const bestOverallBySpecies = {};
+      members.filter(p => {
+        if (p.isDynamax || p.isGigantamax) return false;
+        if (p.slots.some(s => RULES.leagues.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)) return false;
+        if (!isLegendary && !RULES.leagues.some(l => (p[`rankPct${l}`]||0) >= RULES.keepThreshold)) return false;
+        if (!isLegendary && speciesWithConfirmedKeeper.has(p.name)) return false;
+        return true;
+      }).forEach(p => {
         const k = p.name;
-        if (!legendBySpecies[k] || (p.ivAvg||0) > (legendBySpecies[k].ivAvg||0) ||
-          ((p.ivAvg||0) === (legendBySpecies[k].ivAvg||0) && p.isFavorite && !legendBySpecies[k].isFavorite))
-          legendBySpecies[k] = p;
+        if (!bestOverallBySpecies[k] || (p.ivAvg||0) > (bestOverallBySpecies[k].ivAvg||0) ||
+          ((p.ivAvg||0) === (bestOverallBySpecies[k].ivAvg||0) && p.isFavorite && !bestOverallBySpecies[k].isFavorite))
+          bestOverallBySpecies[k] = p;
       });
-      Object.values(legendBySpecies).forEach(best => {
+      Object.values(bestOverallBySpecies).forEach(best => {
         if (!best.slots.includes('best_overall')) best.slots.push('best_overall');
       });
     }
@@ -1027,7 +1045,7 @@ function analyse(rows) {
         p.decision='keep'; p.reason='Best Gigantamax — keep';
         p.nickname=buildNickname(p,'gigantamax');
       } else if (p.slots.includes('best_overall')) {
-        p.decision='keep'; p.reason='Best Legendary — keep';
+        p.decision='keep'; p.reason=isLegendary?'Best Legendary — keep':'Best in family — keep';
         p.nickname=buildNickname(p,'lucky');
       } else if (p.slots.includes('shadow')) {
         p.decision='keep'; p.reason='Best shadow — keep for raids/Master League';

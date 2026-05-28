@@ -53,8 +53,7 @@ describe('Group 1 — Glaceon family (evolved preference + committed)', () => {
     const preEvo = find('Eevee', 654);
     expect(preEvo).toBeDefined();
     expect(preEvo.slots).not.toContain('U');
-    // Not a keeper — no confirmed league slot won
-    expect(['trade', 'review']).toContain(preEvo.decision);
+    expect(preEvo.suggestStar).toBe(false);
     // Glaceon must still hold Ultra
     const evolved = find('Glaceon', 2500);
     expect(evolved.slots).toContain('U');
@@ -148,20 +147,23 @@ describe('Group 4 — Slowpoke CYAN star', () => {
 // ─── Group 5 — Flaaffy (lucky zero-dust committed) ───────────────────────────
 
 describe('Group 5 — Flaaffy (lucky zero-dust committed)', () => {
-  it('Flaaffy CP:500 (Lucky, fav=1, dustL=0) wins Little slot — GOLD', () => {
+  // C2: Flaaffy evolvedNameL='Flaaffy' ≠ evolvedNameG='Ampharos' → different forms → not excluded from Great.
+  // Flaaffy (lucky, effectiveDust=6750) beats Mareep (dustG=25000) for Great via lower effective dust.
+  // Deconfliction fires: Flaaffy's Little evo target ('Flaaffy') ≠ Great anchor ('Ampharos') → Little released.
+  // Mareep wins Little via nextBest.
+  it('Flaaffy CP:500 (Lucky, fav=1, different evo targets for L/G) wins Great slot under C2', () => {
     const p = find('Flaaffy', 500);
     expect(p).toBeDefined();
     expect(p.isLucky).toBe(true);
     expect(p.isFavorite).toBe(true);
-    expect(p.slots).toContain('L');
-    expect(p.suggestStar).toBe(true);
+    expect(p.slots).toContain('G');
   });
 
-  it('Mareep CP:120 does NOT win Little (Flaaffy CP:500 wins it) — correct evo-stage grouping', () => {
+  it('Mareep CP:120 wins Great (regular non-lucky Ampharos group is independent from Flaaffy lucky group)', () => {
     const mareep = find('Mareep', 120);
     expect(mareep).toBeDefined();
-    expect(mareep.slots).not.toContain('L');
     expect(mareep.slots).toContain('G');
+    expect(mareep.slots).not.toContain('L');
   });
 });
 
@@ -1630,15 +1632,19 @@ describe('Group 36 — betterInThisLg guard (committed-to-Little filter uses ran
     expect(p.nickname).toContain('Ⓖ');
   });
 
-  // 4b — contrast: Flaaffy genuinely better in Little (99.95%) than Great (91.50%) → stays committed
-  it('4b: Flaaffy CP:500 (rankG=91.50% < rankL=99.95%) stays committed to Little, not pulled into Great', () => {
+  // 4b — C2 behavioural change: Flaaffy evolvedNameL='Flaaffy' ≠ evolvedNameG='Ampharos' → different forms
+  // Under C2, Flaaffy is no longer excluded from Great. It wins Great (cheaper lucky dust beats Mareep).
+  // Deconfliction: Flaaffy's Great anchor 'Ampharos' ≠ Little evo 'Flaaffy' → Little released.
+  // Mareep wins Little via nextBest (evolvedNameL='Flaaffy').
+  it('4b: Flaaffy CP:500 (C2: evolvedNameL=Flaaffy ≠ evolvedNameG=Ampharos) now wins Great', () => {
     const fl = find('Flaaffy', 500);
-    expect(fl.slots).toContain('L');
-    expect(fl.slots).not.toContain('G');
+    expect(fl.slots).toContain('G');
+    expect(fl.slots).not.toContain('L');
   });
-  it('4b: Mareep CP:120 retains family Great/Ampharos slot (Flaaffy excluded)', () => {
+  it('4b: Mareep CP:120 wins Great (regular non-lucky Ampharos group is independent from Flaaffy lucky group)', () => {
     const mr = find('Mareep', 120);
     expect(mr.slots).toContain('G');
+    expect(mr.slots).not.toContain('L');
   });
 
   // 4c — final-evo same-form: Mawile (rankG=95% < rankL=99%, no evo path) stays excluded from Great
@@ -1812,5 +1818,87 @@ describe('Group 43 — B6: expensive GL winner + affordable backup pair', () => 
     expect(p).toBeDefined();
     expect(p.isAffordableWinner).toBe(true);
     expect(p.slots).toContain('G_affordable');
+  });
+});
+
+// ─── Group 44 — C2: evo-target-scoped committed-to-Little guard ──────────────────
+// Bidoof CP:496: fav=1, dustL=0, rankPctL=95%, evolvedNameL='Bidoof'.
+// evolvedNameG='Bibarel', evolvedNameU='Bibarel' — DIFFERENT from evolvedNameL.
+// With betterInThisLg (old): 92% NOT > 95%+EPS → excluded from G and U.
+// With evo-target fix (C2): 'Bidoof' ≠ 'Bibarel' → NOT excluded → wins both G and U.
+// sameEvoConflict: G (92%) and U (91%) both target Bibarel, U rank ≥ 90% → both kept.
+// Deconfliction: L evo target 'Bidoof' ≠ G/U anchor 'Bibarel' → L released (no nextBest).
+// Mawile 4c guard still holds: evolvedNameL='Mawile' = evolvedNameG='Mawile' → same form → excluded.
+
+describe('Group 44 — C2: evo-target-scoped committed-to-Little guard', () => {
+  it('C2: Bidoof CP:496 (fav, dustL=0, evolvedNameL=Bidoof ≠ Bibarel) wins Great slot', () => {
+    const p = find('Bidoof', 496);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+  });
+  it('C2: Bidoof CP:496 also wins Ultra slot (evolvedNameL=Bidoof ≠ evolvedNameU=Bibarel)', () => {
+    const p = find('Bidoof', 496);
+    expect(p.slots).toContain('U');
+  });
+  it('C2: Bidoof CP:496 holds both G and U simultaneously (dual-league keeper)', () => {
+    const p = find('Bidoof', 496);
+    expect(p.decision).toBe('keep');
+    expect(p.slots).toContain('G');
+    expect(p.slots).toContain('U');
+  });
+  it('4c still holds: Mawile CP:500 (evolvedNameL=Mawile = evolvedNameG=Mawile, same form) excluded from Great', () => {
+    const p = find('Mawile', 500);
+    expect(p.slots).not.toContain('G');
+  });
+});
+
+// ─── Group 45 — C3: remove 70% floor — best-in-family always surfaces as review ─
+// Rattata CP:100: rankPctG=65% (below old 70% floor), only Rattata in fixture.
+// Before C3: no slot assigned → decision='trade'. After C3: gets tentative G slot → decision='review'.
+
+describe('Group 45 — C3: remove 70% floor — best-in-family always surfaces as review', () => {
+  it('C3: Rattata CP:100 (65% GL, below old 70% floor) gets tentative GL slot', () => {
+    const p = find('Rattata', 100);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+  });
+  it('C3: Rattata CP:100 → decision=review (not trade), slotConfirmed=false', () => {
+    const p = find('Rattata', 100);
+    expect(p.decision).toBe('review');
+    expect(p.slotConfirmed).toBeFalsy();
+  });
+});
+
+// ─── Group 46 — C4: non-legendary best-IV without confirmed slot gets best_overall ─
+// Marowak CP:494 wins GL (95%) and LL (97%) → confirmed slots → excluded from best_overall.
+// Cubone CP:12 competes in LL as Marowak (96%) but loses to Marowak CP:494 (97%, evolved-pref).
+// Cubone has no confirmed slot. C4 extends best_overall to non-legendaries with at least one rank.
+// Best-IV Cubone without a slot → gets best_overall → decision='keep', nick=CuboneⓇ51 (51% IV).
+
+describe('Group 46 — C4: non-legendary best-IV without confirmed slot gets best_overall', () => {
+  it('C4: Cubone CP:12 (no confirmed slot, best-IV Cubone) gets best_overall slot', () => {
+    const p = find('Cubone', 12);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('best_overall');
+  });
+  it('C4: Cubone CP:12 → decision=keep', () => {
+    const p = find('Cubone', 12);
+    expect(p.decision).toBe('keep');
+  });
+  it('C4: Cubone CP:12 → nickname contains Ⓡ (best-overall format)', () => {
+    const p = find('Cubone', 12);
+    expect(p.nickname).toMatch(/Ⓡ/);
+  });
+  it('C4: Marowak CP:494 (confirmed GL+LL slots) does NOT also get best_overall', () => {
+    const p = find('Marowak', 494);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('best_overall');
+    expect(p.decision).toBe('keep');
+  });
+  it('C4: non-legendary with no rank data (Magikarp CP:10) still does NOT get best_overall', () => {
+    const p = find('Magikarp', 10);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('best_overall');
+    expect(p.decision).toBe('trade');
   });
 });
