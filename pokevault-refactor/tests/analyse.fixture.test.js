@@ -63,12 +63,12 @@ describe('Group 1 — Glaceon family (evolved preference + committed)', () => {
 // ─── Group 2 — Leafeon family ────────────────────────────────────────────────
 
 describe('Group 2 — Leafeon family (evolved preference)', () => {
-  it('Leafeon CP:1177 wins both Great (99.58%) and Ultra (99.37%) — nick shows Ⓖ (higher rank)', () => {
+  it('Leafeon CP:1177 wins Ultra only (99.37%) — one-slot rule: U processed before G', () => {
     const p = find('Leafeon', 1177);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('G');
-    expect(p.slots).toContain('U'); // Both confirmed (≥90%): dual-league keeper keeps both slots
-    expect(p.nickname).toContain('Ⓖ');
+    expect(p.slots).toContain('U');
+    expect(p.slots).not.toContain('G'); // one-slot: U wins first (M→U→G→L order)
+    expect(p.nickname).toContain('Ⓤ');
     expect(p.isFavorite).toBe(true);
     expect(p.suggestStar).toBe(true);
   });
@@ -92,15 +92,15 @@ describe('Group 2 — Leafeon family (evolved preference)', () => {
 });
 
 // ─── Group 3 — Vaporeon (same-evo slot routing) ──────────────────────────────
-// CP:1497 holds both G (99.90%) and U (99.61%). Both are confirmed (≥90%) for the
-// same evo target (Vaporeon) so both slots are retained as a dual-league keeper.
+// CP:1497 wins Ultra only (99.61%) under one-slot rule — U is processed before G (M→U→G→L).
 // CP:2493 (98.68% Ultra, fav=1, dustU=0) does NOT win Ultra — CP:1497 holds it.
+// CP:2493 has no GL rank so GL for the Vaporeon evo stage goes unfilled.
 
 describe('Group 3 — Vaporeon (same-evo slot routing)', () => {
-  it('Vaporeon CP:1497 (G=99.90%, U=99.61%) holds both Great and Ultra — both ≥90%', () => {
+  it('Vaporeon CP:1497 (G=99.90%, U=99.61%) wins Ultra only — one-slot: U processed before G', () => {
     const p = find('Vaporeon', 1497);
-    expect(p.slots).toContain('G');
-    expect(p.slots).toContain('U'); // dual-league keeper: both confirmed, both retained
+    expect(p.slots).toContain('U');
+    expect(p.slots).not.toContain('G'); // one-slot: U wins first (M→U→G→L order)
   });
 
   it('Vaporeon CP:2493 (fav=1, dustU=0) does NOT win Ultra — CP:1497 retains it', () => {
@@ -168,22 +168,24 @@ describe('Group 5 — Flaaffy (lucky zero-dust committed)', () => {
 });
 
 // ─── Group 6 — Totodile family ───────────────────────────────────────────────
+// Under one-slot (M→U→G→L): Feraligatr CP:2498 wins ML first (hundo, best ivAvg),
+// then is excluded from UL. CP:2400 wins UL as cascade winner.
 
 describe('Group 6 — Totodile/Croconaw/Feraligatr', () => {
-  it('Feraligatr CP:2498 (hundo, fav=1, dustU=0) wins Ultra AND Master — GOLD', () => {
+  it('Feraligatr CP:2498 (hundo, fav=1) wins Master only — one-slot: M wins first', () => {
     const p = find('Feraligatr', 2498);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('U');
     expect(p.slots).toContain('M');
+    expect(p.slots).not.toContain('U'); // one-slot: excluded from UL after winning ML
     expect(p.isFavorite).toBe(true);
     expect(p.suggestStar).toBe(true);
   });
 
-  it('Feraligatr CP:2400 (fav=1, dustU=0) LOSES Ultra to CP:2498 hundo — RED', () => {
+  it('Feraligatr CP:2400 (fav=1) WINS Ultra (freed by CP:2498 moving to ML) — GOLD', () => {
     const p = find('Feraligatr', 2400);
     expect(p.isFavorite).toBe(true);
-    expect(p.slots).not.toContain('U');
-    expect(p.suggestStar).toBe(false);
+    expect(p.slots).toContain('U'); // cascade winner: CP:2498 moved to ML, freeing UL
+    expect(p.suggestStar).toBe(true);
   });
 
   it('Feraligatr CP:1200 (same IVs, fav=1, old scan) does NOT win Ultra slot — RED', () => {
@@ -248,37 +250,41 @@ describe('Group 7 — Purify modal candidates', () => {
 });
 
 // ─── Group 8 — Star flags ────────────────────────────────────────────────────
+// Under one-slot (M→U→G→L): Machamp CP:2450 wins ML first (ivAvg=97.8 → confirmed ML).
+// Cascade: Machop CP:400 wins UL (freed by Machamp), Machop CP:350 wins GL (freed by CP:400).
+// Eevee CP:478 wins ML (as Umbreon, ivAvg=93.3 → confirmed ML).
 
 describe('Group 8 — Explicit star colours', () => {
-  it('Machamp CP:2450 wins Ultra slot (dustU=0, 99.5%) — nick shows Ⓤ not Ⓡ', () => {
+  it('Machamp CP:2450 wins Master slot (ivAvg=97.8%) — one-slot: M wins first, nick shows Ⓜ', () => {
     const p = find('Machamp', 2450);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('U');
-    expect(p.slots).not.toContain('G'); // Bug 1 fix: Ultra rank wins, Great released
-    expect(p.nickname).toContain('Ⓤ');
+    expect(p.slots).toContain('M');
+    expect(p.slots).not.toContain('U'); // one-slot: excluded from UL after winning ML
+    expect(p.nickname).toContain('Ⓜ');
     expect(p.nickname).not.toContain('Ⓡ');
   });
 
-  it('Machop CP:400 wins Great slot (does not get Ultra)', () => {
+  it('Machop CP:400 wins Ultra slot (freed by Machamp moving to ML)', () => {
     const p = find('Machop', 400);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('G');
-    expect(p.slots).not.toContain('U');
+    expect(p.slots).toContain('U'); // cascade: Machamp moved to ML, freeing UL
+    expect(p.slots).not.toContain('G');
   });
 
-  it('Machop CP:350 (fav=1, loses Great to CP:400) — RED star', () => {
-    // CP:350 is fav=1 but lower rank than CP:400 — should not win any slot
+  it('Machop CP:350 (fav=1) wins Great slot (cascade from CP:400 moving to UL) — GOLD star', () => {
+    // CP:400 moved to UL (cascade), freeing GL for CP:350
     const p = find('Machop', 350);
     expect(p.isFavorite).toBe(true);
-    expect(p.suggestStar).toBe(false);
+    expect(p.slots).toContain('G'); // cascade winner: CP:400 freed GL
+    expect(p.suggestStar).toBe(true); // fav=1 + wins slot = gold
   });
 
-  it('Eevee CP:478 shows BLUE star (suggestStarExpensive) — dustU=513600 exceeds affordable threshold', () => {
+  it('Eevee CP:478 wins Master slot (ivAvg=93.3%, as Umbreon) — GREEN star', () => {
     const p = find('Eevee', 478);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('U');
-    expect(p.suggestStarExpensive).toBe(true);
-    expect(p.suggestStar).toBe(false);
+    expect(p.slots).toContain('M'); // one-slot: wins ML (ivAvg ≥ 90%), excluded from UL
+    expect(p.suggestStarExpensive).toBe(false); // ML affordable=Infinity, not expensive
+    expect(p.suggestStar).toBe(true); // fav=0 + wins slot = green
   });
 });
 
@@ -369,11 +375,11 @@ describe('Group 10 — Nick format', () => {
     });
   });
 
-  it('Feraligatr CP:2498 (hundo, wins Ultra + Master) nick contains Ⓤ not Ⓡ', () => {
+  it('Feraligatr CP:2498 (hundo, wins Master) nick contains Ⓜ not Ⓡ', () => {
     const p = find('Feraligatr', 2498);
     expect(p).toBeDefined();
     expect(p.nickname).toBeDefined();
-    expect(p.nickname).toContain('Ⓤ');
+    expect(p.nickname).toContain('Ⓜ'); // one-slot: wins ML, nick uses Ⓜ
     expect(p.nickname).not.toContain('Ⓡ');
   });
 
@@ -393,42 +399,50 @@ describe('Group 10 — Nick format', () => {
   });
 });
 
-// ─── Group 11 — Shadow/Lucky coexistence (EXPECTED TO FAIL) ─────────────────
-// These tests document the desired behaviour BEFORE the feature is built.
-// They will fail until shadow/lucky slot coexistence is implemented in analyse.js.
+// ─── Group 11 — Shadow/Lucky coexistence ────────────────────────────────────
+// Shadow/lucky variants are in SEPARATE groups and each win their own slot independently.
+// Under one-slot (M→U→G→L): high-ivAvg Pokémon (≥90%) win ML first.
+// Shadow Seedot (99.49% UL, 99.71% GL) → wins UL (processed before GL).
+// Shadow Bulbasaur CP:497 (ivAvg=95.6) → wins ML independently of normal ML winner.
+// Scyther shadow/normal (both ivAvg=95.6) → both win ML independently (separate groups).
+// Lucky Qwilfish CP:443 (ivAvg=95.6) → wins ML independently of normal ML winner.
 
 describe('Group 11 — Shadow/Lucky coexistence', () => {
-  it('Shadow Seedot CP:115 holds Great slot independently of normal winner CP:454', () => {
+  it('Shadow Seedot CP:115 wins Ultra (99.49%) independently of normal CP:454 — separate groups', () => {
     const shadow = find('Seedot', 115);
     const normal = find('Seedot', 454);
     expect(shadow).toBeDefined();
     expect(normal).toBeDefined();
-    expect(shadow.slots).toContain('G');
-    expect(normal.slots).toContain('G');
+    expect(shadow.slots).toContain('U'); // one-slot: UL processed before GL; shadow wins UL
     expect(shadow.isShadow).toBe(true);
     expect(shadow.isFavorite).toBe(true);
     expect(shadow.suggestStar).toBe(true);
+    // Shadow and normal are independent — normal also has its own slot
+    const normalHasSlot = normal.slots.some(s => ['L','G','U','M'].includes(s));
+    expect(normalHasSlot).toBe(true);
   });
 
-  it('Shadow Bulbasaur CP:497 holds Ultra slot; normal Bulbasaur CP:463 holds Great slot', () => {
+  it('Shadow Bulbasaur CP:497 holds Master slot; normal Bulbasaur CP:463 also holds Master slot independently', () => {
     const shadow = find('Bulbasaur', 497);
     const normal = find('Bulbasaur', 463);
-    expect(shadow.slots).toContain('U');
-    expect(normal.slots).toContain('G');
+    expect(shadow.slots).toContain('M'); // ivAvg=95.6 → confirmed ML winner in shadow group
+    expect(normal.slots).toContain('M'); // ivAvg=93.3 → confirmed ML winner in normal group
+    expect(shadow.isShadow).toBe(true);
   });
 
-  it('Scyther shadow CP:950 and normal CP:35 both hold Great slot independently', () => {
+  it('Scyther shadow CP:950 and normal CP:35 both hold Master slot independently (separate groups)', () => {
     const shadow = find('Scyther', 950);
     const normal = find('Scyther', 35);
-    expect(shadow.slots).toContain('G');
-    expect(normal.slots).toContain('G');
+    expect(shadow.slots).toContain('M'); // ivAvg=95.6 → ML winner in shadow group
+    expect(normal.slots).toContain('M'); // ivAvg=95.6 → ML winner in normal group
+    expect(shadow.isShadow).toBe(true);
   });
 
-  it('Lucky Qwilfish CP:443 holds Ultra slot alongside normal CP:440', () => {
+  it('Lucky Qwilfish CP:443 holds Master slot independently of normal CP:440', () => {
     const lucky = find('Qwilfish', 443);
     const normal = find('Qwilfish', 440);
-    expect(lucky.slots).toContain('U');
-    expect(normal.slots).toContain('U');
+    expect(lucky.slots).toContain('M'); // ivAvg=95.6 → ML winner in lucky group
+    expect(normal.slots).toContain('M'); // ivAvg=93.3 → ML winner in normal group
     expect(lucky.isLucky).toBe(true);
     expect(lucky.isFavorite).toBe(true);
     expect(lucky.suggestStar).toBe(true);
@@ -483,32 +497,29 @@ describe('Group 13 — Standalone evo target suppresses league slot', () => {
 });
 
 // ─── Group 14 — Sawk multi-league deconfliction ──────────────────────────────
-// CP:190 (IVs 1/8/13, fav=1) wins G (99.3%), U_tentative (75%), and L (98.8%) in
-// initial pass. U (75%) released (below keepThreshold). G (99.3%) and L (98.8%) are
-// both confirmed (≥90%) for the same evo target → dual-league keeper retains both.
-// CP:500 (97.9% LL) does NOT win Little — CP:190 retains it.
+// Under one-slot (M→U→G→L): CP:190 wins G (99.3%) first, excluded from L.
+// CP:500 (97.9% LL) wins Little as cascade winner (CP:190 freed it).
 
 describe('Group 14 — Sawk multi-league deconfliction', () => {
-  it('Sawk CP:190 (G=99.3%, L=98.8%, fav=1) holds both Great and Little — GOLD star', () => {
+  it('Sawk CP:190 (G=99.3%, fav=1) holds Great only — one-slot: G wins first, excluded from L', () => {
     const p = find('Sawk', 190);
     expect(p).toBeDefined();
     expect(p.slots).toContain('G');
-    expect(p.slots).toContain('L'); // both confirmed (≥90%): dual-league keeper retains both
-    expect(p.slots).not.toContain('U'); // U (75%) released — below keepThreshold
+    expect(p.slots).not.toContain('L'); // one-slot: excluded from LL after winning GL
     expect(p.isFavorite).toBe(true);
     expect(p.suggestStar).toBe(true); // fav=1 + wins slot = gold
   });
 
-  it('Sawk CP:500 does NOT win Little slot — CP:190 retains it', () => {
+  it('Sawk CP:500 WINS Little slot (cascade — freed by CP:190 holding GL only)', () => {
     const p = find('Sawk', 500);
     expect(p).toBeDefined();
-    expect(p.slots).not.toContain('L');
+    expect(p.slots).toContain('L'); // cascade: CP:190 only holds GL, LL freed
   });
 
-  it('Sawk CP:500 has no confirmed slot (no star)', () => {
+  it('Sawk CP:500 has a confirmed Little slot — GREEN star', () => {
     const p = find('Sawk', 500);
-    expect(p.suggestStar).toBe(false);
-    expect(p.decision).not.toBe('keep');
+    expect(p.suggestStar).toBe(true); // fav=0 + wins LL = green
+    expect(p.decision).toBe('keep');
   });
 });
 
@@ -555,12 +566,12 @@ describe.each([
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
 
-  it(`Machamp CP:2450 (${flagKey} + Ultra slot) → nick contains Ⓤ and ${suffix}`, () => {
+  it(`Machamp CP:2450 (${flagKey} + Master slot) → nick contains Ⓜ and ${suffix}`, () => {
     const p = ovFind('Machamp', 2450);
     expect(p).toBeDefined();
     expect(p[propName]).toBe(true);
     expect(p.decision).toBe('keep');
-    expect(p.nickname).toContain('Ⓤ');
+    expect(p.nickname).toContain('Ⓜ'); // one-slot: wins ML, nick uses Ⓜ
     expect(p.nickname).toContain(suffix);
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
@@ -1151,14 +1162,14 @@ describe('Group 26 — Nick Symbol Overhaul', () => {
     expect(nick.length).toBeLessThanOrEqual(12);
   });
 
-  // 9. Feraligatr (fixture hundo) + Ultra slot → nick has Ⓗ
-  it('Feraligatr CP:2498 (hundo fixture) → nick contains Ⓤ and Ⓗ', () => {
+  // 9. Feraligatr (fixture hundo) + Master slot → nick has Ⓗ
+  it('Feraligatr CP:2498 (hundo fixture) → nick contains Ⓜ and Ⓗ', () => {
     const p = find('Feraligatr', 2498);
     expect(p).toBeDefined();
     expect(p.atkIV).toBe(15);
     expect(p.defIV).toBe(15);
     expect(p.staIV).toBe(15);
-    expect(p.nickname).toContain('Ⓤ');
+    expect(p.nickname).toContain('Ⓜ'); // one-slot: wins ML, nick uses Ⓜ
     expect(p.nickname).toContain('Ⓗ');
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
@@ -1412,18 +1423,24 @@ describe('Group 28d — Dedup does not collapse two different GL evo-target slot
 });
 
 describe('Group 28e — LL competition: Zweilous-evo Deino wins; blank excluded', () => {
-  // CP:499 wins LL(Zweilous) initially. When nextBest assigns G to CP:499,
-  // CP:499 holds both G (99.40%) and L (91.80%) for the same Zweilous evo target.
-  // Both are confirmed (≥90%) → dual-league keeper retains both. CP:537 does not win L.
-  it('Deino CP:537 does NOT hold LL slot — CP:499 retains it as dual-league keeper', () => {
+  // Under one-slot (M→U→G→L): CP:499 wins GL (99.40%), then excluded from LL.
+  // CP:399 (91.80% LL, evolvedNameL=Zweilous) wins LL as cascade winner. CP:537 does not win L.
+  it('Deino CP:537 does NOT hold LL slot — CP:499 (now GL only) freed CP:399 for LL', () => {
     const p = find('Deino', 537);
     expect(p.slots).not.toContain('L');
   });
 
-  it('Deino CP:499 holds both GL and LL (G=99.40%, L=91.80%, both Zweilous, both ≥90%)', () => {
+  it('Deino CP:499 holds GL only (G=99.40%) — one-slot: excluded from LL after winning GL', () => {
     const p = find('Deino', 499);
     expect(p.slots).toContain('G');
-    expect(p.slots).toContain('L');
+    expect(p.slots).not.toContain('L'); // one-slot: excluded from LL after winning GL
+  });
+
+  it('Deino CP:399 wins LL (91.80% as Zweilous) — cascade after CP:499 freed LL', () => {
+    const p = find('Deino', 399);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('L'); // cascade winner: CP:499 freed LL slot
+    expect(p.decision).toBe('keep');
   });
 
   it('Deino CP:10 (blank evolvedNameL, no rank) does not hold LL slot', () => {
@@ -1824,27 +1841,22 @@ describe('Group 43 — B6: expensive GL winner + affordable backup pair', () => 
 // ─── Group 44 — C2: evo-target-scoped committed-to-Little guard ──────────────────
 // Bidoof CP:496: fav=1, dustL=0, rankPctL=95%, evolvedNameL='Bidoof'.
 // evolvedNameG='Bibarel', evolvedNameU='Bibarel' — DIFFERENT from evolvedNameL.
-// With betterInThisLg (old): 92% NOT > 95%+EPS → excluded from G and U.
-// With evo-target fix (C2): 'Bidoof' ≠ 'Bibarel' → NOT excluded → wins both G and U.
-// sameEvoConflict: G (92%) and U (91%) both target Bibarel, U rank ≥ 90% → both kept.
-// Deconfliction: L evo target 'Bidoof' ≠ G/U anchor 'Bibarel' → L released (no nextBest).
+// C2 fix: 'Bidoof' ≠ 'Bibarel' → NOT excluded from G and U.
+// Under one-slot (M→U→G→L): CP:496 wins U first (91% UL rank), excluded from G.
+// No other Bidoof in fixture → GL slot goes unfilled.
 // Mawile 4c guard still holds: evolvedNameL='Mawile' = evolvedNameG='Mawile' → same form → excluded.
 
 describe('Group 44 — C2: evo-target-scoped committed-to-Little guard', () => {
-  it('C2: Bidoof CP:496 (fav, dustL=0, evolvedNameL=Bidoof ≠ Bibarel) wins Great slot', () => {
+  it('C2: Bidoof CP:496 (fav, dustL=0, evolvedNameL=Bidoof ≠ Bibarel) wins Ultra slot (not excluded by C2)', () => {
     const p = find('Bidoof', 496);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('G');
+    expect(p.slots).toContain('U'); // C2: not excluded (Bidoof≠Bibarel); one-slot: U wins first
   });
-  it('C2: Bidoof CP:496 also wins Ultra slot (evolvedNameL=Bidoof ≠ evolvedNameU=Bibarel)', () => {
-    const p = find('Bidoof', 496);
-    expect(p.slots).toContain('U');
-  });
-  it('C2: Bidoof CP:496 holds both G and U simultaneously (dual-league keeper)', () => {
+  it('C2: Bidoof CP:496 holds U only — one-slot: excluded from G after winning U', () => {
     const p = find('Bidoof', 496);
     expect(p.decision).toBe('keep');
-    expect(p.slots).toContain('G');
     expect(p.slots).toContain('U');
+    expect(p.slots).not.toContain('G'); // one-slot: excluded from GL after winning UL
   });
   it('4c still holds: Mawile CP:500 (evolvedNameL=Mawile = evolvedNameG=Mawile, same form) excluded from Great', () => {
     const p = find('Mawile', 500);
@@ -1869,36 +1881,122 @@ describe('Group 45 — C3: remove 70% floor — best-in-family always surfaces a
   });
 });
 
-// ─── Group 46 — C4: non-legendary best-IV without confirmed slot gets best_overall ─
-// Marowak CP:494 wins GL (95%) and LL (97%) → confirmed slots → excluded from best_overall.
-// Cubone CP:12 competes in LL as Marowak (96%) but loses to Marowak CP:494 (97%, evolved-pref).
-// Cubone has no confirmed slot. C4 extends best_overall to non-legendaries with at least one rank.
-// Best-IV Cubone without a slot → gets best_overall → decision='keep', nick=CuboneⓇ51 (51% IV).
+// ─── Group 46 — One-slot + C4: Marowak GL only; Cubone wins LL directly ────────
+// Under one-slot (M→U→G→L): Marowak CP:494 wins GL (95%), excluded from LL.
+// Cubone CP:12 wins LL directly (96% as Marowak, evolvedNameL='Marowak') — no competition.
+// Cubone wins a confirmed slot → NOT a best_overall case. Nick uses Ⓛ format.
 
-describe('Group 46 — C4: non-legendary best-IV without confirmed slot gets best_overall', () => {
-  it('C4: Cubone CP:12 (no confirmed slot, best-IV Cubone) gets best_overall slot', () => {
-    const p = find('Cubone', 12);
-    expect(p).toBeDefined();
-    expect(p.slots).toContain('best_overall');
-  });
-  it('C4: Cubone CP:12 → decision=keep', () => {
-    const p = find('Cubone', 12);
-    expect(p.decision).toBe('keep');
-  });
-  it('C4: Cubone CP:12 → nickname contains Ⓡ (best-overall format)', () => {
-    const p = find('Cubone', 12);
-    expect(p.nickname).toMatch(/Ⓡ/);
-  });
-  it('C4: Marowak CP:494 (confirmed GL+LL slots) does NOT also get best_overall', () => {
+describe('Group 46 — One-slot: Marowak wins GL only; Cubone CP:12 wins LL as cascade', () => {
+  it('Marowak CP:494 wins GL only — one-slot: excluded from LL after winning GL', () => {
     const p = find('Marowak', 494);
     expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.slots).not.toContain('L'); // one-slot: excluded from LL after winning GL
     expect(p.slots).not.toContain('best_overall');
     expect(p.decision).toBe('keep');
   });
-  it('C4: non-legendary with no rank data (Magikarp CP:10) still does NOT get best_overall', () => {
+  it('Cubone CP:12 wins LL directly (Marowak freed LL under one-slot) — keep', () => {
+    const p = find('Cubone', 12);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('L'); // wins LL directly: Marowak freed it under one-slot
+    expect(p.decision).toBe('keep');
+  });
+  it('Cubone CP:12 → nickname contains ⓛ (Little League format)', () => {
+    const p = find('Cubone', 12);
+    expect(p.nickname).toMatch(/ⓛ/); // LL winner → lowercase ⓛ in nick
+  });
+  it('Cubone CP:12 does NOT need best_overall (wins LL directly)', () => {
+    const p = find('Cubone', 12);
+    expect(p.slots).not.toContain('best_overall'); // has a real LL slot
+  });
+  it('non-legendary with no rank data (Magikarp CP:10) still does NOT get best_overall', () => {
     const p = find('Magikarp', 10);
     expect(p).toBeDefined();
     expect(p.slots).not.toContain('best_overall');
     expect(p.decision).toBe('trade');
+  });
+});
+
+// ─── Group 47 — One-slot invariant: no Pokémon holds more than one league slot ──
+// Core rule: each physical Pokémon wins exactly ONE league slot (M/U/G/L).
+// shadow/lucky/affordable/tentative/best_overall slots don't count — only the four league letters.
+
+describe('Group 47 — One-slot invariant: no Pokémon holds >1 league slot', () => {
+  const leagueSlots = s => s.filter(x => ['L','G','U','M'].includes(x));
+
+  it('no Pokémon in the fixture holds more than one league slot', () => {
+    result.pokemon.forEach(p => {
+      const ls = leagueSlots(p.slots);
+      expect(ls.length).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it('Marowak CP:494 holds exactly one league slot (GL)', () => {
+    const p = find('Marowak', 494);
+    expect(leagueSlots(p.slots)).toHaveLength(1);
+    expect(p.slots).toContain('G');
+  });
+
+  it('Feraligatr CP:2498 (hundo) holds exactly one league slot (ML)', () => {
+    const p = find('Feraligatr', 2498);
+    expect(leagueSlots(p.slots)).toHaveLength(1);
+    expect(p.slots).toContain('M');
+  });
+
+  it('Vaporeon CP:1497 does NOT hold both G and U', () => {
+    const p = find('Vaporeon', 1497);
+    expect(leagueSlots(p.slots)).toHaveLength(1);
+  });
+
+  it('Sawk CP:190 does NOT hold both G and L', () => {
+    const p = find('Sawk', 190);
+    expect(leagueSlots(p.slots)).toHaveLength(1);
+  });
+
+  it('Feraligatr CP:2400 wins UL after CP:2498 is excluded (one cascade slot)', () => {
+    const p = find('Feraligatr', 2400);
+    expect(p.slots).toContain('U');
+    expect(leagueSlots(p.slots)).toHaveLength(1);
+  });
+});
+
+// ─── Group 48 — One-slot motivating example: Marowak/Cubone ─────────────────
+// Marowak CP:494 wins GL (99.9% as Marowak) → excluded from LL under one-slot.
+// Cubone CP:12 wins LL as Marowak (96%) — separate physical Pokémon.
+
+describe('Group 48 — One-slot motivating example: Marowak wins GL; Cubone wins LL', () => {
+  it('Marowak CP:494 wins GL', () => {
+    expect(find('Marowak', 494).slots).toContain('G');
+    expect(find('Marowak', 494).decision).toBe('keep');
+  });
+
+  it('Marowak CP:494 does NOT also hold LL after winning GL', () => {
+    const slots = find('Marowak', 494).slots.filter(s => ['G','U','L','M'].includes(s));
+    expect(slots).toHaveLength(1);
+  });
+
+  it('Cubone CP:12 wins LL (96% as Marowak) after Marowak CP:494 is excluded from LL', () => {
+    expect(find('Cubone', 12).slots).toContain('L');
+    expect(find('Cubone', 12).decision).toBe('keep');
+  });
+
+  it('Cubone CP:12 nickname contains ⓛ (Little League format)', () => {
+    expect(find('Cubone', 12).nickname).toContain('ⓛ');
+  });
+
+  it('Feraligatr CP:2498 does NOT also hold UL after winning ML', () => {
+    const slots = find('Feraligatr', 2498).slots.filter(s => ['G','U','L','M'].includes(s));
+    expect(slots).toHaveLength(1);
+    expect(find('Feraligatr', 2498).slots).toContain('M');
+  });
+
+  it('Feraligatr CP:2400 wins UL (freed by CP:2498 exclusion)', () => {
+    expect(find('Feraligatr', 2400).slots).toContain('U');
+    expect(find('Feraligatr', 2400).decision).toBe('keep');
+  });
+
+  it('Sawk CP:500 wins LL after CP:190 holds GL only (cascade)', () => {
+    expect(find('Sawk', 500).slots).toContain('L');
+    expect(find('Sawk', 500).decision).toBe('keep');
   });
 });

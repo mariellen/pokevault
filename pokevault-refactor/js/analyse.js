@@ -568,6 +568,7 @@ function analyse(rows) {
       bestFast:mv.bestFast, bestC1:mv.bestC1, bestC2:mv.bestC2,
       pokeType:getPokeType(r['Name']),
       slots:[], decision:'review', reason:'', nickname:'', suggestStar:false,
+      hasBattleSlot:false,
       suggestStarExpensive:false, suggestStarCheaper:false,
       isExpensiveWinner:false, isAffordableWinner:false, isCheaperAlternative:false,
       targetEvo:'', hidden:false, evoIndicator:'', canEvolve:false, neverEvolved:false, isHundo:false, dustToL40:0, belowCapNote:'',
@@ -671,6 +672,12 @@ function analyse(rows) {
 
         const eligible = (lg==='M' ? group : group.filter(p => (p.cp||0) <= leagueCap * 1.05))
           .filter(p => {
+            // One slot per Pokémon: once assigned to any league in the main pass, exclude from all others.
+            // isPurifySlot Pokémon are exempt until they win their first main-pass battle slot —
+            // the purify-assigned slot is a recommendation (keep-to-purify), not a won battle slot.
+            if (p.hasBattleSlot) return false;
+            if (!p.isPurifySlot && p.slots.some(s => RULES.leagues.includes(s) || s.endsWith('_affordable'))) return false;
+
             // Master league: only the final evolution (must BE stageName, not just evolve to it)
             // Exception 1: hundo pre-evos always allowed — will be evolved, and 15/15/15 beats any evolved form
             // Exception 2: best-IV pre-evo allowed when no evolved form is available in the group
@@ -847,7 +854,18 @@ function analyse(rows) {
         // ML rank = ivAvg; keep original 70% floor for ML to avoid surfacing every Pokémon
         const floorForLg = lg === 'M' ? 70 : 0;
         if (bestRank2 > floorForLg) {
+          // Skip tentative if best2 has a better rank in a lower-priority league.
+          // Prevents one-slot exclusion from trapping a Pokémon in a tentative higher league
+          // when its primary league is lower in priority (e.g. shadow pre-evo with tiny UL rank but 99%+ GL).
+          if (!isConfirmed) {
+            const processingOrder = ['M','U','G','L'];
+            const lgIndex = processingOrder.indexOf(lg);
+            const hasStrongerLaterLeague = processingOrder.slice(lgIndex + 1)
+              .some(l => (best2['rankPct'+l]||0) > bestRank2);
+            if (hasStrongerLaterLeague) return;
+          }
           if (!best2.slots.includes(lg)) best2.slots.push(lg);
+          best2.hasBattleSlot = true; // mark: won a main-pass battle slot (one-slot rule)
           best2.targetEvo = stageName !== best2.name ? stageName : '';
           best2.slotConfirmed = isConfirmed || !!best2.slotConfirmed; // purify loop may have already confirmed
           if (!isConfirmed) best2.slots.push(lg+'_tentative');
@@ -1228,16 +1246,10 @@ function analyse(rows) {
         const rb = p['rankPct'+best]||0, rs = p['rankPct'+s]||0;
         return rs > rb ? s : best;
       }, keepSlot);
-      // Release same-evo slot only when:
-      //   (a) ML is the best slot (capped leagues always yield to ML for nick/display clarity), OR
-      //   (b) the lower-ranked slot is below the keep threshold.
-      // A Pokémon confirmed (≥90%) in two non-ML leagues for the same evo target
-      // (e.g. GL+UL Greedent) is a genuine dual-league keeper and should hold both slots.
-      const sameEvoConflicts = sameEvoSlots.filter(s =>
-        s !== bestRankedSlot &&
-        (p['rankPct'+s]||0) < (p['rankPct'+bestRankedSlot]||0) &&
-        (bestRankedSlot === 'M' || (p['rankPct'+s]||0) < RULES.keepThreshold)
-      );
+      // Release all same-evo slots except the highest-ranked one.
+      // Under one-slot-per-Pokémon, this should be unreachable from the main assignment pass,
+      // but acts as a safety net (e.g. nextBest assigning a second slot).
+      const sameEvoConflicts = sameEvoSlots.filter(s => s !== bestRankedSlot);
 
       const conflicting = [...diffEvoConflicts, ...sameEvoConflicts];
       if (!conflicting.length) return;
@@ -1267,8 +1279,9 @@ function analyse(rows) {
             // Must match the same variant (shadow/regular/lucky/purified) as the releasing Pokémon
             const m_vk = m.isShadow ? '|shadow' : m.isPurified ? '|purified' : m.isLucky ? '|lucky' : '';
             if (m_vk !== vk) return false;
-            // Must not already hold this league (even for a different evo target)
-            if (m.slots.includes(s)) return false;
+            // One slot per Pokémon: nextBest candidate must not already hold a battle slot
+            if (m.hasBattleSlot) return false;
+            if (!m.isPurifySlot && m.slots.some(sl => RULES.leagues.includes(sl) || sl.endsWith('_affordable'))) return false;
             // Candidate's evo target for this league must match the released slot's evo target
             const candidateEvo = s==='L'?(m.evolvedNameL||m.name)
               :s==='G'?(m.evolvedNameG||m.name)
