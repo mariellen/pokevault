@@ -48,6 +48,19 @@ const MYTHICAL = new Set(['Mew','Celebi','Jirachi','Deoxys','Phione','Manaphy','
 const ULTRA_BEAST = new Set(['Nihilego','Buzzwole','Pheromosa','Xurkitree','Celesteela',
   'Kartana','Guzzlord','Poipole','Naganadel','Stakataka','Blacephalon']);
 
+// Species that have had Gigantamax released in Pokémon GO.
+// Pokémon GO has released only specific species with Gigantamax forms.
+// Dynamax is available for all regular (non-Legendary/Mythical/UB) species in GO — no separate list needed.
+const GIGANTAMAX_SPECIES = new Set([
+  // Gen 1 icons
+  'Venusaur','Charizard','Blastoise','Butterfree','Pikachu','Meowth','Machamp','Gengar',
+  'Kingler','Lapras','Eevee','Snorlax',
+  // Gen 8 (Galar) — Gigantamax Sword/Shield species released in GO
+  'Rillaboom','Cinderace','Inteleon','Corviknight','Orbeetle','Drednaw','Coalossal',
+  'Flapple','Appletun','Sandaconda','Toxtricity','Centiskorch','Hatterene','Grimmsnarl',
+  'Alcremie','Copperajah','Duraludon','Urshifu',
+]);
+
 function getPokeType(name) {
   if (LEGENDARY.has(name)) return 'Legendary';
   if (MYTHICAL.has(name)) return 'Mythical';

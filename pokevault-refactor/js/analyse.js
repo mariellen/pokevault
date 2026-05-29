@@ -564,9 +564,21 @@ function analyse(rows) {
     const evoOvr = (typeof EVO_OVERRIDES !== 'undefined')
       ? (EVO_OVERRIDES[r['Name']+'|'+(r['Gender']||'')] || EVO_OVERRIDES[r['Name']] || null)
       : null;
-    const evolvedNameG = validateEvo(r['Name (G)']) || (evoOvr && validateEvo(evoOvr.G)) || '';
-    const evolvedNameU = validateEvo(r['Name (U)']) || (evoOvr && validateEvo(evoOvr.U)) || '';
-    const evolvedNameL = validateEvo(r['Name (L)']) || (evoOvr && validateEvo(evoOvr.L)) || '';
+    let evolvedNameG = validateEvo(r['Name (G)']) || (evoOvr && validateEvo(evoOvr.G)) || '';
+    let evolvedNameU = validateEvo(r['Name (U)']) || (evoOvr && validateEvo(evoOvr.U)) || '';
+    let evolvedNameL = validateEvo(r['Name (L)']) || (evoOvr && validateEvo(evoOvr.L)) || '';
+
+    // Tyrogue: IV-based evo correction (Pokégenie can misreport equality case).
+    // ATK > DEF → Hitmonlee; DEF > ATK → Hitmonchan; ATK = DEF → Hitmontop.
+    if (r['Name'] === 'Tyrogue') {
+      const hitmon = atkIV > defIV ? 'Hitmonlee' : atkIV < defIV ? 'Hitmonchan' : 'Hitmontop';
+      const tyrogueEvos = typeof VALID_EVOLUTIONS !== 'undefined' ? VALID_EVOLUTIONS['Tyrogue'] : null;
+      if (tyrogueEvos) {
+        if (tyrogueEvos.includes(evolvedNameG)) evolvedNameG = hitmon;
+        if (tyrogueEvos.includes(evolvedNameU)) evolvedNameU = hitmon;
+        if (tyrogueEvos.includes(evolvedNameL)) evolvedNameL = hitmon;
+      }
+    }
 
     return {
       idx:r['Index'], name:r['Name'], form:r['Form']||'',

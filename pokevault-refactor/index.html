@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PokéVault v3.5.26</title>
+  <title>PokéVault v3.5.27</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
 </head>
 <body>
 <header>
-  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.26</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">📂</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
+  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.27</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">📂</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
   <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
   <div style="display:flex;align-items:center;gap:12px">
     <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" class="btn-donation" title="Support PokéVault">☕ Support</a>
@@ -170,8 +170,8 @@
       </div>
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      <button id="dex-view-have"    onclick="dexView='have';renderDexModal()"    class="dex-view-btn">Have ▼</button>
-      <button id="dex-view-missing" onclick="dexView='missing';renderDexModal()" class="dex-view-btn">Missing ▼</button>
+      <button id="dex-view-have"    onclick="dexView='have';renderDexModal()"    class="dex-view-btn">Have</button>
+      <button id="dex-view-missing" onclick="dexView='missing';renderDexModal()" class="dex-view-btn">Missing</button>
       <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
       <button id="dex-cat-all"    class="dex-filter-btn" onclick="dexCat='all';renderDexModal()">All</button>
       <button id="dex-cat-leg"    class="dex-filter-btn" onclick="dexCat='Legendary';renderDexModal()">Legendary</button>
@@ -229,8 +229,9 @@
       </div>
       <button class="pv-modal-close" onclick="closeCullModal()">✕</button>
     </div>
-    <div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)">
-      These families have confirmed keepers (gold ★) and no unresolved recommendations. Everything else is safe to trade or delete.
+    <div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span>These families have confirmed keepers (gold ★) and no unresolved recommendations. Everything else is safe to trade or delete.</span>
+      <button id="cullPracticalBtn" class="btn" onclick="toggleCullPractical(this)" title="Hide families where the only keeper is an expensive ($$$/$$$$) winner">💰 Practical</button>
     </div>
     <div class="pv-modal-body" id="cull-modal-body">
       <div class="pv-modal-empty">Load your collection first</div>

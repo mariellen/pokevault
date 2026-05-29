@@ -309,14 +309,14 @@ function applyFilters(){
   filteredFamilies=families.filter(fam=>{
     if(term){
       const nm=fam.primaryName.toLowerCase().includes(term);
-      // Always check evo targets — so searching "Sylveon" finds Eevees recommended for Sylveon
+      // Check evo targets — so searching "Sylveon" finds Eevees recommended for Sylveon
       const evoMatch=fam.members.some(p=>
         (p.evolvedNameG||'').toLowerCase().includes(term)||
         (p.evolvedNameU||'').toLowerCase().includes(term)||
         (p.evolvedNameL||'').toLowerCase().includes(term));
-      // incEvos also matches by member name (e.g. "Eevee" shows Sylveon family)
-      const em=incEvos&&fam.members.some(p=>p.name.toLowerCase().includes(term));
-      if(!nm&&!evoMatch&&!em) return false;
+      // Always match all member names — so searching "Smoochum" finds the Jynx family
+      const memberMatch=fam.members.some(p=>p.name.toLowerCase().includes(term));
+      if(!nm&&!evoMatch&&!memberMatch) return false;
     }
     if(decFilter==='hundo'&&!fam.members.some(p=>p.isHundo&&(hundoMode===1||(hundoMode===2&&pokemonStarRank(p)===0)||(hundoMode===3&&pokemonStarRank(p)>=1&&pokemonStarRank(p)<=2)))) return false;
     else if(decFilter==='canEvolve'&&!fam.members.some(p=>p.canEvolve)) return false;
@@ -680,6 +680,11 @@ function filterCostlyWinners(btn){
 function togglePractical(btn){
   practicalMode=btn.classList.toggle('active');
   applyFilters();
+}
+
+function toggleCullPractical(btn){
+  cullPracticalMode=btn.classList.toggle('active');
+  openCullModal();
 }
 
 // ═══════════════════════════════════════════════
@@ -1372,14 +1377,25 @@ function renderDexMissingView(body, filteredSpecies) {
     missing = missing.filter(s => !familyShinyNums.has(s.pokedex_number));
   }
 
-  // Task 5: Dmax/Gmax qualifiers in missing view
+  // Dmax/Gmax qualifiers in missing view — only show species where Dynamax/Gigantamax is released in GO.
+  // Dynamax: available for all regular (non-Legendary/Mythical/UB) in-GO species.
+  // Gigantamax: only species in GIGANTAMAX_SPECIES (static list in data.js).
   if (dexQualDmax) {
     const haveDmaxNums = new Set(allPokemon.filter(p => p.isDynamax).map(p => Number(p.pokeNum)));
-    missing = missing.filter(s => !haveDmaxNums.has(s.pokedex_number));
+    missing = missing.filter(s =>
+      s.is_in_go &&
+      s.category !== 'Legendary' &&
+      s.category !== 'Mythical' &&
+      s.category !== 'Ultra Beast' &&
+      !haveDmaxNums.has(s.pokedex_number)
+    );
   }
   if (dexQualGmax) {
     const haveGmaxNums = new Set(allPokemon.filter(p => p.isGigantamax).map(p => Number(p.pokeNum)));
-    missing = missing.filter(s => !haveGmaxNums.has(s.pokedex_number));
+    missing = missing.filter(s =>
+      (typeof GIGANTAMAX_SPECIES !== 'undefined' ? GIGANTAMAX_SPECIES.has(s.name) : true) &&
+      !haveGmaxNums.has(s.pokedex_number)
+    );
   }
 
   // Task 5: Available only — hide "No shiny in GO" species when Shiny+Missing+Available only
@@ -1476,8 +1492,16 @@ function openCullModal(){
   const countNonGold=fam=>fam.members.filter(p=>!(p.isFavorite&&p.suggestStar)).length;
   qualifying.sort((a,b)=>countNonGold(b)-countNonGold(a));
 
-  const totalCull=qualifying.reduce((s,f)=>s+countNonGold(f),0);
-  sub.textContent=qualifying.length+' famil'+(qualifying.length===1?'y':'ies')+' settled · '+totalCull+' potential deletes/trades';
+  // Practical filter: hide families whose only confirmed keepers are expensive winners
+  let displayQualifying = qualifying;
+  if (cullPracticalMode) {
+    displayQualifying = qualifying.filter(fam =>
+      fam.members.some(p => p.isFavorite && p.suggestStar && !p.isExpensiveWinner)
+    );
+  }
+
+  const totalCull=displayQualifying.reduce((s,f)=>s+countNonGold(f),0);
+  sub.textContent=displayQualifying.length+' famil'+(displayQualifying.length===1?'y':'ies')+' settled · '+totalCull+' potential deletes/trades';
 
   if(!qualifying.length){
     body.innerHTML='<div class="pv-modal-empty">No fully-settled families yet — some families still have green, blue, or cyan stars to resolve</div>';
@@ -1487,7 +1511,7 @@ function openCullModal(){
 
   const FAM_STANDALONE=new Set(['Kleavor']);
 
-  const rows=qualifying.map(fam=>{
+  const rows=displayQualifying.map(fam=>{
     const keepers=fam.members.filter(p=>p.isFavorite&&p.suggestStar);
     const redCount=fam.members.filter(p=>p.isFavorite&&!p.suggestStar).length;
     const luckyCount=fam.members.filter(p=>p.isLucky).length;
@@ -1683,7 +1707,8 @@ function openCleanupModal(){
   if(searchRow) searchRow.style.display='';
   const cleanupSearchTerm=(document.getElementById('cleanupSearch')?.value||'').toLowerCase();
 
-  const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!p.specialForm&&!p.vivillonPattern
+  const formIsSet=p=>(p.specialForm&&p.specialForm!=='Unknown')||(p.vivillonPattern&&p.vivillonPattern!=='Unknown');
+  const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!formIsSet(p)
       &&matchesDateRange(p,cleanupFromDate,cleanupToDate)
       &&(!cleanupSearchTerm||p.name.toLowerCase().includes(cleanupSearchTerm)))
     .sort((a,b)=>{
@@ -1694,7 +1719,7 @@ function openCleanupModal(){
       return a.name.localeCompare(b.name);
     });
 
-  const totalNeedsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!p.specialForm&&!p.vivillonPattern
+  const totalNeedsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!formIsSet(p)
       &&matchesDateRange(p,cleanupFromDate,cleanupToDate)).length;
   const dateActive=cleanupFromDate||cleanupToDate;
   sub.textContent=(cleanupSearchTerm?needsForm.length+' of '+totalNeedsForm:needsForm.length)+' Pokémon need form/pattern set'
