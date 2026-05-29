@@ -362,6 +362,37 @@ const VALID_EVOLUTIONS = {
   'Yamper':['Boltund'],'Yanma':['Yanmega'],'Yungoos':['Gumshoos'],
   'Zigzagoon':['Linoone','Obstagoon'],'Zorua':['Zoroark'],
   'Zubat':['Golbat','Crobat'],'Zweilous':['Hydreigon'],
+  // ── Regional-form evolution entries (Finding B2 — broad scope) ──────────────
+  // Keys: 'Name|Form', values: form-qualified evo targets where both pre-evo and evo
+  // are regionally distinct. Entries where the evo is a unique species (Sirfetch'd,
+  // Runerigus, Overqwil, Sneasler, Clodsire) have no form qualifier on the evo.
+  // Hisuian lines
+  'Growlithe|Hisui':['Arcanine|Hisui'],
+  'Voltorb|Hisui':['Electrode|Hisui'],
+  'Zorua|Hisui':['Zoroark|Hisui'],
+  'Qwilfish|Hisui':['Overqwil'],
+  'Sneasel|Hisui':['Sneasler'],
+  // Alolan lines
+  'Rattata|Alola':['Raticate|Alola'],
+  'Sandshrew|Alola':['Sandslash|Alola'],
+  'Vulpix|Alola':['Ninetales|Alola'],
+  'Meowth|Alola':['Persian|Alola'],
+  'Geodude|Alola':['Graveler|Alola','Golem|Alola'],
+  'Graveler|Alola':['Golem|Alola'],
+  'Diglett|Alola':['Dugtrio|Alola'],
+  'Grimer|Alola':['Muk|Alola'],
+  // Galarian lines
+  'Meowth|Galar':['Perrserker'],
+  'Ponyta|Galar':['Rapidash|Galar'],
+  'Slowpoke|Galar':['Slowbro|Galar','Slowking|Galar'],
+  'Farfetch\'d|Galar':['Sirfetch\'d'],
+  'Zigzagoon|Galar':['Linoone|Galar','Obstagoon'],
+  'Linoone|Galar':['Obstagoon'],
+  'Yamask|Galar':['Runerigus'],
+  'Corsola|Galar':['Cursola'],
+  'Darumaka|Galar':['Darmanitan|Galar'],
+  // Paldean lines
+  'Wooper|Paldea':['Clodsire'],
 };
 
 // ═══════════════════════════════════════════════

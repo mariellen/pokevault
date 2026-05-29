@@ -150,18 +150,26 @@ function buildNickname(p, slot, convention) {
   const isNundo = atkIV===0&&defIV===0&&staIV===0;
   const isHundo = atkIV===15&&defIV===15&&staIV===15;
 
-  // Target name for this slot
+  // Target name for this slot; also capture the evo target's form for B1 nick prefix.
   let base = p.name;
-  if (slot==='G' && p.evolvedNameG) base=p.evolvedNameG;
-  else if (slot==='U' && p.evolvedNameU) base=p.evolvedNameU;
-  else if (slot==='L' && p.evolvedNameL) base=p.evolvedNameL;
-  else if (slot==='M') base=p.evolvedNameU||p.evolvedNameG||p.name;
+  let evolvedFormForSlot = '';
+  if (slot==='G' && p.evolvedNameG) { base=p.evolvedNameG; evolvedFormForSlot=p.evolvedFormG||''; }
+  else if (slot==='U' && p.evolvedNameU) { base=p.evolvedNameU; evolvedFormForSlot=p.evolvedFormU||''; }
+  else if (slot==='L' && p.evolvedNameL) { base=p.evolvedNameL; evolvedFormForSlot=p.evolvedFormL||''; }
+  else if (slot==='M') {
+    base=p.evolvedNameU||p.evolvedNameG||p.name;
+    evolvedFormForSlot=p.evolvedFormU||p.evolvedFormG||'';
+  }
 
   // Form nick prefix: visually distinct forms use short prefix instead of species name
   // (e.g. Castform Snowy→'Snow', Deoxys Attack→'Atk', Furfrou Dandy→'Dand')
+  // B1: evo target form (e.g. Midnight/Midday Lycanroc) takes priority over Pokémon's own form.
+  // B2: Pokémon's own regional form (e.g. Hisui) applies when evo target form is absent.
   const activeForm = p.specialForm || p.form;
+  const evoFormPrefix = evolvedFormForSlot && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[evolvedFormForSlot];
   const formPrefix = activeForm && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[activeForm];
-  if (formPrefix) base = formPrefix;
+  if (evoFormPrefix) base = evoFormPrefix;
+  else if (formPrefix) base = formPrefix;
 
   if (isNundo) return fitName(base, NUNDO, '', 12);
 
@@ -524,14 +532,33 @@ function analyse(rows) {
     const mv=evalMoves(r['Name'],r['Quick Move'],r['Charge Move'],r['Charge Move 2'],(Number(r['Shadow/Purified'])||0)===1,(Number(r['Shadow/Purified'])||0)===2);
 
     const baseNum=r['Pokemon Number'];
+    // Finding B2: form-qualified key lookup for regional variants (Alola/Galar/Hisui/Paldea).
+    // When a Pokémon has a regional form, VALID_EVOLUTIONS may have a 'Name|Form' entry
+    // returning form-qualified evo targets (e.g. 'Arcanine|Hisui') so regional lines are
+    // distinguishable from their base-form counterparts in nicks and targetEvo.
+    const pForm = r['Form'] || '';
+    const REGIONAL_FORMS_VE = ['Alola', 'Galar', 'Hisui', 'Paldea'];
+    const isRegionalPoke = REGIONAL_FORMS_VE.includes(pForm);
     const validateEvo = name => {
-      if (!name||name===r['Name']) return '';
-      const validEvos = VALID_EVOLUTIONS[r['Name']];
+      if (!name || name === r['Name']) return '';
+      const formKey = isRegionalPoke ? r['Name'] + '|' + pForm : null;
+      const validEvos = (formKey && typeof VALID_EVOLUTIONS !== 'undefined' && VALID_EVOLUTIONS[formKey])
+        || (typeof VALID_EVOLUTIONS !== 'undefined' && VALID_EVOLUTIONS[r['Name']]);
       if (!validEvos) return '';
-      if (!validEvos.includes(name)) return '';
-      if (STANDALONE_SPECIES.has(name)) return ''; // e.g. Kleavor — standalone, not a valid evo path
-      return name;
+      // Support form-qualified evo targets ('Arcanine|Hisui'): match by base species name
+      const baseName = name.split('|')[0];
+      const match = validEvos.find(v => v === name || v.split('|')[0] === baseName);
+      if (!match) return '';
+      if (STANDALONE_SPECIES.has(match.split('|')[0])) return '';
+      return match; // may be 'Arcanine|Hisui' for Hisui Growlithe
     };
+
+    // Finding B1: capture per-league evo target form from Pokégenie's Form (G/U/L) columns.
+    // 'Normal' is normalised to '' for consistency with the base-form convention.
+    const toEvoForm = f => (!f || f === 'Normal') ? '' : f;
+    const evolvedFormG = toEvoForm(r['Form (G)']);
+    const evolvedFormU = toEvoForm(r['Form (U)']);
+    const evolvedFormL = toEvoForm(r['Form (L)']);
 
     // Apply evo overrides for species where Pokégenie omits evo path data (e.g. male Gothita)
     const evoOvr = (typeof EVO_OVERRIDES !== 'undefined')
@@ -555,6 +582,7 @@ function analyse(rows) {
       rankPctG:rG, rankPctU:rU, rankPctL:rL, rankPctM:iv,
       rankNumG:Number(r['Rank # (G)'])||null, rankNumU:Number(r['Rank # (U)'])||null, rankNumL:Number(r['Rank # (L)'])||null,
       evolvedNameG, evolvedNameU, evolvedNameL,
+      evolvedFormG, evolvedFormU, evolvedFormL,
       standaloneEvoG:!!(r['Name (G)'] && r['Name (G)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (G)'])),
       standaloneEvoU:!!(r['Name (U)'] && r['Name (U)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (U)'])),
       standaloneEvoL:!!(r['Name (L)'] && r['Name (L)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (L)'])),
@@ -888,6 +916,8 @@ function analyse(rows) {
               if (!affordableWinner.slots.includes(lg+'_affordable')) affordableWinner.slots.push(lg+'_affordable');
               affordableWinner.isAffordableWinner = true;
               affordableWinner.affordableForLeague = lg;
+              // Finding A Option 1: affordable backup is a keep-worthy cyan pick (decision set in decision block)
+              affordableWinner.suggestStarCheaper = true;
             }
           } else if (eDustCheck <= lgAffordable && isFinalEvoStage && isConfirmed) {
             best2.isAffordableWinner = true;
@@ -1037,10 +1067,14 @@ function analyse(rows) {
         else if(nickSlot==='G') p.targetEvo=p.evolvedNameG||'';
         else if(nickSlot==='U') p.targetEvo=p.evolvedNameU||'';
         else if(nickSlot==='L') p.targetEvo=p.evolvedNameL||'';
-        if (p.slotConfirmed) {
-          // Confirmed best — circled letter nickname
+        // Finding A Option 1: affordable backup (X_affordable slot only, no confirmed league slot) is
+        // a keep-worthy cyan pick — circled-letter nick + cyan star, not review/holding format.
+        const hasOnlyAffordableSlot = p.isAffordableWinner && !p.slots.some(s => RULES.leagues.includes(s));
+        if (p.slotConfirmed || hasOnlyAffordableSlot) {
           p.decision='keep';
-          p.reason='Best '+lgNames.join(' + ');
+          p.reason = hasOnlyAffordableSlot
+            ? 'Affordable backup for '+RULES.leagueNames[nickSlot]
+            : 'Best '+lgNames.join(' + ');
           p.nickname=buildNickname(p,nickSlot);
         } else {
           // Auto-promoted but below 90% — keep but use review name so you know it's tentative
@@ -1145,7 +1179,10 @@ function analyse(rows) {
       const cyanLeagues = p.cheaperAlternativeLeagues || [];
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
       p.isCheaperAlternative = cyanLeagues.some(cl => leagueSlots.includes(cl));
-      p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStarExpensive;
+      // Finding A Option 1: affordable backup gets cyan only when it holds NO real league slot
+      // (avoids regression when nextBest promotion gives it a real slot later)
+      const isAffordableOnly1 = p.isAffordableWinner && !leagueSlots.length;
+      p.suggestStarCheaper = (p.isCheaperAlternative || isAffordableOnly1) && !p.suggestStarExpensive;
 
       // Force keep for special overrides. Shinies never get red star (pokemonStarRank guards it).
       // Duplicate shinies are resolved in the post-processing pass below.
@@ -1418,7 +1455,9 @@ function analyse(rows) {
       p.cheaperAlternativeLeagues = cyanLeagues;
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
       p.isCheaperAlternative = cyanLeagues.some(cl => leagueSlots.includes(cl));
-      p.suggestStarCheaper = p.isCheaperAlternative && !p.suggestStarExpensive;
+      // Finding A Option 1: affordable backup keeps cyan only when holding no real league slot
+      const isAffordableOnly2 = p.isAffordableWinner && !leagueSlots.length;
+      p.suggestStarCheaper = (p.isCheaperAlternative || isAffordableOnly2) && !p.suggestStarExpensive;
     });
 
     const allN=new Set(parsed.map(p=>p.name));

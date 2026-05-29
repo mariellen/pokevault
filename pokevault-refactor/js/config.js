@@ -99,7 +99,9 @@ const FORM_NICK_PREFIXES = {
   // Castform
   'Snowy':'Snow', 'Rainy':'Rain', 'Sunny':'Snny',
   // Lycanroc
-  'Midnight':'Night', 'Dusk':'Dusk',
+  'Midnight':'Night', 'Midday':'Day', 'Dusk':'Dusk',
+  // Regional variants (Alola/Galar/Hisui/Paldea) — used for pre-evos targeting regional forms
+  'Alola':'Alol', 'Galar':'Galr', 'Hisui':'Hisu', 'Paldea':'Pald',
   // Deoxys
   'Attack':'Atk', 'Defense':'Def', 'Speed':'Spd',
   // Giratina / Dialga
