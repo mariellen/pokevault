@@ -341,6 +341,9 @@ function buildNickname(p, slot, convention) {
     const pv=Math.round(p.rankPctM||p.ivAvg||0);
     mid=LC.R+String(pv);
     return fitName(p.name, mid, nickSuf, 12);
+  } else if (slot==='M_placeholder') {
+    mid = String(iv)+'m';
+    return fitName(p.name, mid, nickSuf, 12);
   } else {
     // Fallback: show best available league rank + master rank — never bare IV%
     const allL = [
@@ -1527,6 +1530,29 @@ function analyse(rows) {
         p.reason = `Shiny duplicate — ${keeper.name} ${Math.round(keeper.ivAvg||0)}% IV is keeper`;
       });
     });
+
+    // ML placeholder pass: if the family has no ML slot at all, surface the highest-ivAvg
+    // member with no league slot as a grey-starred review placeholder. Gives Mariellen
+    // a Master League candidate to star before culling everything else.
+    // Legendaries/Mythicals/UBs skip ML entirely (handled by best_overall) — no placeholder.
+    if (!isLegendary) {
+      const hasMlSlot = members.some(m => m.slots.includes('M'));
+      if (!hasMlSlot) {
+        const candidates = members.filter(m =>
+          !m.slots.some(s => RULES.leagues.includes(s) || s.endsWith('_affordable')) &&
+          m.decision !== 'keep' && m.decision !== 'protected'
+        );
+        if (candidates.length > 0) {
+          const best = candidates.reduce((a, b) => (b.ivAvg||0) > (a.ivAvg||0) ? b : a);
+          best.slots.push('M');
+          best.isMlPlaceholder = true;
+          best.decision = 'review';
+          best.reason = 'ML placeholder — best available (no confirmed ML keeper in family)';
+          best.nickname = buildNickname(best, 'M_placeholder');
+          best.starType = 'grey';
+        }
+      }
+    }
   });
 
   // Build family list

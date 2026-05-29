@@ -392,10 +392,11 @@ describe('Group 10 — Nick format', () => {
     expect(hasCircled).toBe(true);
   });
 
-  it('Magikarp CP:10 is trade decision (far below threshold)', () => {
+  it('Magikarp CP:10 gets ML placeholder (no league data → no ML keeper → grey star review)', () => {
     const p = find('Magikarp', 10);
-    // Magikarp has no league data in fixture — should be trade
-    expect(p.decision).toBe('trade');
+    // No league rank data → ML placeholder fires (best unslotted member in family)
+    expect(p.decision).toBe('review');
+    expect(p.isMlPlaceholder).toBe(true);
   });
 });
 
@@ -1911,11 +1912,14 @@ describe('Group 46 — One-slot: Marowak wins GL only; Cubone CP:12 wins LL as c
     const p = find('Cubone', 12);
     expect(p.slots).not.toContain('best_overall'); // has a real LL slot
   });
-  it('non-legendary with no rank data (Magikarp CP:10) still does NOT get best_overall', () => {
+  it('non-legendary with no rank data (Magikarp CP:10) does NOT get best_overall — gets ML placeholder instead', () => {
     const p = find('Magikarp', 10);
     expect(p).toBeDefined();
     expect(p.slots).not.toContain('best_overall');
-    expect(p.decision).toBe('trade');
+    // ML placeholder fires: family has no ML keeper, Magikarp has no league slot
+    expect(p.isMlPlaceholder).toBe(true);
+    expect(p.slots).toContain('M');
+    expect(p.decision).toBe('review');
   });
 });
 
@@ -2000,5 +2004,51 @@ describe('Group 48 — One-slot motivating example: Marowak wins GL; Cubone wins
   it('Sawk CP:500 wins LL after CP:190 holds GL only (cascade)', () => {
     expect(find('Sawk', 500).slots).toContain('L');
     expect(find('Sawk', 500).decision).toBe('keep');
+  });
+});
+
+// ─── Group 49 — ML placeholder: grey star for families with no ML keeper ──────
+// Rule: if a family has no member with slots.includes('M') after all passes,
+// the highest-ivAvg member with no league slot gets isMlPlaceholder=true,
+// slots=['M'], decision='review', starType='grey', nick = Name+ivAvg+'m'.
+//
+// Test 1 — fires: Magikarp CP:10 (35.6% ivAvg, no league ranks, no ML floor)
+//   → ML placeholder assigned, starType='grey', nick 'Magikarp36m'
+// Test 2 — does not fire: Feraligatr family has confirmed ML (CP:2498 hundo → M slot)
+//   → placeholder does NOT fire; CP:2498 isMlPlaceholder must be false
+// Test 3 — does not fire: Marowak/Cubone family — Marowak has G, Cubone has L,
+//   no unslotted member remains → placeholder cannot find a candidate
+
+describe('Group 49 — ML placeholder: grey star for families with no ML keeper', () => {
+  it('49a: Magikarp CP:10 (no league ranks, ivAvg=35.6%) gets ML placeholder slot', () => {
+    const p = find('Magikarp', 10);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('M');
+    expect(p.isMlPlaceholder).toBe(true);
+  });
+
+  it('49b: Magikarp CP:10 placeholder → decision=review, starType=grey', () => {
+    const p = find('Magikarp', 10);
+    expect(p.decision).toBe('review');
+    expect(p.starType).toBe('grey');
+  });
+
+  it('49c: Magikarp CP:10 placeholder → nickname contains ivAvg rounded + m suffix (Magikarp36m)', () => {
+    const p = find('Magikarp', 10);
+    expect(p.nickname).toMatch(/36m/);
+  });
+
+  it('49d: Feraligatr family already has confirmed ML (CP:2498 hundo) → placeholder does NOT fire', () => {
+    const p = find('Feraligatr', 2498);
+    expect(p.slots).toContain('M');
+    expect(p.isMlPlaceholder).toBeFalsy(); // confirmed ML, not a placeholder
+  });
+
+  it('49e: Marowak/Cubone family — all members have slots → no ML placeholder assigned', () => {
+    // Marowak CP:494 wins G; Cubone CP:12 wins L — no unslotted member remains
+    const marowak = find('Marowak', 494);
+    const cubone = find('Cubone', 12);
+    expect(marowak.isMlPlaceholder).toBeFalsy();
+    expect(cubone.isMlPlaceholder).toBeFalsy();
   });
 });

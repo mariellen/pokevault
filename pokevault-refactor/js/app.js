@@ -27,6 +27,7 @@ function pokemonStarRank(p) {
   if (p.suggestStar && !p.isFavorite) return 1;
   if (p.suggestStarCheaper) return 2;
   if (p.suggestStarExpensive) return 3;
+  if (p.isMlPlaceholder) return 3.5;
   if (!p.isShiny && p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper) return 4;
   if (p.starType === 'visibility') return 5;
   return 6;
@@ -1489,7 +1490,7 @@ function openCullModal(){
       &&!m.some(p=>p.suggestStarCheaper&&!p.isFavorite);
   });
 
-  const countNonGold=fam=>fam.members.filter(p=>!(p.isFavorite&&p.suggestStar)).length;
+  const countNonGold=fam=>fam.members.filter(p=>!(p.isFavorite&&p.suggestStar)&&!p.isMlPlaceholder).length;
   qualifying.sort((a,b)=>countNonGold(b)-countNonGold(a));
 
   // Practical filter: hide families whose only confirmed keepers are expensive winners
@@ -1512,7 +1513,7 @@ function openCullModal(){
   const FAM_STANDALONE=new Set(['Kleavor']);
 
   const rows=displayQualifying.map(fam=>{
-    const keepers=fam.members.filter(p=>p.isFavorite&&p.suggestStar);
+    const keepers=fam.members.filter(p=>(p.isFavorite&&p.suggestStar)||p.isMlPlaceholder);
     const redCount=fam.members.filter(p=>p.isFavorite&&!p.suggestStar).length;
     const luckyCount=fam.members.filter(p=>p.isLucky).length;
     const unstarredCount=fam.members.filter(p=>!p.isFavorite).length;
@@ -1539,9 +1540,10 @@ function openCullModal(){
 
     const keeperLines=keepers.map(p=>
       `<div style="font-size:11px;color:var(--muted);padding-left:4px;margin-top:2px">
-        <span style="color:var(--gold)">★</span>
+        <span style="color:${p.isMlPlaceholder?'var(--muted)':'var(--gold)'}">${p.isMlPlaceholder?'☆':'★'}</span>
         ${p.name} CP:${p.cp}
-        ${p.nickname?`<span style="font-family:monospace;color:var(--green)">${p.nickname}</span>`:''}
+        ${p.nickname?`<span style="font-family:monospace;color:${p.isMlPlaceholder?'var(--muted)':'var(--green)'}">${p.nickname}</span>`:''}
+        ${p.isMlPlaceholder?'<span style="font-size:9px;color:var(--dim)">(ML placeholder)</span>':''}
       </div>`
     ).join('');
 
