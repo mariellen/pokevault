@@ -102,6 +102,12 @@ header{background:var(--surf);border-bottom:1px solid var(--border);padding:10px
 .fb-review{background:rgba(88,166,255,.15);color:var(--great);}
 .fam-count{color:var(--muted);font-size:12px;font-weight:600;}
 .fam-count-large{color:var(--red)!important;}
+.family-header.fam-complete-blue{border-left:3px solid var(--cyan);background:rgba(0,212,255,0.04);}
+.family-header.fam-complete-green{border-left:3px solid var(--green);background:rgba(56,161,105,0.04);}
+.family-header.fam-complete-gold{border-left:3px solid var(--gold);background:rgba(255,215,0,0.04);}
+.family-header.fam-complete-blue:hover{background:rgba(0,212,255,0.08);}
+.family-header.fam-complete-green:hover{background:rgba(56,161,105,0.08);}
+.family-header.fam-complete-gold:hover{background:rgba(255,215,0,0.08);}
 
 /* TABLE */
 .family-body{display:none;border-top:1px solid var(--border);overflow-x:auto;}

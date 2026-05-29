@@ -12,6 +12,7 @@ let allPokemon=[], families=[], filteredFamilies=[];
 let mergeCandidateKeys=new Set();
 let decFilter='all', leagueFilters=new Set(), searchTerm='', page=1, sortMode='star', countThreshold=100;
 let hundoMode=0; // 0=off, 1=all hundos, 2=star hundos (green/cyan only)
+let practicalMode=false; // Option B: hide expensive ($$$/$$$$) slot winners from view
 const PER_PAGE=40;
 const familySortState={};
 

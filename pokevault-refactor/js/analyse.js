@@ -833,7 +833,18 @@ function analyse(rows) {
           return effectiveDust(a) - effectiveDust(b);
         });
 
-        const best = eligible[0];
+        // Option C+D: affordable-first two-pass. ML always single pass (Option D — exempt by design).
+        // Pass 1 (GL/UL/LL): affordable candidates only (effective dust ≤ lgAffordable).
+        // Pass 2 (GL/UL/LL): full eligible pool as fallback when no affordable candidate exists.
+        const lgAffordable = (DUST_THRESHOLDS[lg] || DUST_THRESHOLDS.G).affordable;
+        const eligiblePool = lg !== 'M' ? (() => {
+          const aff = eligible.filter(p =>
+            effectiveDust(p) <= lgAffordable && (p[rankField]||0) >= RULES.keepThreshold
+          );
+          return aff.length ? aff : eligible;
+        })() : eligible;
+
+        const best = eligiblePool[0];
         const bestRank = best[rankField]||0;
 
         // Before assigning: check if best rounds to 100% in a lower league
@@ -858,9 +869,9 @@ function analyse(rows) {
         });
 
         let actualBest = best;
-        if (shouldProtect && eligible.length > 1) {
+        if (shouldProtect && eligiblePool.length > 1) {
           // Try next best that doesn't have the same protection issue
-          const alternative = eligible.slice(1).find(p => {
+          const alternative = eligiblePool.slice(1).find(p => {
             const altShouldProtect = lowerLeagues.some(ll => {
               const lowerEvo = ll==='L'?(p.evolvedNameL||p.name)
                 :ll==='G'?(p.evolvedNameG||p.name):(p.evolvedNameU||p.name);
@@ -903,9 +914,7 @@ function analyse(rows) {
           const isFinalEvoStage = !members.some(m =>
             m.name === stageName && m[leagueEvoKey] && m[leagueEvoKey] !== stageName
           );
-          const lgAffordable = (DUST_THRESHOLDS[lg] || DUST_THRESHOLDS.G).affordable;
-
-          // Dual recommendation: expensive winner + affordable backup
+          // Dual recommendation: expensive winner + affordable backup (Pass 2 only)
           if (eDustCheck > lgAffordable && isConfirmed) {
             best2.isExpensiveWinner = true;
             best2.expensiveForLeague = lg;
@@ -1535,10 +1544,45 @@ function analyse(rows) {
       keepCount:members.filter(p=>p.decision==='keep').length,
       tradeCount:members.filter(p=>p.decision==='trade').length,
       reviewCount:members.filter(p=>p.decision==='review'||p.decision==='protected').length,
+      completeness: computeFamilyCompleteness(members),
     };
   }).sort((a,b)=>a.primaryName.localeCompare(b.primaryName));
 
   return {pokemon:parsed, families:famList};
+}
+
+// ═══════════════════════════════════════════════
+// FAMILY COMPLETENESS
+// Tier: 'gold' (all round to 100%) | 'green' (all ≥95%) | 'blue' (all ≥90%) | 'none'
+// Icons: bonus markers — don't affect tier.
+// ═══════════════════════════════════════════════
+function computeFamilyCompleteness(members) {
+  const LEAGUES = ['L', 'G', 'U', 'M'];
+  const eligibleLeagues = LEAGUES.filter(lg => members.some(p => (p['rankPct'+lg]||0) > 0));
+  if (!eligibleLeagues.length) return { tier: 'none' };
+
+  const confirmedKeepers = members.filter(p =>
+    p.decision === 'keep' && p.slotConfirmed && LEAGUES.some(lg => p.slots.includes(lg))
+  );
+  const allCovered = eligibleLeagues.every(lg => confirmedKeepers.some(p => p.slots.includes(lg)));
+  if (!allCovered) return { tier: 'none' };
+
+  const ranks = confirmedKeepers.flatMap(p =>
+    eligibleLeagues.filter(lg => p.slots.includes(lg)).map(lg => p['rankPct'+lg] || 0)
+  );
+  if (!ranks.length) return { tier: 'none' };
+
+  const allHundo = ranks.every(r => Math.round(r) >= 100);
+  const allGreen = ranks.every(r => r >= 95);
+  const tier = allHundo ? 'gold' : allGreen ? 'green' : 'blue';
+
+  return {
+    tier,
+    hasShinyKeep:   members.some(p => p.isShiny      && p.decision === 'keep'),
+    hasLuckyKeep:   members.some(p => p.isLucky      && p.decision === 'keep'),
+    hasDynamaxKeep: members.some(p => p.isDynamax    && p.decision === 'keep'),
+    hasGmaxKeep:    members.some(p => p.isGigantamax && p.decision === 'keep'),
+  };
 }
 
 // ═══════════════════════════════════════════════

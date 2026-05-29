@@ -23,7 +23,7 @@ const shim = `const overridesCache = {};\n`;
 
 // All const/function declarations share one function scope, so analyse,
 // buildFamilyMap, and buildNickname (declared inside that scope) are visible to the return.
-const factory = new Function(shim + combined + '\nreturn { analyse, buildFamilyMap, buildNickname, findMergeCandidates };');
+const factory = new Function(shim + combined + '\nreturn { analyse, buildFamilyMap, buildNickname, findMergeCandidates, computeFamilyCompleteness };');
 const base = factory();
 module.exports = base;
 
@@ -31,6 +31,6 @@ module.exports = base;
 // Usage: const { analyse } = loader.createWithOverrides({ [stableKey]: { is_dynamax: true } });
 module.exports.createWithOverrides = function(overridesMap) {
   const shimOv = `const overridesCache = ${JSON.stringify(overridesMap)};\n`;
-  const f = new Function(shimOv + combined + '\nreturn { analyse, buildFamilyMap, buildNickname, findMergeCandidates };');
+  const f = new Function(shimOv + combined + '\nreturn { analyse, buildFamilyMap, buildNickname, findMergeCandidates, computeFamilyCompleteness };');
   return f();
 };

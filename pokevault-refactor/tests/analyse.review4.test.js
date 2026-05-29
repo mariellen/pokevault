@@ -302,50 +302,52 @@ describe('Group B — Naming conventions on analysed Pokémon', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// GROUP C — Finding A: affordable backup
+// GROUP C — Finding A / Feature 2 Option C: affordable candidate wins slot directly
 //
-// An "affordable backup" is the cheaper same-rounded-rank alternative to an
-// EXPENSIVE league winner (effective dust > league affordable threshold). The
-// expensive winner gets isExpensiveWinner + blue star; the backup gets an
-// X_affordable slot.
+// BA decision (2026-05-29): Finding A Option 1 + Feature 2 Option C.
 //
-// BA decision (2026-05-29): Option 1 — backup is a keep-worthy CYAN pick:
-//   decision='keep', nick uses the league symbol (Ⓖ96), starType='cyan'.
+// With Option C two-pass: the affordable candidate (dust ≤ lgAffordable) wins the
+// league slot in Pass 1, rather than being a backup to an expensive winner.
+// The expensive candidate is filtered out of Pass 1 and wins no slot (unless
+// it qualifies for a different league in Pass 2).
+//
+// Net result: Tentacruel CP:1430 (dustG=100k ≤ 150k, 96% GL) wins GL directly —
+//   decision='keep', starType='green', slots=['G'], nick uses Ⓖ.
+// Tentacruel CP:1450 (dustG=200k > 150k) loses GL and gets no slot.
 // ════════════════════════════════════════════════════════════════════════════
 
-describe('Group C — Finding A: affordable backup decision/star/nick', () => {
+describe('Group C — Finding A + Option C: affordable candidate wins GL slot directly', () => {
   let result;
   const find = (name, cp) => result.pokemon.find(p => p.name === name && p.cp === cp);
   beforeAll(() => { result = analyse(loadCSV(FIXTURE_PATH)); });
 
-  // GUARD updated: Finding A → Option 1 chosen (BA brief 2026-05-29).
-  // Behaviour changed intentionally: affordable backup is now a keep-worthy cyan pick.
-  it('GUARD: Tentacruel CP:1430 affordable backup is keep/cyan/league-symbol-nick (Finding A Option 1)', () => {
+  // GUARD updated: Option C means affordable candidate wins GL directly (not as backup).
+  // Behaviour changed intentionally by Feature 2 Option C (brief 2026-05-29).
+  it('GUARD: Tentacruel CP:1430 wins GL directly — keep/green/league-symbol-nick (Option C)', () => {
     const p = find('Tentacruel', 1430);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('G_affordable');
+    expect(p.slots).toContain('G');
     expect(p.isAffordableWinner).toBe(true);
     expect(p.decision).toBe('keep');
-    expect(p.starType).toBe('cyan');
-    expect(p.nickname).toContain('Ⓖ'); // league symbol, not holding format
+    expect(p.starType).toBe('green');
+    expect(p.nickname).toContain('Ⓖ');
   });
 
-  // Finding A Option 1 — BA decision confirmed 2026-05-29
-  it('OPTION 1: affordable backup decision === "keep"', () => {
+  it('affordable GL winner decision === "keep"', () => {
     const p = find('Tentacruel', 1430);
     expect(p.decision).toBe('keep');
   });
 
-  it('OPTION 1: affordable backup nick uses Ⓖ league symbol, not holding format', () => {
+  it('affordable GL winner nick uses Ⓖ league symbol', () => {
     const p = find('Tentacruel', 1430);
     expect(p.nickname).toContain('Ⓖ');
     expect(p.nickname).not.toMatch(/\d+g$/);
   });
 
-  it('OPTION 1: affordable backup starType === "cyan" (suggestStarCheaper)', () => {
+  it('affordable GL winner gets green star (not cyan — it IS the winner, not a backup)', () => {
     const p = find('Tentacruel', 1430);
-    expect(p.starType).toBe('cyan');
-    expect(p.suggestStarCheaper).toBe(true);
+    expect(p.starType).toBe('green');
+    expect(p.isAffordableWinner).toBe(true);
   });
 });
 

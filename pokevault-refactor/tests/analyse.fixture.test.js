@@ -1517,32 +1517,33 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
   });
 });
 
-// ─── Group 29 — Skwovet UL slot held by CP:750; GL held by CP:496 (100%) ───────
-// Locks in the sameEvoConflicts fix: UL slot retained by the best UL candidate
-// (CP:750 at 98.58%) rather than being released to the runner-up (Greedent CP:1438).
-// GL is won by CP:496 (100%) which beats CP:750 (99.5%) on rank — CP:750 drops to UL only.
+// ─── Group 29 — Greedent CP:1438 wins UL (Option C affordable-first) ─────────
+// Option C two-pass: affordable candidates (dust ≤ 300k for UL) win Pass 1.
+// Greedent CP:1438 (92.09% UL, affordable as final evo) beats expensive Skwovet CP:750 (98.58% UL).
+// GL is still won by Skwovet CP:496 (100%, affordable, dustG=0).
+// Behaviour changed intentionally by Feature 2 Option C (brief 2026-05-29).
 
-describe('Group 29 — Skwovet CP:750 retains UL (98.58%); CP:496 wins GL (100%)', () => {
-  it('Skwovet CP:750 (98.58% UL) → slots contains U', () => {
-    const p = find('Skwovet', 750);
+describe('Group 29 — Greedent CP:1438 wins UL (Option C); Skwovet CP:750 loses UL to affordable candidate', () => {
+  it('Greedent CP:1438 (92.09% UL, affordable) → wins UL slot (Option C Pass 1)', () => {
+    const p = find('Greedent', 1438);
     expect(p).toBeDefined();
     expect(p.slots).toContain('U');
+    expect(p.decision).toBe('keep');
   });
 
-  it('Skwovet CP:750 does NOT hold GL — CP:496 (100%) wins it via higher rank', () => {
+  it('Skwovet CP:750 (98.58% UL, expensive dustU) → does NOT hold UL slot (Option C)', () => {
+    const p = find('Skwovet', 750);
+    expect(p.slots).not.toContain('U');
+  });
+
+  it('Skwovet CP:750 does NOT hold GL either — CP:496 (100%) wins it', () => {
     const p = find('Skwovet', 750);
     expect(p.slots).not.toContain('G');
   });
 
-  it('Skwovet CP:750 (UL slot) → decision=keep', () => {
+  it('Skwovet CP:750 (no league slot) → decision=review', () => {
     const p = find('Skwovet', 750);
-    expect(p.decision).toBe('keep');
-  });
-
-  it('Greedent CP:1438 (92.09% UL) → does NOT hold UL slot (Skwovet CP:750 wins it)', () => {
-    const p = find('Greedent', 1438);
-    expect(p).toBeDefined();
-    expect(p.slots).not.toContain('U');
+    expect(p.decision).toBe('review');
   });
 });
 
@@ -1570,11 +1571,12 @@ describe('Group 30 — Skwovet CP:496 (99.78% GL) wins and is kept — regressio
     expect(p.nickname).toContain('100');
   });
 
-  it('Skwovet CP:750 retains UL (98.58%) while CP:496 holds GL — both kept concurrently', () => {
-    const p750 = find('Skwovet', 750);
+  it('Skwovet CP:496 holds GL; Greedent CP:1438 holds UL (Option C affordable-first)', () => {
+    // Option C: affordable Greedent CP:1438 wins UL in Pass 1; Skwovet CP:750 (expensive) loses UL.
     const p496 = find('Skwovet', 496);
+    const greedent = find('Greedent', 1438);
     expect(p496.slots).toContain('G');
-    expect(p750.slots).toContain('U');
+    expect(greedent.slots).toContain('U');
   });
 });
 
@@ -1817,24 +1819,24 @@ describe('Group 42 — B5: shadow purify-p suffix toggling', () => {
   });
 });
 
-// ─── Group 43 — B6: expensive GL winner + affordable backup (cyan star) ──────────
-// When the GL winner's effective dust exceeds the affordable threshold (150k for GL),
-// a cheaper backup at the same rounded rank gets G_affordable + cyan star (suggestStarCheaper).
-// Tentacruel CP:1450 (96.10% GL, dustG=200k > 150k) → expensive winner → isExpensiveWinner=true.
-// Tentacruel CP:1420 (96.00% GL, dustG=100k ≤ 150k) → affordable backup → suggestStarCheaper=true.
+// ─── Group 43 — B6: affordable candidate wins GL outright (Option C) ────────────
+// Option C: affordable CP:1430 (dustG=100k ≤ 150k, 96% GL) wins GL in Pass 1.
+// Expensive CP:1450 (dustG=200k > 150k) does not win GL — filtered out of Pass 1 and
+// no other league slot is available for it. Behaviour changed by Feature 2 Option C (brief 2026-05-29).
 
-describe('Group 43 — B6: expensive GL winner + affordable backup pair', () => {
-  it('B6: Tentacruel CP:1450 (dustG=200k, 96% GL) wins GL with isExpensiveWinner flag', () => {
-    const p = find('Tentacruel', 1450);
-    expect(p).toBeDefined();
-    expect(p.slots).toContain('G');
-    expect(p.isExpensiveWinner).toBe(true);
-  });
-  it('B6: Tentacruel CP:1430 (dustG=100k, 96% GL) is the affordable backup (isAffordableWinner=true, G_affordable slot)', () => {
+describe('Group 43 — B6: affordable GL winner wins slot outright (Option C)', () => {
+  it('B6: Tentacruel CP:1430 (dustG=100k, 96% GL) wins GL directly (isAffordableWinner=true, G slot)', () => {
     const p = find('Tentacruel', 1430);
     expect(p).toBeDefined();
     expect(p.isAffordableWinner).toBe(true);
-    expect(p.slots).toContain('G_affordable');
+    expect(p.slots).toContain('G');
+    expect(p.decision).toBe('keep');
+  });
+  it('B6: Tentacruel CP:1450 (dustG=200k, expensive) does NOT win GL (Option C Pass 1 skips it)', () => {
+    const p = find('Tentacruel', 1450);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('G');
+    expect(p.isExpensiveWinner).toBeFalsy();
   });
 });
 

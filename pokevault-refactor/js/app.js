@@ -217,6 +217,10 @@ function renderFamily(fam,isOpen){
   const isEevee=members.some(p=>p.name==='Eevee');
   const eeveeTip=isEevee?`<div class="eevee-tip">💡 Eevee family: best evolutions for Great = Umbreon / Sylveon, Ultra = Glaceon / Espeon. Check existing eeveelutions below.</div>`:'';
 
+  const {tier:cTier='none',hasShinyKeep,hasLuckyKeep,hasDynamaxKeep,hasGmaxKeep}=fam.completeness||{};
+  const headerClass='family-header'+(cTier&&cTier!=='none'?' fam-complete-'+cTier:'');
+  const completeIcons=[hasShinyKeep?'✨':'',hasLuckyKeep?'🍀':'',hasDynamaxKeep?'Ⓓ':'',hasGmaxKeep?'Ⓧ':''].filter(Boolean).join(' ');
+
   const famForms=[...new Set(members.map(p=>p.form).filter(x=>x&&x!=='Normal'))];
   const famFormStr=famForms.length===1?`<span style="color:var(--cyan);font-size:11px">${famForms[0]}</span>`:'';
   const goSearchStr=buildGoSearchStr(primaryName,members);
@@ -240,7 +244,7 @@ function renderFamily(fam,isOpen){
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
-  const sorted=[...members].sort((a,b)=>pokemonStarRank(a)-pokemonStarRank(b));
+  const sorted=[...members].filter(p=>!(practicalMode&&p.isExpensiveWinner)).sort((a,b)=>pokemonStarRank(a)-pokemonStarRank(b));
   const rows=sorted.map(p=>buildRow(p)).join('');
 
   const thead=`<thead><tr>
@@ -259,7 +263,7 @@ function renderFamily(fam,isOpen){
   </tr></thead>`;
 
   return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
-    <div class="family-header" onclick="toggleFamily('fam-${key}')">
+    <div class="${headerClass}" onclick="toggleFamily('fam-${key}')">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;min-width:0">
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''} <span style="color:var(--dim);font-size:11px">(${members.length})</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
@@ -267,6 +271,7 @@ function renderFamily(fam,isOpen){
         ${goldCount?`<span class="fam-badge" style="color:var(--gold)">${goldCount}★</span>`:''}
         ${luckyCount?`<span class="fam-badge" style="color:var(--gold)">${luckyCount}🍀</span>`:''}
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
+        ${completeIcons?`<span class="fam-badge" style="font-size:11px" title="Completeness icons">${completeIcons}</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
         <span class="fam-chevron">▶</span>
@@ -397,6 +402,10 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const luckyCount=members.filter(p=>p.isLucky).length;
   const binCount=members.filter(p=>!p.isFavorite&&p.decision!=='keep').length;
   const isEevee=members.some(p=>p.name==='Eevee');
+
+  const {tier:cTier='none',hasShinyKeep,hasLuckyKeep,hasDynamaxKeep,hasGmaxKeep}=fam.completeness||{};
+  const headerClass='family-header'+(cTier&&cTier!=='none'?' fam-complete-'+cTier:'');
+  const completeIcons=[hasShinyKeep?'✨':'',hasLuckyKeep?'🍀':'',hasDynamaxKeep?'Ⓓ':'',hasGmaxKeep?'Ⓧ':''].filter(Boolean).join(' ');
   const eeveeTip=isEevee?`<div class="eevee-tip">💡 Eevee: best for Great = Umbreon / Sylveon, Ultra = Glaceon / Espeon</div>`:'';
 
   const term = searchTerm ? searchTerm.toLowerCase() : '';
@@ -450,8 +459,8 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
            (p.evolvedNameU||'').toLowerCase().includes(term);
   };
 
-  const visible=members.filter(p=>!p._leagueFiltered&&!p.hidden&&memberMatchesTerm(p));
-  const hidden=members.filter(p=>p._leagueFiltered||p.hidden||!memberMatchesTerm(p));
+  const visible=members.filter(p=>!p._leagueFiltered&&!p.hidden&&memberMatchesTerm(p)&&!(practicalMode&&p.isExpensiveWinner));
+  const hidden=members.filter(p=>p._leagueFiltered||p.hidden||!memberMatchesTerm(p)||(practicalMode&&p.isExpensiveWinner));
   const filteredNote=activeLeagues.length>0&&hidden.length>0?
     `<div style="padding:5px 12px;font-size:10px;color:var(--dim)">${hidden.length} row${hidden.length!==1?'s':''} hidden by league filter</div>`:'';
 
@@ -523,7 +532,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   </tr></thead>`;
 
   return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
-    <div class="family-header" onclick="toggleFamily('fam-${key}')">
+    <div class="${headerClass}" onclick="toggleFamily('fam-${key}')">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;min-width:0">
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''}${collBadge} <span style="color:var(--dim);font-size:11px">(${members.length})${activeLeagues.length>0?' · '+visible.length+' shown':''}</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
@@ -531,6 +540,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
         ${goldCount?`<span class="fam-badge" style="color:var(--gold)">${goldCount}★</span>`:''}
         ${luckyCount?`<span class="fam-badge" style="color:var(--gold)">${luckyCount}🍀</span>`:''}
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
+        ${completeIcons?`<span class="fam-badge" style="font-size:11px" title="Completeness icons">${completeIcons}</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
         <span class="fam-chevron">▶</span>
@@ -665,6 +675,11 @@ function filterCostlyWinners(btn){
     filteredFamilies=families.filter(f=>f.members.some(p=>p.suggestStarExpensive&&!p.isFavorite));
   } else { applyFilters(); return; }
   renderPage();
+}
+
+function togglePractical(btn){
+  practicalMode=btn.classList.toggle('active');
+  applyFilters();
 }
 
 // ═══════════════════════════════════════════════
@@ -914,6 +929,7 @@ function encodeStateToHash() {
   if (searchTerm) params.set('search', searchTerm);
   if (decFilter !== 'all') params.set('decision', decFilter);
   if (leagueFilters.size) params.set('leagues', [...leagueFilters].join(','));
+  if (practicalMode) params.set('practical', 'true');
   const qs = params.toString();
   return qs ? '#results?' + qs : '#';
 }
@@ -984,6 +1000,10 @@ function applyHashState() {
         leagueFilters.add(l);
         document.querySelector(`[data-l="${l}"]`)?.classList.add('active');
       });
+    }
+    if (params.get('practical') === 'true') {
+      practicalMode = true;
+      document.getElementById('practicalBtn')?.classList.add('active');
     }
     applyFilters();
   }
@@ -1490,6 +1510,8 @@ function openCullModal(){
     }
     const searchEsc=searchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     const nameEsc=fam.primaryName.replace(/"/g,'&quot;');
+    const {tier:cullTier='none'}=fam.completeness||{};
+    const cullBorderStyle=cullTier==='gold'?'border-left:3px solid var(--gold)':cullTier==='green'?'border-left:3px solid var(--green)':cullTier==='blue'?'border-left:3px solid var(--cyan)':'';
 
     const keeperLines=keepers.map(p=>
       `<div style="font-size:11px;color:var(--muted);padding-left:4px;margin-top:2px">
@@ -1499,7 +1521,7 @@ function openCullModal(){
       </div>`
     ).join('');
 
-    return `<div style="padding:8px 16px;border-bottom:1px solid var(--border)">
+    return `<div style="padding:8px 16px;border-bottom:1px solid var(--border)${cullBorderStyle?';'+cullBorderStyle:''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span data-name="${nameEsc}" onclick="navigateToFamily(this.dataset.name)" style="font-weight:700;font-size:13px;cursor:pointer;color:var(--cyan)" title="View family in main list">${fam.primaryName}</span>
         <span style="color:var(--muted);font-size:11px">${fam.members.length}</span>
