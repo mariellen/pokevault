@@ -77,7 +77,7 @@ function decBadge(d){
 function starCell(p){
   const type=p.pokeType||'';
   const tc={Legendary:'st-legendary',Mythical:'st-mythical','Ultra Beast':'st-ub',Mega:'st-mega'}[type]||'';
-  const st=p.starType||'none';
+  const st=p.isMlPlaceholder ? 'grey' : (p.starType||'none');
   let si;
   if(st==='gold') si='<span class="star-yellow" title="Starred correctly ✓">★</span>';
   else if(st==='green') si='<span class="star-green" title="Should be starred — action needed">★</span>';

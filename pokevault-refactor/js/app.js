@@ -28,7 +28,7 @@ function pokemonStarRank(p) {
   if (p.suggestStarCheaper) return 2;
   if (p.suggestStarExpensive) return 3;
   if (p.isMlPlaceholder) return 3.5;
-  if (!p.isShiny && p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper) return 4;
+  if (!p.isShiny && p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper && !p.isMlPlaceholder) return 4;
   if (p.starType === 'visibility') return 5;
   return 6;
 }
