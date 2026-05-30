@@ -1536,12 +1536,12 @@ function analyse(rows) {
     // a Master League candidate to star before culling everything else.
     // Legendaries/Mythicals/UBs skip ML entirely (handled by best_overall) — no placeholder.
     if (!isLegendary) {
-      const hasMlSlot = members.some(m => m.slots.includes('M'));
-      if (!hasMlSlot) {
-        const candidates = members.filter(m =>
-          !m.slots.some(s => RULES.leagues.includes(s) || s.endsWith('_affordable')) &&
-          m.decision !== 'keep' && m.decision !== 'protected'
-        );
+      const hasConfirmedMlKeeper = members.some(m => m.slots.includes('M') && m.slotConfirmed);
+      const candidates = members.filter(m =>
+        !m.slots.some(s => RULES.leagues.includes(s) || s.endsWith('_affordable')) &&
+        m.decision !== 'keep' && m.decision !== 'protected'
+      );
+      if (!hasConfirmedMlKeeper) {
         if (candidates.length > 0) {
           const best = candidates.reduce((a, b) => (b.ivAvg||0) > (a.ivAvg||0) ? b : a);
           best.slots.push('M');
