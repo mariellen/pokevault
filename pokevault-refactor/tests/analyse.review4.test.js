@@ -518,8 +518,11 @@ describe('Group F — B1 form prefix: single evo-path regional forms', () => {
   let result;
   beforeAll(() => {
     result = analyse([
+      // ivAvg set to 64.4 (below the ML 70% floor) so the M pass skips both Vulpix,
+      // leaving CP:500 free to win the G slot with its 98% GL rank.
+      // GL rank is independent of ivAvg — 0/15/14 is a realistic GL-optimal spread.
       row({ 'Name':'Vulpix', 'Form':'Alola', 'Pokemon Number':'37',
-        'CP':'500', 'Atk IV':'14', 'Def IV':'15', 'Sta IV':'13', 'IV Avg':'93.3',
+        'CP':'500', 'Atk IV':'0', 'Def IV':'15', 'Sta IV':'14', 'IV Avg':'64.4',
         'Rank % (G)':'98', 'Dust Cost (G)':'10000',
         'Name (G)':'Ninetales', 'Form (G)':'Alola',
         'Rank % (U)':'72', 'Name (U)':'Ninetales', 'Form (U)':'Alola',
