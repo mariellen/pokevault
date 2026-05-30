@@ -163,11 +163,16 @@ function buildNickname(p, slot, convention) {
 
   // Form nick prefix: visually distinct forms use short prefix instead of species name
   // (e.g. Castform Snowy→'Snow', Deoxys Attack→'Atk', Furfrou Dandy→'Dand')
-  // B1: evo target form (e.g. Midnight/Midday Lycanroc) takes priority over Pokémon's own form.
-  // B2: Pokémon's own regional form (e.g. Hisui) applies when evo target form is absent.
+  // B1: evo-target form prefix only when evo form differs from the Pokémon's own form.
+  //     Rockruff (own='') → Midnight: different → prefix. Alolan Vulpix (own='Alola') → Alola: same → skip.
+  // B2: own-form prefix — suppressed when evo target is a different species with the same form as own
+  //     (e.g. Alolan Vulpix → Ninetales, both 'Alola': use the evo species name instead of 'Alol').
   const activeForm = p.specialForm || p.form;
-  const evoFormPrefix = evolvedFormForSlot && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[evolvedFormForSlot];
-  const formPrefix = activeForm && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[activeForm];
+  const evoFormPrefix = evolvedFormForSlot && evolvedFormForSlot !== (p.form || '')
+    && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[evolvedFormForSlot];
+  const suppressB2 = base !== p.name && evolvedFormForSlot && evolvedFormForSlot === (p.form || '');
+  const formPrefix = !suppressB2 && activeForm
+    && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[activeForm];
   if (evoFormPrefix) base = evoFormPrefix;
   else if (formPrefix) base = formPrefix;
 

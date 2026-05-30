@@ -503,3 +503,47 @@ describeE('Group E — Finding B1: Rockruff→Lycanroc form-divergent evolution'
     expect(blob.includes('Midnight') && blob.includes('Midday')).toBe(true);
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// GROUP F — B1 form prefix: regional forms with single evo path (Alolan Vulpix)
+//
+// Bug: AlolⒼ98 instead of NinetaⒼ98 for Alolan Vulpix.
+// Fix: B1 evo-target prefix only fires when the evo form DIFFERS from the
+//      Pokémon's own form. Alolan Vulpix (own='Alola') → Alola Ninetales (evo='Alola'):
+//      same form → prefix suppressed → plain evo name used.
+//      B2 own-form prefix also suppressed in this case (different species, same form = redundant).
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Group F — B1 form prefix: single evo-path regional forms', () => {
+  let result;
+  beforeAll(() => {
+    result = analyse([
+      row({ 'Name':'Vulpix', 'Form':'Alola', 'Pokemon Number':'37',
+        'CP':'500', 'Atk IV':'14', 'Def IV':'15', 'Sta IV':'13', 'IV Avg':'93.3',
+        'Rank % (G)':'98', 'Dust Cost (G)':'10000',
+        'Name (G)':'Ninetales', 'Form (G)':'Alola',
+        'Rank % (U)':'72', 'Name (U)':'Ninetales', 'Form (U)':'Alola',
+        'Name (L)':'', 'Form (L)':'',
+      }),
+      row({ 'Name':'Vulpix', 'Form':'Alola', 'Pokemon Number':'37',
+        'CP':'450', 'Atk IV':'10', 'Def IV':'10', 'Sta IV':'10', 'IV Avg':'66.7',
+        'Rank % (G)':'62', 'Name (G)':'Ninetales', 'Form (G)':'Alola',
+        'Name (U)':'Ninetales', 'Form (U)':'Alola',
+      }),
+    ]);
+  });
+
+  it('Alolan Vulpix GL winner nick uses evo species name (Nineta…), not form prefix (Alol…)', () => {
+    const p = result.pokemon.find(x => x.name === 'Vulpix' && x.cp === 500);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('G');
+    expect(p.nickname).not.toMatch(/^Alol/);
+    expect(p.nickname).toMatch(/^Nineta/);
+  });
+
+  it('Alolan Vulpix GL winner form fields are preserved for traceability', () => {
+    const p = result.pokemon.find(x => x.name === 'Vulpix' && x.cp === 500);
+    expect(p.evolvedFormG).toBe('Alola');
+    expect(p.form).toBe('Alola');
+  });
+});
