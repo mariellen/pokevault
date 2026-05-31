@@ -166,22 +166,25 @@ function buildNickname(p, slot, convention) {
 
   // Form nick prefix: visually distinct forms use short prefix instead of species name
   // (e.g. Castform Snowy→'Snow', Deoxys Attack→'Atk', Furfrou Dandy→'Dand')
-  // B1: evo-target form prefix ONLY when forms differ across leagues (e.g. Rockruff:
-  //     G=Midnight, U=Midday → G nick='Night', U nick='Day'). Single-path regionals
-  //     (Alolan Vulpix, Hisui Growlithe) get the plain evo species name instead.
-  // B2: own-form prefix — suppressed for ALL regional forms when the evo target is a
-  //     different species and no cross-league ambiguity exists. Midnight Lycanroc keeps
-  //     its prefix because base===p.name (it IS the evo target, not a pre-evo).
+  // B1: evo-target form prefix when evo form differs from own form (e.g. Rockruff '' →
+  //     Midnight: different → 'Night'). Alolan Vulpix ('Alola' → 'Alola'): same → no prefix.
+  //     Fires per-slot, so a Rockruff with G=Midnight/U=Midday gets Night(G) and Day(U).
+  // B2: own-form prefix — suppressed for regional-variant forms (Alola/Galar/Hisui/Paldea)
+  //     when no cross-league evo-form divergence. These are in their own PokéVault families so
+  //     the prefix is redundant. Battle forms (Midnight/Midday etc.) keep their prefix.
   const activeForm = p.specialForm || p.form;
   const evoFormValues = [
     p.evolvedNameG ? (p.evolvedFormG || '') : null,
     p.evolvedNameU ? (p.evolvedFormU || '') : null,
     p.evolvedNameL ? (p.evolvedFormL || '') : null,
   ].filter(f => f !== null);
-  const evoFormsDiffer = evoFormValues.length > 1 && new Set(evoFormValues).size > 1;
-  const evoFormPrefix = evoFormsDiffer && evolvedFormForSlot && evolvedFormForSlot !== (p.form || '')
+  // Filter blanks before comparing — a missing form is not a divergent form.
+  const nonBlankEvoForms = evoFormValues.filter(f => f !== '');
+  const evoFormsDiffer = nonBlankEvoForms.length > 1 && new Set(nonBlankEvoForms).size > 1;
+  const evoFormPrefix = evolvedFormForSlot && evolvedFormForSlot !== (p.form || '')
     && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[evolvedFormForSlot];
-  const suppressB2 = base !== p.name && !evoFormsDiffer;
+  const REGIONAL_FORMS = new Set(['Alola', 'Galar', 'Hisui', 'Paldea']);
+  const suppressB2 = !evoFormsDiffer && (base !== p.name || REGIONAL_FORMS.has(p.form || ''));
   const formPrefix = !suppressB2 && activeForm
     && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[activeForm];
   if (evoFormPrefix) base = evoFormPrefix;

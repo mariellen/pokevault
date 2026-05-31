@@ -488,12 +488,13 @@ describeE('Group E — Finding B1: Rockruff→Lycanroc form-divergent evolution'
     expect(p.nickname).not.toMatch(/^Lycanroc/);
   });
 
-  it('DESIRED: Rockruff CP492 UL winner nick shows bare Lycanroc (same Midday form G+U → no prefix)', () => {
-    // CP492 has Form(G)=Midday AND Form(U)=Midday — no cross-league divergence.
-    // Per brief: evoFormsDiffer=false → B1 suppressed → plain species name 'Lycanroc'.
+  it('DESIRED: Rockruff CP492 UL winner nick shows form prefix (Midday → Day)', () => {
+    // CP492 Form(G)=Midday AND Form(U)=Midday. B1 fires: evolvedFormForSlot='Midday' !== p.form=''.
+    // Even without cross-league divergence, the prefix guides which form to evolve.
     const p = at(492);
     expect(p).toBeDefined();
-    expect(p.nickname).toMatch(/^Lycanroc/);
+    expect(p.nickname).toMatch(/^Day/);
+    expect(p.nickname).not.toMatch(/^Lycanroc/);
   });
 
   it('DESIRED: the per-league form difference is captured somewhere user-visible', () => {
