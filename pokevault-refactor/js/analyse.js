@@ -1255,6 +1255,10 @@ function analyse(rows) {
       if (p.decision === 'trade' && (p.isDynamax || p.isGigantamax || isLegendary)) {
         p.starType = 'visibility';
       }
+      // Gold + expensive winner: action already complete in GO — $ dust warning is redundant.
+      if (p.starType === 'gold' && p.isExpensiveWinner) {
+        p.nickname = p.nickname.replace(/\$+/, '');
+      }
     });
     // Fix dustCostBest to use the dust for the assigned league slot
     members.forEach(p=>{

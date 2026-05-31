@@ -1497,7 +1497,7 @@ function openCullModal(){
   let displayQualifying = qualifying;
   if (cullPracticalMode) {
     displayQualifying = qualifying.filter(fam =>
-      fam.members.some(p => p.isFavorite && p.suggestStar && !p.isExpensiveWinner)
+      fam.members.some(p => p.isFavorite && (p.suggestStar || p.isExpensiveWinner))
     );
   }
 
