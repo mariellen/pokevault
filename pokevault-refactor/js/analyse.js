@@ -166,24 +166,22 @@ function buildNickname(p, slot, convention) {
 
   // Form nick prefix: visually distinct forms use short prefix instead of species name
   // (e.g. Castform Snowy→'Snow', Deoxys Attack→'Atk', Furfrou Dandy→'Dand')
-  // B1: evo-target form prefix only when evo form differs from the Pokémon's own form.
-  //     Rockruff (own='') → Midnight: different → prefix.
-  // B2: own-form prefix — suppressed for Alola/Galar forms when the evo target is a different
-  //     species and evo forms don't diverge across leagues. For these classic regionals the evo
-  //     species name is recognisable enough on its own (e.g. Alolan Vulpix → 'Nineta', not 'Alol').
-  //     Hisui/Paldea forms keep the prefix (their evo lines are newer and less universally known).
-  //     Midnight Lycanroc (base===p.name) and Hisui Growlithe (form='Hisui') always keep prefix.
+  // B1: evo-target form prefix ONLY when forms differ across leagues (e.g. Rockruff:
+  //     G=Midnight, U=Midday → G nick='Night', U nick='Day'). Single-path regionals
+  //     (Alolan Vulpix, Hisui Growlithe) get the plain evo species name instead.
+  // B2: own-form prefix — suppressed for ALL regional forms when the evo target is a
+  //     different species and no cross-league ambiguity exists. Midnight Lycanroc keeps
+  //     its prefix because base===p.name (it IS the evo target, not a pre-evo).
   const activeForm = p.specialForm || p.form;
-  const evoFormPrefix = evolvedFormForSlot && evolvedFormForSlot !== (p.form || '')
-    && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[evolvedFormForSlot];
   const evoFormValues = [
     p.evolvedNameG ? (p.evolvedFormG || '') : null,
     p.evolvedNameU ? (p.evolvedFormU || '') : null,
     p.evolvedNameL ? (p.evolvedFormL || '') : null,
   ].filter(f => f !== null);
   const evoFormsDiffer = evoFormValues.length > 1 && new Set(evoFormValues).size > 1;
-  const CLASSIC_REGIONAL_FORMS = new Set(['Alola', 'Galar']);
-  const suppressB2 = base !== p.name && !evoFormsDiffer && CLASSIC_REGIONAL_FORMS.has(p.form || '');
+  const evoFormPrefix = evoFormsDiffer && evolvedFormForSlot && evolvedFormForSlot !== (p.form || '')
+    && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[evolvedFormForSlot];
+  const suppressB2 = base !== p.name && !evoFormsDiffer;
   const formPrefix = !suppressB2 && activeForm
     && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[activeForm];
   if (evoFormPrefix) base = evoFormPrefix;
@@ -355,10 +353,10 @@ function buildNickname(p, slot, convention) {
   } else if (slot==='lucky') {
     // Pure hundo with no league slot (not actually lucky): standalone Ⓗ only
     if (isHundo && !p.isLucky) return fitName(p.name, HUNDO_SFX, '', 12);
-    // Lucky with no league slot: NameⓇIV (Master/level-up candidate)
+    // Lucky with no league slot: BaseⓇIV — base is evo species name where applicable
     const pv=Math.round(p.rankPctM||p.ivAvg||0);
     mid=LC.R+String(pv);
-    return fitName(p.name, mid, nickSuf, 12);
+    return fitName(base, mid, nickSuf, 12);
   } else if (slot==='M_placeholder') {
     mid = String(iv)+'m';
     return fitName(p.name, mid, nickSuf, 12);

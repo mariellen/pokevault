@@ -390,11 +390,12 @@ describe('Group D — Finding B2: regional-form pre-evo distinct keeper', () => 
     });
   });
 
-  // Finding B2 fix landed — convert it.failing → it (BA decision 2026-05-29)
-  it('DESIRED: the Normal and Hisui Growlithe produce DIFFERENT nicknames', () => {
-    const norm = result.pokemon.find(p => p.name === 'Growlithe' && p.form !== 'Hisui');
+  // BA brief 2026-05-31: Hisui Growlithe has a single evo path (no cross-league form
+  // divergence) → suppress B2 prefix, use plain evo species name 'Arcanine'.
+  it('DESIRED: Hisui Growlithe GL nick uses evo species name (Arca…) not form prefix (Hisu…)', () => {
     const hisui = result.pokemon.find(p => p.name === 'Growlithe' && p.form === 'Hisui');
-    expect(hisui.nickname).not.toBe(norm.nickname);
+    expect(hisui.nickname).not.toMatch(/^Hisu/);
+    expect(hisui.nickname).toMatch(/^Arca/);
   });
 
   it('DESIRED: the Hisui Growlithe targets a Hisui-distinct Arcanine, not plain "Arcanine"', () => {
@@ -487,11 +488,12 @@ describeE('Group E — Finding B1: Rockruff→Lycanroc form-divergent evolution'
     expect(p.nickname).not.toMatch(/^Lycanroc/);
   });
 
-  it('DESIRED: Rockruff CP492 UL winner nick shows the Midday target (not bare Lycanroc)', () => {
-    // Pokégenie Form(U) for CP492 = Midday. Nick reflects Midday via FORM_NICK_PREFIXES.
+  it('DESIRED: Rockruff CP492 UL winner nick shows bare Lycanroc (same Midday form G+U → no prefix)', () => {
+    // CP492 has Form(G)=Midday AND Form(U)=Midday — no cross-league divergence.
+    // Per brief: evoFormsDiffer=false → B1 suppressed → plain species name 'Lycanroc'.
     const p = at(492);
     expect(p).toBeDefined();
-    expect(p.nickname).not.toMatch(/^Lycanroc/);
+    expect(p.nickname).toMatch(/^Lycanroc/);
   });
 
   it('DESIRED: the per-league form difference is captured somewhere user-visible', () => {
@@ -501,6 +503,52 @@ describeE('Group E — Finding B1: Rockruff→Lycanroc form-divergent evolution'
     expect(p).toBeDefined();
     const blob = JSON.stringify(p);
     expect(blob.includes('Midnight') && blob.includes('Midday')).toBe(true);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// GROUP E2 — Brief item 2: Rockruff UL winner with Midnight(G)/Midday(U) divergence
+//
+// When evoFormsDiffer=true, B1 fires for each slot individually.
+// The UL winner should show 'Day' prefix (Midday target), not bare 'Lycanroc'.
+// Uses a synthetic 2-Rockruff fixture (below ML 70% floor to avoid M-slot interference).
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Group E2 — Rockruff UL with Midnight(G)/Midday(U) form divergence → Day prefix', () => {
+  let result;
+  beforeAll(() => {
+    result = analyse([
+      // GL winner (higher GL rank): Form(G)=Midnight, Form(U)=Midday → evoFormsDiffer=true
+      row({ 'Name':'Rockruff', 'Form':'', 'Pokemon Number':'744',
+        'CP':'393', 'Atk IV':'11', 'Def IV':'15', 'Sta IV':'14', 'IV Avg':'64.4',
+        'Rank % (G)':'97', 'Dust Cost (G)':'18900',
+        'Name (G)':'Lycanroc', 'Form (G)':'Midnight',
+        'Rank % (U)':'60', 'Dust Cost (U)':'18900',
+        'Name (U)':'Lycanroc', 'Form (U)':'Midday',
+      }),
+      // UL winner (higher UL rank): Form(G)=Midnight, Form(U)=Midday → evoFormsDiffer=true
+      row({ 'Name':'Rockruff', 'Form':'', 'Pokemon Number':'744',
+        'CP':'400', 'Atk IV':'12', 'Def IV':'14', 'Sta IV':'13', 'IV Avg':'65.0',
+        'Rank % (G)':'60', 'Dust Cost (G)':'18900',
+        'Name (G)':'Lycanroc', 'Form (G)':'Midnight',
+        'Rank % (U)':'97', 'Dust Cost (U)':'18900',
+        'Name (U)':'Lycanroc', 'Form (U)':'Midday',
+      }),
+    ]);
+  });
+
+  it('UL winner nick starts with Day (Midday form prefix, cross-league divergence present)', () => {
+    const winner = result.pokemon.find(p => p.name === 'Rockruff' && p.slots.includes('U'));
+    expect(winner).toBeDefined();
+    expect(winner.nickname).toMatch(/^Day/);
+    expect(winner.nickname).not.toMatch(/^Lycanroc/);
+  });
+
+  it('GL winner nick starts with Night (Midnight form prefix, cross-league divergence present)', () => {
+    const winner = result.pokemon.find(p => p.name === 'Rockruff' && p.slots.includes('G'));
+    expect(winner).toBeDefined();
+    expect(winner.nickname).toMatch(/^Night/);
+    expect(winner.nickname).not.toMatch(/^Lycanroc/);
   });
 });
 
@@ -548,5 +596,94 @@ describe('Group F — B1 form prefix: single evo-path regional forms', () => {
     const p = result.pokemon.find(x => x.name === 'Vulpix' && x.cp === 500);
     expect(p.evolvedFormG).toBe('Alola');
     expect(p.form).toBe('Alola');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// GROUP F2 — Brief item 4: Alolan Vulpix UL winner → NinetaⓊ...
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Group F2 — Alolan Vulpix UL winner uses evo species name (not form prefix)', () => {
+  let result;
+  beforeAll(() => {
+    result = analyse([
+      row({ 'Name':'Vulpix', 'Form':'Alola', 'Pokemon Number':'37',
+        'CP':'2200', 'Atk IV':'2', 'Def IV':'15', 'Sta IV':'14', 'IV Avg':'64.4',
+        'Rank % (G)':'55', 'Dust Cost (G)':'75000',
+        'Name (G)':'Ninetales', 'Form (G)':'Alola',
+        'Rank % (U)':'97', 'Dust Cost (U)':'75000',
+        'Name (U)':'Ninetales', 'Form (U)':'Alola',
+        'Name (L)':'', 'Form (L)':'',
+      }),
+    ]);
+  });
+
+  it('Alolan Vulpix UL winner nick uses evo species name (Nineta…), not form prefix (Alol…)', () => {
+    const p = result.pokemon.find(x => x.name === 'Vulpix' && x.slots.includes('U'));
+    expect(p).toBeDefined();
+    expect(p.nickname).not.toMatch(/^Alol/);
+    expect(p.nickname).toMatch(/^Nineta/);
+    expect(p.nickname).toContain('Ⓤ');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// GROUP F3 — Brief item 6: Shadow Alolan Vulpix → NinetaⒼ...
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Group F3 — Shadow Alolan Vulpix GL winner uses evo species name', () => {
+  let result;
+  beforeAll(() => {
+    result = analyse([
+      row({ 'Name':'Vulpix', 'Form':'Alola', 'Pokemon Number':'37',
+        'CP':'500', 'Atk IV':'0', 'Def IV':'15', 'Sta IV':'13', 'IV Avg':'62.2',
+        'Shadow/Purified': '1',
+        'Rank % (G)':'96', 'Dust Cost (G)':'10000',
+        'Name (G)':'Ninetales', 'Form (G)':'Alola',
+        'Rank % (U)':'65', 'Name (U)':'Ninetales', 'Form (U)':'Alola',
+        'Name (L)':'', 'Form (L)':'',
+      }),
+    ]);
+  });
+
+  it('Shadow Alolan Vulpix GL winner nick uses evo species name (Nineta…), not form prefix (Alol…)', () => {
+    const p = result.pokemon.find(x => x.name === 'Vulpix' && x.slots.includes('G'));
+    expect(p).toBeDefined();
+    expect(p.isShadow).toBe(true);
+    expect(p.nickname).not.toMatch(/^Alol/);
+    expect(p.nickname).toMatch(/^Nineta/);
+    expect(p.nickname).toContain('Ⓖ');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// GROUP F4 — Brief item 7: Lucky Alolan Vulpix → NinetaⓇ...
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Group F4 — Lucky Alolan Vulpix no-slot nick uses evo species name', () => {
+  let result;
+  beforeAll(() => {
+    result = analyse([
+      // ivAvg=91 so Ⓡ91. Below ML 70%? No — 91 > 70 so M pass could claim this.
+      // Set dust cost prohibitively high so it's not worth evolving for any PvP league,
+      // and no rank data so it doesn't win a league slot. Lucky flag = '1'.
+      row({ 'Name':'Vulpix', 'Form':'Alola', 'Pokemon Number':'37',
+        'CP':'1200', 'Atk IV':'13', 'Def IV':'13', 'Sta IV':'13', 'IV Avg':'91.1',
+        'Lucky': '1',
+        'Rank % (G)':'', 'Name (G)':'Ninetales', 'Form (G)':'Alola',
+        'Rank % (U)':'', 'Name (U)':'Ninetales', 'Form (U)':'Alola',
+        'Name (L)':'', 'Form (L)':'',
+      }),
+    ]);
+  });
+
+  it('Lucky Alolan Vulpix (no league slot) nick uses evo species name (Nineta…) with Ⓡ', () => {
+    const p = result.pokemon.find(x => x.name === 'Vulpix' && x.isLucky);
+    expect(p).toBeDefined();
+    expect(p.isLucky).toBe(true);
+    expect(p.nickname).not.toMatch(/^Alol/);
+    expect(p.nickname).not.toMatch(/^Vulpix/);
+    expect(p.nickname).toMatch(/^Nineta/);
+    expect(p.nickname).toContain('Ⓡ');
   });
 });
