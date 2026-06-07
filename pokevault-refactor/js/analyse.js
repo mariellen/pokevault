@@ -256,7 +256,6 @@ function buildNickname(p, slot, convention) {
     });
     if (!hasShadowOwnSlot) suf += p.purifyHundo ? 'p✪' : 'p';
   }
-  if (p.isPurified) suf += '*';
   if (p.isDynamax) suf += 'Ⓓ';
   if (p.isGigantamax) suf += 'Ⓧ';
   if (isHundo) suf += HUNDO_SFX;
@@ -265,8 +264,12 @@ function buildNickname(p, slot, convention) {
   if (p.hasAllBestMoves) suf+='☆';
   else if (p.hasTwoMoves&&p.hasBestMoves) suf+='b';
 
-  // Shiny on non-shiny slots — always last so ※ trails everything else in GO
+  // Shiny on non-shiny slots — ※ trails everything else...
   if (p.isShiny && slot !== 'shiny' && slot !== 'shiny_lower') suf += SHINY_SFX;
+
+  // ...except the Purified asterisk, which is ALWAYS the final character (Decision 2, option a).
+  // Confirmed GO renders e.g. RaikouⓂ100Ⓗ* and …※* correctly.
+  if (p.isPurified) suf += '*';
 
   let mid='', nickSuf=suf;
 
@@ -324,8 +327,11 @@ function buildNickname(p, slot, convention) {
     return fitName(p.name, mid, nickSuf, 12);
   } else if (slot==='M') {
     const pv=Math.round(p.rankPctM||p.ivAvg||0);
-    // Lucky uses Ⓡ (best-overall indicator); confirmed ML slot uses Ⓜ
-    mid=(p.isLucky ? LC.R : LC.M)+(pv===100?PERFECT:String(pv));
+    // Decision 1: the Master slot WINNER gets Ⓜ; non-winners (kept as raid/best-overall
+    // candidates) get Ⓡ. A non-shadow wins via wonMasterSlot; a shadow holds Master via the
+    // purify-push (isPurifySlot on the M league). Either way it's a Master keeper → Ⓜ.
+    const holdsMaster = p.wonMasterSlot || (p.isPurifySlot && p.purifyLeague === 'M');
+    mid=(holdsMaster ? LC.M : LC.R)+(pv===100?PERFECT:String(pv));
     return fitName(base, mid, nickSuf, 12);
   } else if (['L','G','U'].includes(slot)) {
     const pv = (p.isPurifySlot && slot === p.purifyLeague)
@@ -341,7 +347,9 @@ function buildNickname(p, slot, convention) {
     } else {
       mid=LC.R+String(iv);
     }
-    nickSuf=suf+SHINY_SFX;
+    // suf may already carry a trailing purified '*' (Decision 2). Re-order so ※ then * trail.
+    const sufNoStar = (p.isPurified && suf.endsWith('*')) ? suf.slice(0, -1) : suf;
+    nickSuf = sufNoStar + SHINY_SFX + (p.isPurified ? '*' : '');
     return fitName(p.name, mid, nickSuf, 12);
   } else if (slot==='dynamax') {
     const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
@@ -354,8 +362,10 @@ function buildNickname(p, slot, convention) {
     else { mid=LC.R+String(iv); }
     return fitName(p.name, mid, nickSuf, 12); // nickSuf has Ⓧ from suf
   } else if (slot==='lucky') {
-    // Pure hundo with no league slot (not actually lucky): standalone Ⓗ only
-    if (isHundo && !p.isLucky) return fitName(p.name, HUNDO_SFX, '', 12);
+    // Pure hundo with no league slot (not actually lucky): Ⓗ plus any other suffixes
+    // (purified '*', shiny '※', move flags). nickSuf already includes Ⓗ (added when isHundo),
+    // so emit an empty mid and let nickSuf carry Ⓗ…* — previously the suffix was discarded.
+    if (isHundo && !p.isLucky) return fitName(p.name, '', nickSuf, 12);
     // Lucky with no league slot: BaseⓇIV — base is evo species name where applicable
     const pv=Math.round(p.rankPctM||p.ivAvg||0);
     mid=LC.R+String(pv);
@@ -713,8 +723,10 @@ function analyse(rows) {
         // Strip gender/variant suffix to get the actual species name for comparisons
         const stageName = groupKey.split('|')[0];
         // Master league: only final evolution
+        // NOTE: Legendaries now DO enter the M competition (previously skipped here and
+        // handled only by best_overall). The non-shadow Master winner is chosen below via
+        // the approved special-category precedence (hundo > Lucky-adjusted > shiny-lucky > purified).
         if (lg==='M') {
-          if (isLegendary) return; // Legendaries skip ML — handled by best_overall
           const hasHigherEvo = members.some(m =>
             m.name === stageName && (
               (m.evolvedNameG && m.evolvedNameG !== stageName) ||
@@ -870,6 +882,8 @@ function analyse(rows) {
         // Option C+D: affordable-first two-pass. ML always single pass (Option D — exempt by design).
         // Pass 1 (GL/UL/LL): affordable candidates only (effective dust ≤ lgAffordable).
         // Pass 2 (GL/UL/LL): full eligible pool as fallback when no affordable candidate exists.
+        // ML non-shadow winner is chosen in a dedicated post-loop step (see "Non-shadow Master
+        // pick" below) so all variant groups (normal/lucky/purified) compete for ONE slot.
         const lgAffordable = (DUST_THRESHOLDS[lg] || DUST_THRESHOLDS.G).affordable;
         const eligiblePool = lg !== 'M' ? (() => {
           const aff = eligible.filter(p =>
@@ -939,6 +953,9 @@ function analyse(rows) {
           }
           if (!best2.slots.includes(lg)) best2.slots.push(lg);
           best2.hasBattleSlot = true; // mark: won a main-pass battle slot (one-slot rule)
+          // Decision 1: Ⓜ (not Ⓡ) — only for a CONFIRMED non-shadow Master win. Tentative M
+          // (rankM≥70 but <90) keeps the holding nick (…87m) and is not a real Master keeper.
+          if (lg === 'M' && !best2.isShadow && isConfirmed) best2.wonMasterSlot = true;
           best2.targetEvo = stageName !== best2.name ? stageName : '';
           best2.slotConfirmed = isConfirmed || !!best2.slotConfirmed; // purify loop may have already confirmed
           if (!isConfirmed) best2.slots.push(lg+'_tentative');
@@ -1005,6 +1022,77 @@ function analyse(rows) {
       });
     });
 
+    // ── Non-shadow Master pick (approved special-category ruleset) ──────────────
+    // The per-evo-stage M-pass above can promote several CONFIRMED non-shadow M winners
+    // because it groups by variant (normal / |lucky / |purified) and by evo stage. Master
+    // allows only ONE non-shadow keeper per family, so reconcile to a single winner here by
+    // the approved precedence: Hundo > Lucky-adjusted IV (5pp margin) > shiny-lucky > purified
+    // > normal. Shadows are untouched (own Master slot via purify-push). Tentative M holders
+    // (…87m holding nicks) are not real keepers and are left to the ML-placeholder pass.
+    {
+      const HUNDO = p => p.atkIV===15 && p.defIV===15 && p.staIV===15;
+      const LUCKY_MARGIN = (typeof RULES.luckyMasterMargin === 'number') ? RULES.luckyMasterMargin : 5;
+      const adjIV = p => (p.ivAvg||0) + (p.isLucky ? LUCKY_MARGIN : 0);
+      const catRank = p => (p.isLucky && p.isShiny) ? 3 : p.isLucky ? 2 : p.isPurified ? 1 : 0;
+      const masterCmp = (a, b) => {
+        const ah = HUNDO(a)?1:0, bh = HUNDO(b)?1:0;
+        if (ah !== bh) return bh - ah;
+        const aa = adjIV(a), ba = adjIV(b);
+        if (Math.abs(aa - ba) > 0.01) return ba - aa;
+        const ac = catRank(a), bc = catRank(b);
+        if (ac !== bc) return bc - ac;
+        return (b.ivAvg||0) - (a.ivAvg||0);
+      };
+      // Candidate pool = every non-shadow member that is a legitimate Master keeper:
+      // either it won an M slot in the loop, OR it's a confirmed ML-rank final-stage member
+      // that lost its per-group race to an equal/lower pick (e.g. shiny-lucky vs plain-lucky
+      // in the same variant group). Pooling them lets the approved precedence decide ONE winner.
+      const isFinalStage = p => !members.some(m =>
+        m.name === p.name && (
+          (m.evolvedNameG && m.evolvedNameG !== p.name) ||
+          (m.evolvedNameU && m.evolvedNameU !== p.name)
+        )
+      );
+      const wonInLoop = members.filter(p => p.wonMasterSlot && !p.isShadow);
+      const mlFloor = RULES.keepThreshold; // confirmed keeper threshold
+      const extraCandidates = members.filter(p =>
+        !p.isShadow && !p.wonMasterSlot &&
+        (p.rankPctM || p.ivAvg || 0) >= mlFloor &&
+        isFinalStage(p) &&
+        // not already committed to a capped league it should keep instead
+        !p.slots.some(s => ['L','G','U'].includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)
+      );
+      const winners = wonInLoop.concat(extraCandidates);
+      if (wonInLoop.length >= 1) {
+        const winner = winners.slice().sort(masterCmp)[0];
+        // Demote every other loop-winner to its fallback nick.
+        wonInLoop.forEach(p => {
+          if (p === winner) return;
+          p.slots = p.slots.filter(s => s !== 'M' && s !== 'M_tentative');
+          p.wonMasterSlot = false;
+          if (p.targetEvo && p.name === p.targetEvo) p.targetEvo = '';
+        });
+        // Promote the winner if it came from the extra-candidate pool (didn't win in the loop).
+        if (!winner.wonMasterSlot) {
+          if (!winner.slots.includes('M')) winner.slots.push('M');
+          winner.slots = winner.slots.filter(s => s !== 'M_tentative');
+          winner.wonMasterSlot = true;
+          winner.hasBattleSlot = true;
+          winner.slotConfirmed = true;
+        }
+        // A confirmed Master keeper exists for the family, so strip any TENTATIVE M slot
+        // (…87m / Ⓡ raid holding) from other non-shadows — only one non-shadow Master slot.
+        members.forEach(p => {
+          if (p === winner || p.isShadow) return;
+          if (p.slots.includes('M_tentative')) {
+            p.slots = p.slots.filter(s => s !== 'M' && s !== 'M_tentative');
+            p.wonMasterSlot = false;
+            if (p.targetEvo && p.name === p.targetEvo) p.targetEvo = '';
+          }
+        });
+      }
+    }
+
     // Shiny, shadow, purified, lucky, nundo slots
     const shinies=members.filter(p=>p.isShiny).sort((a,b)=>b.ivAvg-a.ivAvg);
     if(shinies.length){shinies[0].slots.push('shiny');shinies.slice(1).forEach(p=>p.slots.push('shiny_lower'));}
@@ -1058,7 +1146,7 @@ function analyse(rows) {
         if (p.isDynamax || p.isGigantamax) return false;
         if (p.slots.some(s => RULES.leagues.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)) return false;
         if (!isLegendary && !RULES.leagues.some(l => (p[`rankPct${l}`]||0) >= RULES.keepThreshold)) return false;
-        if (!isLegendary && speciesWithConfirmedKeeper.has(p.name)) return false;
+        if (speciesWithConfirmedKeeper.has(p.name)) return false;
         return true;
       }).forEach(p => {
         const k = p.name;

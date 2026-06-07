@@ -442,8 +442,8 @@ describe('Group 11 — Shadow/Lucky coexistence', () => {
   it('Lucky Qwilfish CP:443 holds Master slot independently of normal CP:440', () => {
     const lucky = find('Qwilfish', 443);
     const normal = find('Qwilfish', 440);
-    expect(lucky.slots).toContain('M'); // ivAvg=95.6 → ML winner in lucky group
-    expect(normal.slots).toContain('M'); // ivAvg=93.3 → ML winner in normal group
+    expect(lucky.slots).toContain('M'); // Lucky wins non-shadow Master (95.6%+5pp beats normal 93.3%)
+    expect(normal.slots).not.toContain('M'); // normal loses to Lucky in one-winner Master pick
     expect(lucky.isLucky).toBe(true);
     expect(lucky.isFavorite).toBe(true);
     expect(lucky.suggestStar).toBe(true);
@@ -1093,7 +1093,7 @@ describe('Group 26 — Nick Symbol Overhaul', () => {
 
   // 2. Hundo + Master League → Ⓜ not Ⓡ, with Ⓗ
   it('15/15/15 + Master slot → nick contains Ⓜ100Ⓗ (not Ⓡ)', () => {
-    const p = makeP({ slots: ['M'] });
+    const p = makeP({ slots: ['M'], wonMasterSlot: true });
     const nick = buildNickname(p, 'M');
     expect(nick).toContain('Ⓜ');
     expect(nick).toContain('100');
@@ -1247,41 +1247,43 @@ describe('Group 27b — Gmax Snorlax: best-IV keeps (Ⓧ in nick), dupe gets vis
     expect(p.decision).toBe('keep');
   });
 
-  it('Snorlax CP:2448 (best Gmax) → nickname contains Ⓧ and is SnorlaxⓂ98Ⓧ', () => {
-    // CP:2448 wins ML slot (best non-lucky Snorlax, ivAvg=97.8) → nick via ML handler + Ⓧ suffix
+  it('Snorlax CP:2448 (best Gmax) → nickname contains Ⓧ and is SnorlaxⓊ96Ⓧ', () => {
+    // Lucky Snorlax wins Master slot; CP:2448 (non-lucky) demoted → holds Gmax slot instead.
+    // Gmax nick picks best capped league ≥90% (Ultra 96%), so SnorlaxⓊ96Ⓧ.
     const p = g27bFind('Snorlax', 2448);
     expect(p.nickname).toContain('Ⓧ');
-    expect(p.nickname).toBe('SnorlaxⓂ98Ⓧ');
+    expect(p.nickname).toBe('SnorlaxⓊ96Ⓧ');
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
 
-  it('Snorlax CP:200 (best Gmax without league slot, 71.1%) → decision=keep', () => {
+  it('Snorlax CP:200 (no Gmax slot, Lucky winner holds Master) → decision=trade', () => {
+    // CP:2448 holds Gmax slot (no M slot after demotion); CP:200 has no slot.
     const p = g27bFind('Snorlax', 200);
     expect(p).toBeDefined();
     expect(p.isGigantamax).toBe(true);
-    expect(p.decision).toBe('keep');
+    expect(p.decision).toBe('trade');
   });
 
-  it('Snorlax CP:200 (best Gmax without league slot) → starType is green', () => {
+  it('Snorlax CP:200 (no slot) → starType is visibility', () => {
     const p = g27bFind('Snorlax', 200);
-    expect(p.starType).toBe('green');
+    expect(p.starType).toBe('visibility');
   });
 });
 
-// 27c: Raikou Legendary (no overrides) — best keeps with best_overall, dupe trades with visibility
-describe('Group 27c — Raikou Legendary: best keeps (best_overall), dupe gets visibility star', () => {
-  // Uses global result — Raikou rows auto-classified as Legendary (no Dmax/Gmax)
+// 27c: Raikou Legendary — best wins Master slot (Ⓜ93), dupe trades with visibility
+describe('Group 27c — Raikou Legendary: best wins Master slot (Ⓜ93), dupe gets visibility star', () => {
+  // Uses global result — Raikou rows auto-classified as Legendary (now enter M competition).
 
-  it('Raikou CP:2900 (best, 93.3%) → decision=keep, slots includes best_overall', () => {
+  it('Raikou CP:2900 (best, 93.3%) → decision=keep, slots includes M', () => {
     const p = find('Raikou', 2900);
     expect(p).toBeDefined();
     expect(p.decision).toBe('keep');
-    expect(p.slots).toContain('best_overall');
+    expect(p.slots).toContain('M');
   });
 
-  it('Raikou CP:2900 (best Legendary) → nickname is RaikouⓇ93', () => {
+  it('Raikou CP:2900 (best Legendary) → nickname is RaikouⓂ93', () => {
     const p = find('Raikou', 2900);
-    expect(p.nickname).toBe('RaikouⓇ93');
+    expect(p.nickname).toBe('RaikouⓂ93');
   });
 
   it('Raikou CP:2700 (dupe, 77.8%) → decision=trade', () => {
@@ -1500,7 +1502,8 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
     g27eResult = loader.createWithOverrides(overrides).analyse(csv);
   });
 
-  it('Entei CP:3200 (Dmax hundo, 15/15/15) → decision=keep, slots includes dynamax', () => {
+  it('Entei CP:3200 (Dmax hundo, 15/15/15) → decision=keep, slots includes M', () => {
+    // Legendaries now enter M competition; 15/15/15 Entei wins Master slot (not Dmax slot).
     const p = g27eFind('Entei', 3200);
     expect(p).toBeDefined();
     expect(p.isDynamax).toBe(true);
@@ -1508,7 +1511,7 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
     expect(p.defIV).toBe(15);
     expect(p.staIV).toBe(15);
     expect(p.decision).toBe('keep');
-    expect(p.slots).toContain('dynamax');
+    expect(p.slots).toContain('M');
   });
 
   it('Entei CP:3200 (Dmax hundo) → nickname is EnteiⓂ100ⒹⒽ', () => {
@@ -1581,15 +1584,15 @@ describe('Group 30 — Skwovet CP:496 (99.78% GL) wins and is kept — regressio
   });
 });
 
-// ─── Group 31 — Mewtwo best_overall: highest-IV wins, lower-IV does NOT ─────────
-// Legendaries skip ML and are assigned best_overall by highest ivAvg per species.
-// CP:2368 (93.3% IV, fav=1) should win; CP:2352 (88.9% IV) should not.
+// ─── Group 31 — Mewtwo M slot: highest-IV wins Master, lower-IV does NOT ─────────
+// Legendaries now enter M competition; highest ivAvg wins Master slot (Ⓜ).
+// CP:2368 (93.3% IV, fav=1) wins M; CP:2352 (88.9% IV) does not.
 
 describe('Group 31 — Mewtwo best-IV wins best_overall (Legendary regression guard)', () => {
-  it('Mewtwo CP:2368 (93.3% IV, highest) → slots contains best_overall', () => {
+  it('Mewtwo CP:2368 (93.3% IV, highest) → slots contains M', () => {
     const p = find('Mewtwo', 2368);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('best_overall');
+    expect(p.slots).toContain('M');
   });
 
   it('Mewtwo CP:2368 → decision=keep', () => {
@@ -1597,9 +1600,9 @@ describe('Group 31 — Mewtwo best-IV wins best_overall (Legendary regression gu
     expect(p.decision).toBe('keep');
   });
 
-  it('Mewtwo CP:2368 (best Legendary) → nickname contains Ⓡ and 93', () => {
+  it('Mewtwo CP:2368 (best Legendary) → nickname contains Ⓜ and 93', () => {
     const p = find('Mewtwo', 2368);
-    expect(p.nickname).toContain('Ⓡ');
+    expect(p.nickname).toContain('Ⓜ');
     expect(p.nickname).toContain('93');
   });
 

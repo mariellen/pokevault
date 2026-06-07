@@ -678,13 +678,14 @@ describe('Group F4 — Lucky Alolan Vulpix no-slot nick uses evo species name', 
     ]);
   });
 
-  it('Lucky Alolan Vulpix (no league slot) nick uses evo species name (Nineta…) with Ⓡ', () => {
+  it('Lucky Alolan Vulpix wins non-shadow Master slot → nick uses evo species name (Nineta…) with Ⓜ', () => {
+    // Lucky Vulpix at 91.1% ivAvg wins the non-shadow M slot (confirmed Master keeper → Ⓜ).
     const p = result.pokemon.find(x => x.name === 'Vulpix' && x.isLucky);
     expect(p).toBeDefined();
     expect(p.isLucky).toBe(true);
     expect(p.nickname).not.toMatch(/^Alol/);
     expect(p.nickname).not.toMatch(/^Vulpix/);
     expect(p.nickname).toMatch(/^Nineta/);
-    expect(p.nickname).toContain('Ⓡ');
+    expect(p.nickname).toContain('Ⓜ');
   });
 });

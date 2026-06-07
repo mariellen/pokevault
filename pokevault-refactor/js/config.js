@@ -41,6 +41,7 @@ const DUST_THRESHOLDS = {
 // ── Analysis thresholds ───────────────────────────────────
 const RULES = {
   keepThreshold:        90,     // min rank% to qualify for a confirmed keep slot
+  luckyMasterMargin:     5,     // Lucky Pokémon get +5pp bonus in Master non-shadow winner comparison
   dustTier1:           100000,  // $ — flag dust over this
   dustTier2:           150000,  // $$ — flag dust over this; also triggers affordable backup
   dustTier3:           200000,  // $$$ — flag dust over this
