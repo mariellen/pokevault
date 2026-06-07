@@ -13,6 +13,26 @@ let initialHash = window.location.hash;
 let showDynamaxOnly = false;
 let showGigantamaxOnly = false;
 
+// Best-in-league / costly shortcut filter state (go through applyFilters so Dmax survives sort changes)
+let bestLeagueOnly = false;
+let costlyOnly = false;
+
+// Moves column visibility (session only — no localStorage)
+let movesColumnVisible = false;
+
+// Load in progress — blocks CSV upload to prevent concurrent write to shared globals
+let loadInProgress = false;
+
+function setLoadInProgress(active) {
+  loadInProgress = active;
+  ['fileInput','csvFileInput','tryOwnInput'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=active;
+  });
+  const dz=document.getElementById('dropZone');
+  if(dz) dz.style.pointerEvents=active?'none':'';
+}
+
 // Collection Tracker modal qualifier state
 let dexQualDmax    = false;
 let dexQualGmax    = false;
@@ -244,6 +264,15 @@ function renderFamily(fam,isOpen){
   }
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const nameEsc=primaryName.replace(/"/g,'&quot;');
+
+  const leagueDots=['L','G','U','M'].map(lg=>{
+    const col=lg==='L'?'var(--little)':lg==='G'?'var(--great)':lg==='U'?'var(--ultra)':'var(--master)';
+    const has=members.some(p=>
+      p.decision==='keep'&&
+      p.slots.some(s=>s===lg||s===lg+'_affordable'));
+    return `<span style="color:${has?col:'var(--dim)'}">${has?'●':'○'}</span>`;
+  }).join('');
 
   const sorted=[...members].filter(p=>!(practicalMode&&p.isExpensiveWinner)).sort((a,b)=>pokemonStarRank(a)-pokemonStarRank(b));
   const rows=sorted.map(p=>buildRow(p)).join('');
@@ -258,8 +287,7 @@ function renderFamily(fam,isOpen){
     <th data-col="rankPctG" onclick="sortFamilyBy(this,'rankPctG')" style="color:var(--great)">Great</th>
     <th data-col="rankPctU" onclick="sortFamilyBy(this,'rankPctU')" style="color:var(--ultra)">Ultra</th>
     <th data-col="rankPctM" onclick="sortFamilyBy(this,'rankPctM')" style="color:var(--master)">Master</th>
-    <th data-col="catchDate" onclick="sortFamilyBy(this,'catchDate')">Catch Date</th>
-    <th>Moves / TM</th>
+    <th class="col-moves">Moves / TM</th>
     <th></th>
   </tr></thead>`;
 
@@ -275,6 +303,8 @@ function renderFamily(fam,isOpen){
         ${completeIcons?`<span class="fam-badge" style="font-size:11px" title="Completeness icons">${completeIcons}</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
+        <span class="fam-league-dots">${leagueDots}</span>
+        <button class="copy-search-btn" data-fam="${nameEsc}" onclick="event.stopPropagation();openCullModal(this.dataset.fam)" title="View in Cull modal" aria-label="View ${primaryName} in Cull modal">🗑</button>
         <span class="fam-chevron">▶</span>
       </div>
     </div>
@@ -295,10 +325,6 @@ function renderSummary(pokemon){
     `<span>Total <strong>${t.toLocaleString()}</strong></span>
      <span style="color:var(--green)">Keep <strong>${k.toLocaleString()}</strong></span>
      <span style="color:var(--red)">Trade <strong>${tr.toLocaleString()}</strong></span>`;
-  document.getElementById('summary-strip').innerHTML=`
-    <div class="sum-card s-total" onclick="setDecFilter('all',null)"><div class="sum-label">Total</div><div class="sum-val">${t.toLocaleString()}</div></div>
-    <div class="sum-card s-keep" onclick="setDecFilter('keep',null)"><div class="sum-label">Keep</div><div class="sum-val">${k.toLocaleString()}</div></div>
-    <div class="sum-card s-trade" onclick="setDecFilter('trade',null)"><div class="sum-label">Trade</div><div class="sum-val">${tr.toLocaleString()}</div></div>`;
 }
 
 function applyFilters(){
@@ -317,7 +343,9 @@ function applyFilters(){
         (p.evolvedNameL||'').toLowerCase().includes(term));
       // Always match all member names — so searching "Smoochum" finds the Jynx family
       const memberMatch=fam.members.some(p=>p.name.toLowerCase().includes(term));
-      if(!nm&&!evoMatch&&!memberMatch) return false;
+      // Exact pokédex number search: "1" matches Bulbasaur family (key="1") only, not 10/100
+      const dexMatch=/^\d+$/.test(term) && fam.members.some(p=>String(p.pokeNum)===term);
+      if(!nm&&!evoMatch&&!memberMatch&&!dexMatch) return false;
     }
     if(decFilter==='hundo'&&!fam.members.some(p=>p.isHundo&&(hundoMode===1||(hundoMode===2&&pokemonStarRank(p)===0)||(hundoMode===3&&pokemonStarRank(p)>=1&&pokemonStarRank(p)<=2)))) return false;
     else if(decFilter==='canEvolve'&&!fam.members.some(p=>p.canEvolve)) return false;
@@ -343,6 +371,8 @@ function applyFilters(){
   }else{
     filteredFamilies.sort((a,b)=>a.primaryName.localeCompare(b.primaryName));
   }
+  if(bestLeagueOnly) filteredFamilies=filteredFamilies.filter(f=>f.members.some(p=>p.suggestStar&&!p.isFavorite));
+  if(costlyOnly) filteredFamilies=filteredFamilies.filter(f=>f.members.some(p=>p.suggestStarExpensive&&!p.isFavorite));
   renderPage();
   updateHash();
 }
@@ -487,6 +517,15 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   }
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const nameEsc=primaryName.replace(/"/g,'&quot;');
+
+  const leagueDots=['L','G','U','M'].map(lg=>{
+    const col=lg==='L'?'var(--little)':lg==='G'?'var(--great)':lg==='U'?'var(--ultra)':'var(--master)';
+    const has=members.some(p=>
+      p.decision==='keep'&&
+      p.slots.some(s=>s===lg||s===lg+'_affordable'));
+    return `<span style="color:${has?col:'var(--dim)'}">${has?'●':'○'}</span>`;
+  }).join('');
 
   // Evo-target reason tags: show G→Umbreon in league colour in nick cell
   // when the row is visible because of an evo-target search match (not a name match)
@@ -527,8 +566,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
     <th data-col="rankPctG" onclick="sortFamilyBy(this,'rankPctG')" style="color:var(--great)">Great</th>
     <th data-col="rankPctU" onclick="sortFamilyBy(this,'rankPctU')" style="color:var(--ultra)">Ultra</th>
     <th data-col="rankPctM" onclick="sortFamilyBy(this,'rankPctM')" style="color:var(--master)">Master</th>
-    <th data-col="catchDate" onclick="sortFamilyBy(this,'catchDate')">Catch Date</th>
-    <th>Moves / TM</th>
+    <th class="col-moves">Moves / TM</th>
     <th></th>
   </tr></thead>`;
 
@@ -544,6 +582,8 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
         ${completeIcons?`<span class="fam-badge" style="font-size:11px" title="Completeness icons">${completeIcons}</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
+        <span class="fam-league-dots">${leagueDots}</span>
+        <button class="copy-search-btn" data-fam="${nameEsc}" onclick="event.stopPropagation();openCullModal(this.dataset.fam)" title="View in Cull modal" aria-label="View ${primaryName} in Cull modal">🗑</button>
         <span class="fam-chevron">▶</span>
       </div>
     </div>
@@ -636,6 +676,11 @@ function toggleGmaxFilter(btn){
   applyFilters();
 }
 
+function toggleMovesColumn(btn){
+  movesColumnVisible=btn.classList.toggle('active');
+  document.body.classList.toggle('moves-visible',movesColumnVisible);
+}
+
 function cycleHundoFilter(btn){
   hundoMode=(hundoMode+1)%4;
   // Clear other filter buttons and sum-card highlights
@@ -661,21 +706,15 @@ function toggleLeague(l,btn){
 }
 
 function filterBestInLeague(btn){
-  const active=btn.classList.toggle('active');
-  if(active){
-    document.getElementById('costlyBtn')?.classList.remove('active');
-    filteredFamilies=families.filter(f=>f.members.some(p=>p.suggestStar&&!p.isFavorite));
-  } else { applyFilters(); return; }
-  renderPage();
+  bestLeagueOnly=btn.classList.toggle('active');
+  if(bestLeagueOnly){ costlyOnly=false; document.getElementById('costlyBtn')?.classList.remove('active'); }
+  applyFilters();
 }
 
 function filterCostlyWinners(btn){
-  const active=btn.classList.toggle('active');
-  if(active){
-    document.getElementById('bestLeagueBtn')?.classList.remove('active');
-    filteredFamilies=families.filter(f=>f.members.some(p=>p.suggestStarExpensive&&!p.isFavorite));
-  } else { applyFilters(); return; }
-  renderPage();
+  costlyOnly=btn.classList.toggle('active');
+  if(costlyOnly){ bestLeagueOnly=false; document.getElementById('bestLeagueBtn')?.classList.remove('active'); }
+  applyFilters();
 }
 
 function togglePractical(btn){
@@ -1474,11 +1513,16 @@ function renderDexMissingView(body, filteredSpecies) {
 }
 
 // ── Cull modal ──────────────────────────────────
-function openCullModal(){
+function openCullModal(focusFam){
   if(!allPokemon.length){alert('Load your collection first');return;}
   const modal=document.getElementById('cull-modal');
   const body=document.getElementById('cull-modal-body');
   const sub=document.getElementById('cull-modal-sub');
+
+  // Pre-fill search box if called with a family name
+  const searchBox=document.getElementById('cullSearchBox');
+  if(focusFam && searchBox) searchBox.value=focusFam;
+  const cullTerm=(searchBox?.value||'').toLowerCase();
 
   // Qualify: has ≥1 gold star (regular or expensive-winner), and no UNRESOLVED green/blue/cyan stars.
   // Expensive-winner golds (suggestStarExpensive && isFavorite) count as resolved — user has already starred them.
@@ -1500,6 +1544,9 @@ function openCullModal(){
       fam.members.some(p => p.isFavorite && (p.suggestStar || p.isExpensiveWinner))
     );
   }
+
+  // Search filter
+  if(cullTerm) displayQualifying=displayQualifying.filter(fam=>fam.primaryName.toLowerCase().includes(cullTerm));
 
   const totalCull=displayQualifying.reduce((s,f)=>s+countNonGold(f),0);
   sub.textContent=displayQualifying.length+' famil'+(displayQualifying.length===1?'y':'ies')+' settled · '+totalCull+' potential deletes/trades';
@@ -1538,14 +1585,16 @@ function openCullModal(){
     const {tier:cullTier='none'}=fam.completeness||{};
     const cullBorderStyle=cullTier==='gold'?'border-left:3px solid var(--gold)':cullTier==='green'?'border-left:3px solid var(--green)':cullTier==='blue'?'border-left:3px solid var(--cyan)':'';
 
-    const keeperLines=keepers.map(p=>
-      `<div style="font-size:11px;color:var(--muted);padding-left:4px;margin-top:2px">
+    const keeperLines=keepers.map(p=>{
+      const nick=p.nickname||'';
+      const nickEscAttr=nick.replace(/"/g,'&quot;');
+      return `<div style="font-size:11px;color:var(--muted);padding-left:4px;margin-top:2px">
         <span style="color:${p.isMlPlaceholder?'var(--muted)':'var(--gold)'}">${p.isMlPlaceholder?'☆':'★'}</span>
         ${p.name} CP:${p.cp}
-        ${p.nickname?`<span style="font-family:monospace;color:${p.isMlPlaceholder?'var(--muted)':'var(--green)'}">${p.nickname}</span>`:''}
+        ${nick?`<span style="font-family:monospace;color:${p.isMlPlaceholder?'var(--muted)':'var(--green)'};cursor:pointer" data-nick="${nickEscAttr}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy">${nick}</span>`:''}
         ${p.isMlPlaceholder?'<span style="font-size:9px;color:var(--dim)">(ML placeholder)</span>':''}
-      </div>`
-    ).join('');
+      </div>`;
+    }).join('');
 
     return `<div style="padding:8px 16px;border-bottom:1px solid var(--border)${cullBorderStyle?';'+cullBorderStyle:''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -1749,10 +1798,13 @@ function openCleanupModal(){
         const stableTag=p.catchDate
           ?`<span style="color:var(--green);font-size:9px">✓ stable ID</span>`
           :`<span style="color:var(--red);font-size:9px">⚠ no catch date</span>`;
+        const cleanNick=p.nickname||'';
+        const cleanNickEsc=cleanNick.replace(/"/g,'&quot;');
+        const cleanNameEsc=p.name.replace(/"/g,'&quot;');
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
-            <div class="pv-modal-name">${p.name}</div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${p.atkIV}/${p.defIV}/${p.staIV} · ${Math.round(p.ivAvg)}% IV · ${p.catchDate||'no catch date'} · ${stableTag}</div>
+            <div class="pv-modal-name"><a href="#" data-name="${cleanNameEsc}" onclick="event.preventDefault();cleanupNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${p.name}</a></div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV${cleanNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${cleanNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${cleanNick}</span>`:''} · ${p.catchDate||'no catch date'} · ${stableTag}</div>
           </div>
           <div class="pv-modal-controls">
             <select class="pv-modal-select" onchange="setOverride('${p.stableKey}','special_form',this.value);allPokemon.find(x=>x.stableKey==='${p.stableKey}').specialForm=this.value;">${opts}</select>
@@ -1765,6 +1817,15 @@ function openCleanupModal(){
 function closeCleanupModal(){
   document.getElementById('cleanup-modal').classList.remove('open');
   const si=document.getElementById('cleanupSearch'); if(si) si.value='';
+}
+
+function cleanupNavigate(name){
+  closeCleanupModal();
+  const box=document.getElementById('searchBox');
+  if(box) box.value=name;
+  searchTerm=name.toLowerCase();
+  applyFilters();
+  document.getElementById('searchClear')?.classList.add('visible');
 }
 
 function openSpecialModal(){
@@ -1838,10 +1899,12 @@ function openSpecialModal(){
     : controls+selectAllRow+candidates.map(p=>{
         const isCostumable=COSTUME_SPECIES&&COSTUME_SPECIES.has(p.name);
         const displayDate=getSortDate(p)||'no date';
+        const specNick=p.nickname||'';
+        const specNickEsc=specNick.replace(/"/g,'&quot;');
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
-            <div class="pv-modal-name"><a href="#" onclick="event.preventDefault();specialNavigate('${p.name}')" style="color:inherit;text-decoration:underline;cursor:pointer">${p.name}</a></div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${p.atkIV}/${p.defIV}/${p.staIV} · ${Math.round(p.ivAvg)}% IV · ${displayDate}</div>
+            <div class="pv-modal-name"><a href="#" data-name="${p.name.replace(/"/g,'&quot;')}" onclick="event.preventDefault();specialNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${p.name}</a></div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV${specNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${specNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${specNick}</span>`:''} · ${displayDate}</div>
           </div>
           <div class="pv-modal-controls">
             <label class="pv-modal-cb"><input type="checkbox" class="special-cb-shiny" data-key="${p.stableKey}" ${p.isShiny?'checked':''} onchange="setOverride('${p.stableKey}','is_shiny',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isShiny=this.checked;updateSelectAllHeader('shiny')"> ✨ Shiny</label>
@@ -1932,6 +1995,7 @@ function processCloudRows(rows) {
       if(currentNickConvention!=='pvpvault') allPokemon.forEach(p=>{p.nickname=buildNickname(p,getNickSlot(p),currentNickConvention);});
       setProgress('BUILDING DISPLAY...', 88);
       setTimeout(()=>{
+        setLoadInProgress(false);
         document.getElementById('loading-section').style.display='none';
         document.getElementById('dashboard').style.display='block';
         renderSummary(allPokemon); applyFilters();
@@ -1948,17 +2012,20 @@ function processCloudRows(rows) {
         clearIncompleteWarningIfHealthy(rows.length);
       },50);
     } catch(err) {
+      setLoadInProgress(false);
       showError('Cloud load failed', err.message);
     }
   },80);
 }
 
 async function handleCloudLoad() {
+  setLoadInProgress(true);
   const btn = document.getElementById('cloudLoadBtn');
   const status = document.getElementById('cloud-load-status');
   if (btn) { btn.disabled=true; btn.textContent='Loading...'; }
   const rows = await loadCollectionFromCloud();
   if (!rows) {
+    setLoadInProgress(false);
     if (status) status.textContent = 'No cloud data found. Import a CSV first.';
     if (btn) { btn.disabled=false; btn.textContent='☁ Load last collection from cloud'; }
     return;
@@ -1967,10 +2034,12 @@ async function handleCloudLoad() {
 }
 
 async function autoLoadFromCloud() {
+  setLoadInProgress(true);
   const status = document.getElementById('cloud-load-status');
   if (status) status.textContent = 'Checking for latest collection...';
   const rows = await loadCollectionFromCloud();
   if (!rows) {
+    setLoadInProgress(false);
     if (status) status.textContent = '';
     return;
   }
@@ -2107,6 +2176,7 @@ function copyNick(el, text) {
     document.body.appendChild(ta); ta.select(); document.execCommand('copy');
     document.body.removeChild(ta);
   });
+  showToast('Copied!');
   const orig = el.textContent;
   el.textContent = '✓ Copied!';
   el.style.color = 'var(--green)';
@@ -2202,14 +2272,16 @@ function setProgress(msg,pct){
 }
 
 function handleFile(file){
-  if(!file.name.toLowerCase().endsWith('.csv')){showError('Wrong file type',`Expected .csv, got: ${file.name}`);return;}
+  if(loadInProgress){showToast('Still loading your collection — please wait a moment.');return;}
+  setLoadInProgress(true);
+  if(!file.name.toLowerCase().endsWith('.csv')){setLoadInProgress(false);showError('Wrong file type',`Expected .csv, got: ${file.name}`);return;}
   const MAX_MB=10;
-  if(file.size>MAX_MB*1024*1024){showToast(`File too large (${(file.size/1024/1024).toFixed(1)}MB) — max ${MAX_MB}MB. Pokégenie exports are typically under 5MB.`);return;}
+  if(file.size>MAX_MB*1024*1024){setLoadInProgress(false);showToast(`File too large (${(file.size/1024/1024).toFixed(1)}MB) — max ${MAX_MB}MB. Pokégenie exports are typically under 5MB.`);return;}
   document.getElementById('upload-section').style.display='none';
   document.getElementById('loading-section').style.display='block';
-  const watchdog=setTimeout(()=>showError('Timed out after 60s','The file may be too large for this device. Try cleaning up Pokégenie first and re-exporting a smaller file.'),60000);
+  const watchdog=setTimeout(()=>{setLoadInProgress(false);showError('Timed out after 60s','The file may be too large for this device. Try cleaning up Pokégenie first and re-exporting a smaller file.');},60000);
   const reader=new FileReader();
-  reader.onerror=()=>showError('Could not read file','FileReader error');
+  reader.onerror=()=>{setLoadInProgress(false);showError('Could not read file','FileReader error');};
   reader.onload=e=>{
     setProgress('PARSING CSV...',20);
     setTimeout(()=>{
@@ -2229,6 +2301,7 @@ function handleFile(file){
             setProgress('BUILDING DISPLAY...',88);
             setTimeout(()=>{
               clearTimeout(watchdog);
+              setLoadInProgress(false);
               document.getElementById('loading-section').style.display='none';
               document.getElementById('dashboard').style.display='block';
               renderSummary(allPokemon);applyFilters();
@@ -2244,9 +2317,9 @@ function handleFile(file){
               document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
               document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
             },50);
-          }catch(err){clearTimeout(watchdog);showError('Analysis failed',err.message+'\n'+(err.stack||'').split('\n').slice(0,3).join('\n'));}
+          }catch(err){clearTimeout(watchdog);setLoadInProgress(false);showError('Analysis failed',err.message+'\n'+(err.stack||'').split('\n').slice(0,3).join('\n'));}
         },80);
-      }catch(err){clearTimeout(watchdog);showError('Could not parse CSV',err.message);}
+      }catch(err){clearTimeout(watchdog);setLoadInProgress(false);showError('Could not parse CSV',err.message);}
     },120);
   };
   reader.readAsText(file);
@@ -2309,7 +2382,7 @@ async function checkForIncompleteSave() {
   const userId = await getCurrentUserId();
   if (!userId) return;
   const sessions = await supabaseFetch('GET',
-    `sync_sessions?user_id=eq.${userId}&status=eq.in_progress&order=id.desc&limit=1`);
+    `sync_sessions?user_id=eq.${userId}&status=in.(in_progress,failed)&order=id.desc&limit=1`);
   if (!sessions?.length) return;
   const s = sessions[0];
   // Guard: ignore if saved_records >= total_records (unlikely but safe)
@@ -2358,7 +2431,7 @@ window.addEventListener('load', async () => {
   if (sel) sel.value = currentNickConvention;
   // Auto-load from cloud for all users (anon read policy allows this).
   // Falls back silently to the CSV import screen if cloud is empty or unavailable.
-  if (allPokemon.length === 0) autoLoadFromCloud();
+  if (allPokemon.length === 0) await autoLoadFromCloud();
   checkForIncompleteSave();
 });
 

@@ -43,7 +43,10 @@ header{background:var(--surf);border-bottom:1px solid var(--border);padding:10px
 /* DASHBOARD */
 #dashboard{display:none;}
 
-/* SUMMARY STRIP */
+/* FAMILY LEAGUE DOTS */
+.fam-league-dots{font-size:11px;letter-spacing:2px;flex-shrink:0;}
+
+/* SUMMARY STRIP — removed from main view; styles kept for compatibility */
 .summary-strip{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;}
 .sum-card{flex:1;min-width:90px;padding:12px 14px;border-right:1px solid var(--border);cursor:pointer;transition:background .15s;}
 .sum-card:last-child{border-right:none;}
@@ -174,7 +177,12 @@ tr.row-hidden{display:none;}
 .target-evo{font-size:11px;color:var(--cyan);font-weight:600;}
 .target-evo-none{color:var(--dim);font-size:10px;}
 
-/* MOVES */
+/* MOVES — column hidden by default; body.moves-visible shows it */
+.col-moves{display:none;}
+body.moves-visible .col-moves{display:table-cell;}
+/* Header th is display:table-cell when visible so use same selector */
+th.col-moves{display:none;}
+body.moves-visible th.col-moves{display:table-cell;}
 .move-good{color:var(--green);font-size:11px;}
 .move-bad{color:var(--red);font-size:11px;}
 .move-unknown{color:var(--dim);font-size:10px;font-style:italic;}

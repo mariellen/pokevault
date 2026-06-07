@@ -20,6 +20,8 @@ const familySortState={};
 // ═══════════════════════════════════════════════
 // RENDER HELPERS
 // ═══════════════════════════════════════════════
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 function lrHTML(pct,num,dust,isLucky){
   if(!pct) return '<span class="lr-low">—</span>';
   const cls=pct>=90?'lr-90':pct>=70?'lr-70':'lr-low';
@@ -48,9 +50,9 @@ function moveHTML(p){
   const fc=p.bestFast?(f===p.bestFast?'move-good':'move-bad'):'';
   const c1c=p.bestC1?((c1===p.bestC1||c1===p.bestC2)?'move-good':'move-bad'):'';
   const c2c=p.bestC2?((c2===p.bestC2||c2===p.bestC1)?'move-good':'move-bad'):'';
-  let h=`<div class="${fc}">${f}</div><div class="${c1c}">${c1}</div>`;
-  if(c2) h+=`<div class="${c2c}">${c2}</div>`;
-  (p.moveNotes||[]).forEach(n=>h+=`<div class="move-tm">⚡ ${n}</div>`);
+  let h=`<div class="${fc}">${esc(f)}</div><div class="${c1c}">${esc(c1)}</div>`;
+  if(c2) h+=`<div class="${c2c}">${esc(c2)}</div>`;
+  (p.moveNotes||[]).forEach(n=>h+=`<div class="move-tm">⚡ ${esc(n)}</div>`);
   return h;
 }
 
@@ -105,7 +107,7 @@ function variantTags(p){
   if(p.isCostumed) t+='<span class="vtag" style="background:rgba(255,166,87,.2);color:var(--master)">🎭 Costume</span>';
   if(p.isDynamax) t+='<span class="vtag" style="background:rgba(88,166,255,.2);color:var(--great)">Dmax</span>';
   if(p.isGigantamax) t+='<span class="vtag" style="background:rgba(168,85,247,.2);color:var(--ultra)">Gmax</span>';
-  if(p.vivillonPattern) t+='<span class="vtag" style="background:rgba(255,166,87,.2);color:var(--master)">'+p.vivillonPattern+'</span>';
+  if(p.vivillonPattern) t+='<span class="vtag" style="background:rgba(255,166,87,.2);color:var(--master)">'+esc(p.vivillonPattern)+'</span>';
   if(p.manualDecision) t+='<span class="vtag" style="background:rgba(255,215,0,.15);color:var(--gold)">Manual</span>';
   if(p.isFavorite) t+='<span class="vt-fav">★</span>';
   return t;
@@ -160,14 +162,14 @@ function buildRow(p){
     <td style="min-width:44px;white-space:nowrap">${starCell(p)}<button class="edit-btn" onclick="toggleOverride('${p.stableKey}')" title="Overrides">✎</button></td>
     <td class="poke-name-cell">
       <div class="poke-variants">${variantTags(p)}</div>
-      <div class="poke-name">${p.name}${p.form?` <span class="poke-form">(${p.form})</span>`:''}${genderStr}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button>${isMergeCandidate?`<button class="merge-icon-btn" onclick="event.stopPropagation();openMergeModal('${p.stableKey}')" title="Merge candidate — tap to review">🔀</button>`:''}</div>
+      <div class="poke-name">${esc(p.name)}${p.form?` <span class="poke-form">(${esc(p.form)})</span>`:''}${genderStr}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button>${isMergeCandidate?`<button class="merge-icon-btn" onclick="event.stopPropagation();openMergeModal('${p.stableKey}')" title="Merge candidate — tap to review">🔀</button>`:''}</div>
       ${evoIndicators}
     </td>
     <td style="font-size:11px;color:var(--muted)">${p.cp||'--'}</td>
     <td class="${p.suggestStar?'nick-starred':'nick-suggested'}" style="cursor:pointer"
         data-nick="${(p.nickname||'').replace(/"/g,'&quot;')}"
         onclick="copyNick(this.querySelector('.main-nick'),this.dataset.nick)" title="Click to copy nickname">
-      <span class="main-nick">${p.nickname}</span>${altNicks}
+      <span class="main-nick">${esc(p.nickname)}</span>${altNicks}
       ${evoSearchTag?`<div style="margin-top:2px">${evoSearchTag}</div>`:''}
     </td>
     <td>
@@ -178,8 +180,7 @@ function buildRow(p){
     <td>${lrHTML(p.rankPctG||null,p.rankNumG,p.dustG,p.isLucky)}</td>
     <td>${lrHTML(p.rankPctU||null,p.rankNumU,p.dustU,p.isLucky)}</td>
     <td><span style="color:${iv>=90?'var(--green)':iv>=70?'var(--cyan)':'var(--muted)'};font-size:11px">${Math.round(p.rankPctM||0)}%</span></td>
-    <td style="font-size:11px;color:var(--muted);white-space:nowrap">${p.catchDate||'--'}</td>
-    <td data-moves-species="${p.name}" data-moves-idx="${p.idx}">${moveHTML(p)}</td>
+    <td class="col-moves" data-moves-species="${esc(p.name)}" data-moves-idx="${p.idx}">${moveHTML(p)}</td>
     <td><button class="hide-btn" onclick="hideRow('${p.idx}')" title="Hide">&#10005;</button></td>
     <tr class="override-row" id="ov-${p.stableKey}" style="display:none">
       <td colspan="12" style="padding:8px 12px;background:var(--surf2)">
@@ -189,7 +190,7 @@ function buildRow(p){
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_gigantamax',this.checked)" ${p.isGigantamax?'checked':''}> Gigantamax</label>
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_costumed',this.checked)" ${p.isCostumed?'checked':''}> 🎭 Costumed</label>
           <label style="display:flex;align-items:center;gap:4px">Vivillon:
-            <input type="text" value="${p.vivillonPattern||''}" placeholder="e.g. Polar" style="width:80px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','vivillon_pattern',this.value)">
+            <input type="text" value="${esc(p.vivillonPattern)}" placeholder="e.g. Polar" style="width:80px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','vivillon_pattern',this.value)">
           </label>
           <label style="display:flex;align-items:center;gap:4px">Override:
             <select onchange="setOverride('${p.stableKey}','manual_decision',this.value)" style="background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px">
@@ -200,7 +201,7 @@ function buildRow(p){
             </select>
           </label>
           <label style="display:flex;align-items:center;gap:4px">Notes:
-            <input type="text" value="${p.notes||''}" placeholder="Optional notes" style="width:140px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','notes',this.value)">
+            <input type="text" value="${esc(p.notes)}" placeholder="Optional notes" style="width:140px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','notes',this.value)">
           </label>
           <button class="btn" style="padding:2px 8px;font-size:10px" onclick="clearOverride('${p.stableKey}')">Clear overrides</button>
         </div>

@@ -3,15 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PokéVault v3.5.35</title>
+  <title>PokéVault v3.5.37</title>
   <link rel="stylesheet" href="css/styles.css">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-8TPX6P50XM"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-8TPX6P50XM');
+  </script>
 </head>
 <body>
 
 </head>
 <body>
 <header>
-  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.35</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">📂</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
+  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.37</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">📂</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
   <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
   <div style="display:flex;align-items:center;gap:12px">
     <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" class="btn-donation" title="Support PokéVault">☕ Support</a>
@@ -231,7 +239,8 @@
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <span>These families have confirmed keepers (gold ★) and no unresolved recommendations. Everything else is safe to trade or delete.</span>
-      <button id="cullPracticalBtn" class="btn" onclick="toggleCullPractical(this)" title="Hide families where the only keeper is an expensive ($$$/$$$$) winner">💰 Practical</button>
+      <input type="text" id="cullSearchBox" placeholder="Search family..." oninput="openCullModal()" style="font-size:11px;padding:3px 7px;background:var(--surf);color:var(--text);border:1px solid var(--border);border-radius:4px;width:140px">
+      <button id="cullPracticalBtn" class="btn" onclick="toggleCullPractical(this)" title="Hide families where the only keeper is an expensive ($$$/$$$$) winner" aria-label="Practical filter">💰 Practical</button>
     </div>
     <div class="pv-modal-body" id="cull-modal-body">
       <div class="pv-modal-empty">Load your collection first</div>
@@ -256,7 +265,6 @@
 </div>
 
 <div id="dashboard">
-  <div class="summary-strip" id="summary-strip"></div>
   <div class="toolbar">
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
@@ -264,17 +272,17 @@
       <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear search">✕</button>
     </div>
     <label class="evo-toggle"><input type="checkbox" id="evoToggle"> Include evolutions</label>
-    <button class="btn active" data-f="all" onclick="setDecFilter('all',this)">All</button>
-    <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)" style="display:none">↗ Trade</button>
-    <button class="btn" data-f="review" onclick="setDecFilter('review',this)" style="display:none">⚠ Review</button>
-    <button class="btn" id="dmaxFilterBtn" onclick="toggleDmaxFilter(this)">Ⓓ Dynamax</button>
-    <button class="btn" id="gmaxFilterBtn" onclick="toggleGmaxFilter(this)">Ⓧ Gigantamax</button>
-    <button class="league-btn btn lb-L" data-l="L" onclick="toggleLeague('L',this)">Little</button>
-    <button class="league-btn btn lb-G" data-l="G" onclick="toggleLeague('G',this)">Great</button>
-    <button class="league-btn btn lb-U" data-l="U" onclick="toggleLeague('U',this)">Ultra</button>
-    <button class="league-btn btn lb-M" data-l="M" onclick="toggleLeague('M',this)">Master</button>
-    <button class="btn active" id="sortCountBtn" onclick="cycleSortMode(this)">★ Stars</button>
-    <select id="nickConvention" title="Nick format" onchange="setNickConvention(this.value)" style="font-size:11px;padding:2px 4px;background:var(--surf);color:var(--text);border:1px solid var(--border);border-radius:4px;cursor:pointer">
+    <button class="btn active" data-f="all" onclick="setDecFilter('all',this)" aria-label="Show all Pokémon">All</button>
+    <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)" style="display:none" aria-label="Filter: Trade">↗ Trade</button>
+    <button class="btn" data-f="review" onclick="setDecFilter('review',this)" style="display:none" aria-label="Filter: Review">⚠ Review</button>
+    <button class="btn" id="dmaxFilterBtn" onclick="toggleDmaxFilter(this)" aria-label="Filter: Dynamax">Ⓓ Dynamax</button>
+    <button class="btn" id="gmaxFilterBtn" onclick="toggleGmaxFilter(this)" aria-label="Filter: Gigantamax">Ⓧ Gigantamax</button>
+    <button class="league-btn btn lb-L" data-l="L" onclick="toggleLeague('L',this)" aria-label="Filter: Little League">Little</button>
+    <button class="league-btn btn lb-G" data-l="G" onclick="toggleLeague('G',this)" aria-label="Filter: Great League">Great</button>
+    <button class="league-btn btn lb-U" data-l="U" onclick="toggleLeague('U',this)" aria-label="Filter: Ultra League">Ultra</button>
+    <button class="league-btn btn lb-M" data-l="M" onclick="toggleLeague('M',this)" aria-label="Filter: Master League">Master</button>
+    <button class="btn active" id="sortCountBtn" onclick="cycleSortMode(this)" aria-label="Cycle sort mode">★ Stars</button>
+    <select id="nickConvention" title="Nick format" onchange="setNickConvention(this.value)" aria-label="Nickname format" style="font-size:11px;padding:2px 4px;background:var(--surf);color:var(--text);border:1px solid var(--border);border-radius:4px;cursor:pointer">
       <option value="pvpvault">⭐ PvP</option>
       <option value="ivpct">% IV</option>
       <option value="rawiv">Raw IV</option>
@@ -284,23 +292,25 @@
       Red: <input type="number" id="countThresholdInput" value="100" min="1" max="9999"
         style="width:44px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);font-size:11px;text-align:center"
         onchange="countThreshold=Math.max(1,parseInt(this.value)||100);applyFilters()"
-        title="Families with more members than this show in red">
+        title="Families with more members than this show in red"
+        aria-label="Large family threshold">
     </label>
-    <button class="btn" id="hundoBtn" data-f="hundo" onclick="cycleHundoFilter(this)">✚ Hundos</button>
-    <button class="btn" id="bestLeagueBtn" onclick="filterBestInLeague(this)" title="Show only families with new unstarred league winners">🏆 Best in League</button>
-    <button class="btn" id="costlyBtn" onclick="filterCostlyWinners(this)" title="Show only costly (blue star) recommendations">💰 Costly</button>
-    <button class="btn" id="practicalBtn" onclick="togglePractical(this)" title="Hide expensive ($$$/$$$$ dust) slot winners — focus on what you can actually power up">💰 Practical</button>
-    <button class="btn" data-f="canEvolve" onclick="setDecFilter('canEvolve',this)">Can Evolve</button>
-    <button class="btn" data-f="neverEvolved" onclick="setDecFilter('neverEvolved',this)">Never Evolved</button>
-    <button class="btn" onclick="openMergeModal()" title="Find merge candidates — same-IV Pokémon at different CP">🔀 Merge</button>
-    <button class="btn" onclick="openCullModal()" title="Families with confirmed keepers — everything else is safe to cull">🗑 Cull</button>
-    <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates">🌟 Purify</button>
-    <button class="btn" onclick="openShinyModal()" title="Shiny Pokémon tagged via overrides">✨ Shinies</button>
-    <button class="btn" onclick="openDexModal()" title="Collection Tracker — see what you have and what's missing">📖 Pokédex</button>
-    <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc">🎨 Set Forms</button>
-    <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax">✨ Mark Special</button>
-    <button class="btn export-btn" onclick="exportCSV()">⬇ Export</button>
-    <button class="btn" onclick="copyCurrentLink()" title="Copy link to current view">🔗</button>
+    <button class="btn" id="hundoBtn" data-f="hundo" onclick="cycleHundoFilter(this)" aria-label="Filter: Hundos">✚ Hundos</button>
+    <button class="btn" id="bestLeagueBtn" onclick="filterBestInLeague(this)" title="Show only families with new unstarred league winners" aria-label="Filter: Best in League">🏆 Best in League</button>
+    <button class="btn" id="costlyBtn" onclick="filterCostlyWinners(this)" title="Show only costly (blue star) recommendations" aria-label="Filter: Costly winners">💰 Costly</button>
+    <button class="btn" id="practicalBtn" onclick="togglePractical(this)" title="Hide expensive ($$$/$$$$ dust) slot winners — focus on what you can actually power up" aria-label="Toggle Practical mode">💰 Practical</button>
+    <button class="btn" data-f="canEvolve" onclick="setDecFilter('canEvolve',this)" aria-label="Filter: Can Evolve">Can Evolve</button>
+    <button class="btn" data-f="neverEvolved" onclick="setDecFilter('neverEvolved',this)" aria-label="Filter: Never Evolved">Never Evolved</button>
+    <button class="btn" onclick="openMergeModal()" title="Find merge candidates — same-IV Pokémon at different CP" aria-label="Open Merge modal">🔀 Merge</button>
+    <button class="btn" onclick="openCullModal()" title="Families with confirmed keepers — everything else is safe to cull" aria-label="Open Cull modal">🗑 Cull</button>
+    <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates" aria-label="Open Purify modal">🌟 Purify</button>
+    <button class="btn" onclick="openShinyModal()" title="Shiny Pokémon tagged via overrides" aria-label="Open Shinies modal">✨ Shinies</button>
+    <button class="btn" onclick="openDexModal()" title="Collection Tracker — see what you have and what's missing" aria-label="Open Pokédex tracker">📖 Pokédex</button>
+    <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc" aria-label="Set forms">🎨 Set Forms</button>
+    <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax" aria-label="Mark Special Pokémon">✨ Mark Special</button>
+    <button class="btn" id="movesToggleBtn" onclick="toggleMovesColumn(this)" title="Show/hide moves column" aria-label="Toggle moves column">Moves ⟨/⟩</button>
+    <button class="btn export-btn" onclick="exportCSV()" aria-label="Export to CSV">⬇ Export</button>
+    <button class="btn" onclick="copyCurrentLink()" title="Copy link to current view" aria-label="Copy deep link">🔗</button>
   </div>
   <div id="anon-import-bar" style="display:none;flex-direction:column;gap:0;border-bottom:1px solid var(--border);background:var(--surf)">
     <div style="display:flex;align-items:center;gap:12px;padding:7px 16px;font-size:12px;color:var(--muted)">
