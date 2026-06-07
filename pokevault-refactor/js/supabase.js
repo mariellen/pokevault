@@ -32,7 +32,7 @@ let supabaseConnected = false;
 
 async function supabaseFetch(method, path, body, isDeleteAll, prefer) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+  const timeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout (mobile networks need more time)
 
   // Always fetch the current session so RLS sees auth.uid() for authenticated users.
   // Use window.supabaseClient explicitly — const in auth.js is not a window property
@@ -287,7 +287,12 @@ async function checkCloudCollection() {
 }
 
 async function loadOverrides() {
-  const data = await supabaseFetch('GET', 'pokemon_overrides?select=*');
+  let data = await supabaseFetch('GET', 'pokemon_overrides?select=*');
+  if (data === null) {
+    // Retry once after a short delay before declaring offline (handles transient mobile drops)
+    await new Promise(r => setTimeout(r, 2000));
+    data = await supabaseFetch('GET', 'pokemon_overrides?select=*');
+  }
   if (data === null) {
     supabaseConnected = false;
     // Don't overwrite timeout message if already set

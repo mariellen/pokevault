@@ -156,7 +156,7 @@ function buildNickname(p, slot, convention) {
   if (slot==='G' && p.evolvedNameG) { base=p.evolvedNameG; evolvedFormForSlot=p.evolvedFormG||''; }
   else if (slot==='U' && p.evolvedNameU) { base=p.evolvedNameU; evolvedFormForSlot=p.evolvedFormU||''; }
   else if (slot==='L' && p.evolvedNameL) { base=p.evolvedNameL; evolvedFormForSlot=p.evolvedFormL||''; }
-  else if (slot==='M') {
+  else if (slot==='M' || slot==='dynamax' || slot==='gigantamax') {
     base=p.evolvedNameU||p.evolvedNameG||p.name;
     evolvedFormForSlot=p.evolvedFormU||p.evolvedFormG||'';
   }
@@ -355,12 +355,12 @@ function buildNickname(p, slot, convention) {
     const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
     if (best) { const pv=Math.round(p['rankPct'+best]||0); mid=LC[best]+(pv===100?PERFECT:String(pv)); }
     else { mid=LC.R+String(iv); }
-    return fitName(p.name, mid, nickSuf, 12); // nickSuf has Ⓓ from suf
+    return fitName(base, mid, nickSuf, 12); // nickSuf has Ⓓ from suf
   } else if (slot==='gigantamax') {
     const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
     if (best) { const pv=Math.round(p['rankPct'+best]||0); mid=LC[best]+(pv===100?PERFECT:String(pv)); }
     else { mid=LC.R+String(iv); }
-    return fitName(p.name, mid, nickSuf, 12); // nickSuf has Ⓧ from suf
+    return fitName(base, mid, nickSuf, 12); // nickSuf has Ⓧ from suf
   } else if (slot==='lucky') {
     // Pure hundo with no league slot (not actually lucky): Ⓗ plus any other suffixes
     // (purified '*', shiny '※', move flags). nickSuf already includes Ⓗ (added when isHundo),
@@ -600,6 +600,15 @@ function analyse(rows) {
     let evolvedNameU = validateEvo(r['Name (U)']) || (evoOvr && validateEvo(evoOvr.U)) || '';
     let evolvedNameL = validateEvo(r['Name (L)']) || (evoOvr && validateEvo(evoOvr.L)) || '';
 
+    // Gender-locked species: if gender is unknown, clear evo assignments to avoid wrong slot.
+    let genderUnknownLocked = false;
+    if (typeof GENDER_LOCKED_EVO !== 'undefined' && GENDER_LOCKED_EVO.has(r['Name']) && !r['Gender']) {
+      evolvedNameG = '';
+      evolvedNameU = '';
+      evolvedNameL = '';
+      genderUnknownLocked = true;
+    }
+
     // Tyrogue: IV-based evo correction (Pokégenie can misreport equality case).
     // ATK > DEF → Hitmonlee; DEF > ATK → Hitmonchan; ATK = DEF → Hitmontop.
     if (r['Name'] === 'Tyrogue') {
@@ -647,6 +656,7 @@ function analyse(rows) {
       isDynamax:false, isGigantamax:false, isCostumed:false, vivillonPattern:'', specialForm:'', manualDecision:'', notes:'', stableKey:'',
       overBudget100:false, cheaperAvailable:false,
       evolutionUnknown: typeof FAMILY_OVERRIDES !== 'undefined' && FAMILY_OVERRIDES.unknownEvo ? FAMILY_OVERRIDES.unknownEvo.has(r['Name']) : false,
+      genderUnknownLocked,
       purifyHundo:false, purifyLeague:'', purifyRankPct:0,
     };
   });
@@ -1071,6 +1081,7 @@ function analyse(rows) {
           p.slots = p.slots.filter(s => s !== 'M' && s !== 'M_tentative');
           p.wonMasterSlot = false;
           p.hasBattleSlot = false; // allow capped-league reconsideration after M demotion
+          p.slotConfirmed = false; // prevent stale confirmed state carrying to capped-league wins
           if (p.targetEvo && p.name === p.targetEvo) p.targetEvo = '';
         });
         // Promote the winner if it came from the extra-candidate pool (didn't win in the loop).
@@ -1170,7 +1181,7 @@ function analyse(rows) {
       else if (leagueSlot === 'M') p.dustCostBest = 0;
       else p.dustCostBest = p.dustMin || 0;
 
-      const hasLeagueSlot=p.slots.some(s=>RULES.leagues.includes(s)||s.endsWith('_affordable'))&&!(isLegendary&&p.slots.includes('best_overall')&&!p.slotConfirmed);
+      const hasLeagueSlot=p.slots.some(s=>RULES.leagues.includes(s)||s.endsWith('_affordable'))&&!(isLegendary&&p.slots.includes('best_overall')&&!p.slotConfirmed)&&!((p.isLucky||p.isShiny)&&!p.slotConfirmed);
       const hasAffordableBackup=p.slots.some(s=>s.endsWith('_affordable'));
       const hasProtectedSlot=isLegendary&&p.slots.length>0;
       const qualifiesAny=RULES.leagues.some(l=>(p[`rankPct${l}`]||0)>=RULES.keepThreshold);

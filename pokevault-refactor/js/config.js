@@ -67,6 +67,11 @@ const GENDER_DIMORPHIC = new Set([
   'Wooper',               // Paldean Wooper male/female differ
 ]);
 
+// ── Gender-locked evolution species ──────────────────────────────
+// Species where gender is required to determine evolution eligibility.
+// When gender is missing/unknown, evo targets are cleared to prevent incorrect slot assignment.
+const GENDER_LOCKED_EVO = new Set(['Combee', 'Kirlia', 'Snorunt', 'Burmy']);
+
 // ── Special family overrides ──────────────────────────────
 // Pokémon that need custom family grouping behaviour
 const FAMILY_OVERRIDES = {
@@ -105,10 +110,6 @@ const FORM_NICK_PREFIXES = {
   'Alola':'Alol', 'Galar':'Galr', 'Hisui':'Hisu', 'Paldea':'Pald',
   // Deoxys
   'Attack':'Atk', 'Defense':'Def', 'Speed':'Spd',
-  // Giratina / Dialga
-  'Origin':'Orig',
-  // Forces of Nature (Tornadus/Thundurus/Landorus/Enamorus)
-  'Therian':'Ther',
   // Groudon / Kyogre
   'Primal':'Prml',
   // Wormadam

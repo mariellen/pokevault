@@ -162,7 +162,7 @@ function buildRow(p){
     <td style="min-width:44px;white-space:nowrap">${starCell(p)}<button class="edit-btn" onclick="toggleOverride('${p.stableKey}')" title="Overrides">✎</button></td>
     <td class="poke-name-cell">
       <div class="poke-variants">${variantTags(p)}</div>
-      <div class="poke-name">${esc(p.name)}${p.form?` <span class="poke-form">(${esc(p.form)})</span>`:''}${genderStr}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button>${isMergeCandidate?`<button class="merge-icon-btn" onclick="event.stopPropagation();openMergeModal('${p.stableKey}')" title="Merge candidate — tap to review">🔀</button>`:''}</div>
+      <div class="poke-name">${esc(p.name)}${p.form?` <span class="poke-form">(${esc(p.form)})</span>`:''}${genderStr}${p.genderUnknownLocked?' <span title="Gender unknown — evo slot may be incorrect; rescan or set gender manually" style="color:var(--yellow);font-size:11px">⚠</span>':''}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button>${isMergeCandidate?`<button class="merge-icon-btn" onclick="event.stopPropagation();openMergeModal('${p.stableKey}')" title="Merge candidate — tap to review">🔀</button>`:''}</div>
       ${evoIndicators}
     </td>
     <td style="font-size:11px;color:var(--muted)">${p.cp||'--'}</td>

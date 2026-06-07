@@ -338,6 +338,63 @@ describe('Non-Legendary branching-evo final form — Master slot', () => {
   });
 });
 
+// ─── Group K — Fix 1: Shiny/Lucky falls to Ⓡ after M demotion (not weak capped slot) ───
+// Repro: Latias Shiny Lucky CP:1772, 87% IV was showing LatiasⓊ40※ instead of LatiasⓇ87※.
+// Root cause: slotConfirmed was not reset in demotion loop → stale true → capped slot confirmed.
+// Fix: reset slotConfirmed in demotion loop + exclude Lucky/Shiny with tentative slots from hasLeagueSlot.
+
+describe('Fix 1 regression — Shiny/Lucky falls to Ⓡ when beaten in Master', () => {
+  const latias = (cp, pct, opts = {}) => {
+    const total = Math.round(pct / 100 * 45);
+    const atk = Math.min(15, total), rem = total - atk;
+    const def = Math.min(15, rem), sta = rem - def;
+    const iv = opts.iv || { atk, def, sta };
+    return row({
+      Index: String(opts.idx || Math.floor(Math.random()*1e6)),
+      Name: 'Latias', 'Pokemon Number': '380', CP: String(cp),
+      'Atk IV': String(iv.atk), 'Def IV': String(iv.def), 'Sta IV': String(iv.sta),
+      'IV Avg': pct.toFixed(1), 'Level Min': '20',
+      Lucky: opts.lucky ? '1' : '0',
+      Dust: '5000',
+      'Rank % (U)': opts.rankU || '40.0', 'Dust Cost (U)': '300000', 'Name (U)': 'Latias',
+    });
+  };
+
+  it('Shiny Lucky Latias 87% beaten by Hundo shows Ⓡ, not Ⓤ40', () => {
+    const iv87 = { atk: 15, def: 15, sta: 9 };
+    const shinyKey = ['380', '', '', iv87.atk, iv87.def, iv87.sta, '_idx2'].join('|');
+    const { analyse: analyseOv } = loader.createWithOverrides({ [shinyKey]: { is_shiny: true } });
+    const res = analyseOv(toCSV([
+      latias(2466, 100.0, { iv: { atk:15, def:15, sta:15 }, idx: 1 }),   // hundo wins M
+      latias(1772, 86.7, { iv: iv87, lucky: true, idx: 2 }),             // shiny lucky loses M
+    ]));
+    const shinyLucky = res.pokemon.find(p => p.name === 'Latias' && p.isShiny && p.isLucky);
+    expect(shinyLucky).toBeDefined();
+    expect(shinyLucky.wonMasterSlot).toBeFalsy();
+    expect(shinyLucky.nickname).toMatch(/Ⓡ/);      // best-overall keep
+    expect(shinyLucky.nickname).toMatch(/※/);      // shiny suffix
+    expect(shinyLucky.nickname).not.toMatch(/Ⓤ/); // NOT a capped Ultra slot
+    expect(shinyLucky.nickname).not.toMatch(/Ⓛ/); // NOT a capped slot of any kind
+    expect(shinyLucky.nickname).not.toMatch(/Ⓖ/);
+  });
+
+  it('plain Shiny Latias 87% beaten by Hundo shows Ⓡ, not a weak league nick', () => {
+    const iv87 = { atk: 15, def: 15, sta: 9 };
+    const shinyKey = ['380', '', '', iv87.atk, iv87.def, iv87.sta, '_idx3'].join('|');
+    const { analyse: analyseOv } = loader.createWithOverrides({ [shinyKey]: { is_shiny: true } });
+    const res = analyseOv(toCSV([
+      latias(2466, 100.0, { iv: { atk:15, def:15, sta:15 }, idx: 1 }),
+      latias(1772, 86.7, { iv: iv87, idx: 3 }),   // shiny non-lucky loses M
+    ]));
+    const shiny = res.pokemon.find(p => p.name === 'Latias' && p.isShiny && !p.isLucky);
+    expect(shiny).toBeDefined();
+    expect(shiny.wonMasterSlot).toBeFalsy();
+    expect(shiny.nickname).toMatch(/Ⓡ/);
+    expect(shiny.nickname).toMatch(/※/);
+    expect(shiny.nickname).not.toMatch(/Ⓤ/);
+  });
+});
+
 // ─── Group I — global invariant on the real export (smoke test) ──────────────
 // If export_187 is available next to the tests, assert the family-level cap holds.
 describe('Global cap invariant (export_187 smoke test)', () => {
