@@ -52,12 +52,16 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
   });
 
   it('marks session failed and records saved_records if a batch upsert errors', async () => {
-    let batchCount = 0;
+    // Fix 2a adds 3 retries per batch — mock must fail ALL attempts for the second batch
     const patches = [];
     const mockFetch = async (method, path, body) => {
       if (method === 'POST' && path === 'sync_sessions') return [{ id: 'sess-1' }];
       if (method === 'DELETE') return {};
-      if (method === 'POST') { batchCount++; return batchCount === 2 ? null : {}; }
+      if (method === 'POST') {
+        // Fail every attempt whose first item belongs to the second batch (offset >= 200)
+        const offset = parseInt((body?.[0]?.pokemon_index || 'poke-0').replace('poke-', ''), 10);
+        return offset >= 200 ? null : {};
+      }
       if (method === 'PATCH') { patches.push({ path, body }); return {}; }
       return {};
     };
@@ -105,19 +109,24 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
     expect(completePatch.body.completed_at).toBeDefined();
   });
 
-  it('aborts if pre-sync DELETE fails — does not write on top of stale data', async () => {
+  it('phase-2 stale-row DELETE failure is non-fatal — upserts still complete and session marked complete', async () => {
+    // Fix 2a: the cleanup DELETE (after all upserts) is non-fatal. Upserts must still happen.
     const upsertBatches = [];
+    const patches = [];
     const mockFetch = async (method, path, body) => {
       if (method === 'POST' && path === 'sync_sessions') return [{ id: 'sess-1' }];
-      if (method === 'DELETE') return null; // DELETE fails
+      if (method === 'DELETE') return null; // phase-2 cleanup DELETE fails (non-fatal)
       if (method === 'POST') { upsertBatches.push(body); return {}; }
+      if (method === 'PATCH') { patches.push({ path, body }); return {}; }
       return {};
     };
 
     const { saveCollectionToCloud } = supabaseLoader.createEnv({ supabaseFetch: mockFetch });
     await saveCollectionToCloud(makePokemon(100));
 
-    expect(upsertBatches.length).toBe(0);
+    expect(upsertBatches.length).toBe(1); // upserts still happened
+    const completePatch = patches.find(p => p.body.status === 'complete');
+    expect(completePatch).toBeDefined(); // session still marked complete
   });
 
   it('session insert includes correct total_records count', async () => {

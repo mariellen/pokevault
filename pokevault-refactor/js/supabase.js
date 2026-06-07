@@ -122,15 +122,19 @@ async function saveCollectionToCloud(pokemon, onProgress) {
     sessionId = Array.isArray(sessionRows) ? (sessionRows[0]?.id ?? null) : null;
   }
 
-  // Delete existing collection first
-  const delResult = await supabaseFetch('DELETE', 'pokemon_collection?id=gte.0', null, true);
-  if (delResult === null) {
-    updateSyncStatus('⚠ Could not clear old collection — check Supabase permissions', 'warn');
-    if (sessionId) {
-      supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, { status: 'failed', error_text: 'DELETE failed' });
-    }
-    return;
-  }
+  // ── Fix 2a: INSERT-new-then-DELETE-old (no destructive pre-delete) ──────────
+  // Previous behaviour DELETE-then-INSERT could wipe the collection if a batch failed.
+  // New flow: upsert every row with a single shared run timestamp; only AFTER all batches
+  // are confirmed written do we delete rows left with an OLDER imported_at (i.e. Pokémon
+  // no longer in the collection — traded away). If any batch fails after retries, we never
+  // delete, so the previous cloud save stays intact.
+  //
+  // NOTE ON SCHEMA: pokemon_collection has a GLOBAL unique index on pokemon_index and POSTs
+  // use resolution=merge-duplicates, so re-saving the same Pokémon UPSERTS in place (its
+  // imported_at is refreshed to runTimestamp). After a fully-successful upsert pass, any row
+  // still carrying an older imported_at for this user is provably a stale row to delete.
+  // (If/when the unique key becomes (user_id, pokemon_index), this logic is unchanged.)
+  const runTimestamp = new Date().toISOString();
 
   const slim = pokemon.map(p => ({
     pokemon_index: p.stableKey,
@@ -167,16 +171,33 @@ async function saveCollectionToCloud(pokemon, onProgress) {
     evolved_name_g: p.evolvedNameG||'',
     evolved_name_u: p.evolvedNameU||'',
     evolved_name_l: p.evolvedNameL||'',
-    imported_at: new Date().toISOString(),
+    imported_at: runTimestamp,
     user_id: userId
   }));
 
+  // Bounded retry for transient batch failures (timeout / 5xx). supabaseFetch returns null
+  // on any failure, so retry up to MAX_BATCH_ATTEMPTS with a short backoff before giving up.
+  const MAX_BATCH_ATTEMPTS = 3;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  async function upsertBatchWithRetry(batch, rowOffset) {
+    for (let attempt = 1; attempt <= MAX_BATCH_ATTEMPTS; attempt++) {
+      const result = await supabaseFetch('POST', 'pokemon_collection?on_conflict=pokemon_index', batch);
+      if (result !== null) return true;
+      if (attempt < MAX_BATCH_ATTEMPTS) {
+        updateSyncStatus(`Retrying save (batch at row ${rowOffset}, attempt ${attempt + 1})...`, 'warn');
+        await sleep(500 * attempt); // 500ms, 1000ms backoff
+      }
+    }
+    return false;
+  }
+
   let saved = 0;
   try {
+    // Phase 1 — upsert all new batches. Throw on a batch that fails all retries.
     for (let i = 0; i < slim.length; i += BATCH_SIZE) {
       const batch = slim.slice(i, i + BATCH_SIZE);
-      const result = await supabaseFetch('POST', 'pokemon_collection?on_conflict=pokemon_index', batch);
-      if (result === null) throw new Error('Batch write failed at row ' + i);
+      const wroteOk = await upsertBatchWithRetry(batch, i);
+      if (!wroteOk) throw new Error('Batch write failed at row ' + i + ' after ' + MAX_BATCH_ATTEMPTS + ' attempts');
 
       saved += batch.length;
 
@@ -189,28 +210,39 @@ async function saveCollectionToCloud(pokemon, onProgress) {
       if (onProgress) onProgress(saved, slim.length);
     }
 
-    if (sessionId) {
-      if (saved === slim.length) {
-        await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
-          status: 'complete',
-          completed_at: new Date().toISOString(),
-          saved_records: saved,
-        });
-      } else {
-        await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
-          status: 'failed',
-          error_text: `Incomplete: ${saved}/${slim.length} records confirmed`,
-          saved_records: saved,
-        });
-      }
+    // Guard: only proceed to delete-old if EVERY row was written.
+    if (saved !== slim.length) {
+      throw new Error(`Incomplete write: ${saved}/${slim.length} rows confirmed — old data left intact`);
     }
 
-    cloudCollectionDate = new Date().toISOString();
+    // Phase 2 — all new rows are confirmed written. Now (and only now) delete stale rows:
+    // this user's rows whose imported_at predates this run. Explicit user_id filter is defense
+    // in depth alongside RLS. If this DELETE fails it's non-fatal: the new data is already
+    // saved; at worst a few traded-away Pokémon linger until the next successful save.
+    const delOld = await supabaseFetch(
+      'DELETE',
+      'pokemon_collection?user_id=eq.' + userId + '&imported_at=lt.' + encodeURIComponent(runTimestamp),
+      null, true
+    );
+    if (delOld === null) {
+      console.warn('Stale-row cleanup failed (non-fatal) — new data is saved; old rows will clear on next save');
+    }
+
+    if (sessionId) {
+      await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
+        status: 'complete',
+        completed_at: new Date().toISOString(),
+        saved_records: saved,
+      });
+    }
+
+    cloudCollectionDate = runTimestamp;
     localStorage.setItem('pokevault_last_cloud_save', cloudCollectionDate);
     localStorage.setItem('pokevault_last_cloud_save_count', slim.length);
     updateSyncStatus('✓ Collection saved to cloud (' + slim.length + ' Pokémon)', 'ok');
 
   } catch (err) {
+    // A batch failed — the old collection was NEVER deleted, so the previous save is intact.
     if (sessionId) {
       await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
         status: 'failed',
@@ -218,7 +250,8 @@ async function saveCollectionToCloud(pokemon, onProgress) {
         saved_records: saved,
       });
     }
-    updateSyncStatus('⚠ Cloud save failed at row ' + saved + ' — check F12 console for details', 'warn');
+    updateSyncStatus('⚠ Cloud save failed at row ' + saved + ' of ' + slim.length +
+      ' — your previous cloud save is unchanged. Check F12 console for details.', 'warn');
     console.error('saveCollectionToCloud error:', err);
   }
 }
