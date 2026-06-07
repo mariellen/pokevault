@@ -41,11 +41,6 @@ async function supabaseFetch(method, path, body, isDeleteAll, prefer) {
   try {
     if (window.supabaseClient) {
       const { data } = await window.supabaseClient.auth.getSession();
-      // TEMP DEBUG — remove after auth is confirmed working
-      console.log('[supabaseFetch]', method, path.split('?')[0],
-        '| session:', data?.session ? 'EXISTS' : 'NULL',
-        '| token prefix:', data?.session?.access_token?.substring(0, 20) || 'none',
-        '| uid:', data?.session?.user?.id || 'none');
       if (data?.session?.access_token) bearerToken = data.session.access_token;
     } else {
       console.warn('[supabaseFetch] window.supabaseClient not ready — using anon key');
@@ -195,11 +190,19 @@ async function saveCollectionToCloud(pokemon, onProgress) {
     }
 
     if (sessionId) {
-      await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
-        status: 'complete',
-        completed_at: new Date().toISOString(),
-        saved_records: saved,
-      });
+      if (saved === slim.length) {
+        await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
+          status: 'complete',
+          completed_at: new Date().toISOString(),
+          saved_records: saved,
+        });
+      } else {
+        await supabaseFetch('PATCH', 'sync_sessions?id=eq.' + sessionId, {
+          status: 'failed',
+          error_text: `Incomplete: ${saved}/${slim.length} records confirmed`,
+          saved_records: saved,
+        });
+      }
     }
 
     cloudCollectionDate = new Date().toISOString();
