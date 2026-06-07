@@ -257,6 +257,87 @@ describe('Non-Legendary special categories', () => {
   });
 });
 
+// ─── Group J — Non-Legendary branching-evo final form wins Master ─────────────
+// Regression for: Jolteon 15/15/14 (98% IV) was showing as ML placeholder (…98m)
+// instead of confirmed Master keeper (…Ⓜ98). Root cause: the non-shadow Master pick
+// demotion loop did not reset hasBattleSlot=false, leaving demoted pokemon frozen out
+// of capped-league reconsideration and best_overall (via speciesWithConfirmedKeeper).
+
+describe('Non-Legendary branching-evo final form — Master slot', () => {
+  // Helper: actual Jolteon (already evolved, no further evolutions).
+  const jolteon = (cp, pct, opts = {}) => {
+    const total = Math.round(pct / 100 * 45);
+    const atk = Math.min(15, total), rem = total - atk;
+    const def = Math.min(15, rem), sta = rem - def;
+    const iv = opts.iv || { atk, def, sta };
+    return row({
+      Index: String(opts.idx || 1),
+      Name: 'Jolteon', 'Pokemon Number': '135', CP: String(cp),
+      'Atk IV': String(iv.atk), 'Def IV': String(iv.def), 'Sta IV': String(iv.sta),
+      'IV Avg': pct.toFixed(1), 'Level Min': '40',
+      Lucky: opts.lucky ? '1' : '0',
+      'Shadow/Purified': opts.shadow ? '1' : opts.purified ? '2' : '0',
+      Favorite: opts.fav ? '1' : '0', Dust: '5000',
+      // Jolteon has no capped-league evo targets (final form); give it token U rank.
+      'Rank % (U)': '38.0', 'Dust Cost (U)': '200000', 'Name (U)': 'Jolteon',
+    });
+  };
+  // Helper: Eevee pre-evo pointing at a given evo target for UL.
+  const eeveeForU = (cp, pct, evoU, opts = {}) => {
+    const total = Math.round(pct / 100 * 45);
+    const atk = Math.min(15, total), rem = total - atk;
+    const def = Math.min(15, rem), sta = rem - def;
+    const iv = opts.iv || { atk, def, sta };
+    return row({
+      Index: String(opts.idx || 99),
+      Name: 'Eevee', 'Pokemon Number': '133', CP: String(cp),
+      'Atk IV': String(iv.atk), 'Def IV': String(iv.def), 'Sta IV': String(iv.sta),
+      'IV Avg': pct.toFixed(1), 'Level Min': '5',
+      Dust: '1000',
+      'Rank % (U)': '60.0', 'Dust Cost (U)': '150000', 'Name (U)': evoU,
+    });
+  };
+
+  it('Jolteon 15/15/14 (98% IV) wins confirmed Master slot and shows Ⓜ', () => {
+    const res = analyse(toCSV([
+      jolteon(1234, 97.8, { iv: { atk: 15, def: 15, sta: 14 }, idx: 1 }),
+    ]));
+    const w = res.pokemon.find(p => p.name === 'Jolteon' && p.slots.includes('M'));
+    expect(w).toBeDefined();
+    expect(w.wonMasterSlot).toBe(true);
+    expect(w.nickname).toMatch(/Ⓜ/);
+    expect(w.nickname).not.toMatch(/Ⓡ/);
+  });
+
+  it('Jolteon 98% beats lower-IV Eevee→Vaporeon for non-shadow Master slot', () => {
+    // Eevee→Vaporeon 80% IV: lower adjIV than Jolteon 98% → Jolteon should win M.
+    const res = analyse(toCSV([
+      jolteon(1234, 97.8, { iv: { atk: 15, def: 15, sta: 14 }, idx: 1 }),
+      eeveeForU(800, 80.0, 'Vaporeon', { idx: 2 }),
+    ]));
+    const j = res.pokemon.find(p => p.name === 'Jolteon' && p.cp === 1234);
+    expect(j.wonMasterSlot).toBe(true);
+    expect(j.nickname).toMatch(/Ⓜ/);
+  });
+
+  it('demoted M candidate (beaten by hundo) gets hasBattleSlot reset and keeps decision', () => {
+    // Jolteon 98% wins M in main loop → hasBattleSlot=true.
+    // Hundo Eevee→Vaporeon wins non-shadow Master pick → Jolteon demoted.
+    // After fix: Jolteon.hasBattleSlot=false → eligible for best_overall → decision=keep.
+    const res = analyse(toCSV([
+      jolteon(1234, 97.8, { iv: { atk: 15, def: 15, sta: 14 }, idx: 1 }),
+      eeveeForU(100, 100.0, 'Vaporeon', { iv: { atk: 15, def: 15, sta: 15 }, idx: 2 }),
+    ]));
+    const j = res.pokemon.find(p => p.name === 'Jolteon' && p.cp === 1234);
+    // Jolteon lost M to the hundo, but should NOT fall to review with an Xm-format nick.
+    expect(j.decision).toBe('keep');
+    expect(j.nickname).not.toMatch(/\d+m$/); // no review-format trailing 'm'
+    // The hundo Eevee should hold the confirmed M slot.
+    const ev = res.pokemon.find(p => p.name === 'Eevee');
+    expect(ev.wonMasterSlot).toBe(true);
+  });
+});
+
 // ─── Group I — global invariant on the real export (smoke test) ──────────────
 // If export_187 is available next to the tests, assert the family-level cap holds.
 describe('Global cap invariant (export_187 smoke test)', () => {

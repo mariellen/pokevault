@@ -1070,6 +1070,7 @@ function analyse(rows) {
           if (p === winner) return;
           p.slots = p.slots.filter(s => s !== 'M' && s !== 'M_tentative');
           p.wonMasterSlot = false;
+          p.hasBattleSlot = false; // allow capped-league reconsideration after M demotion
           if (p.targetEvo && p.name === p.targetEvo) p.targetEvo = '';
         });
         // Promote the winner if it came from the extra-candidate pool (didn't win in the loop).

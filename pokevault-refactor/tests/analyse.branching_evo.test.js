@@ -228,6 +228,39 @@ describe('Wurmple family — unknown-evo base-form keep + branch separation', ()
   });
 });
 
+// ─── Eevee — actual evolved form wins Master slot ────────────────────────────
+
+describe('Eevee family — actual Jolteon wins Master slot', () => {
+  it('actual Jolteon 15/15/14 (98% IV) in Eevee family wins confirmed Master slot', () => {
+    // Regression: non-Legendary branching-evo final form was showing Jolteon98m (placeholder)
+    // instead of JolteonⓂ98 (confirmed M keeper). Jolteon must be the best non-shadow in family.
+    const res = analyse(toCSV([
+      named({ idx: 1, name: 'Jolteon', num: 135, cp: 1234, a: 15, d: 15, s: 14, iv: 97.8 }),
+      eevee({ idx: 2, cp: 13, el: 'Leafeon', rl: 100.0, fav: true }),
+      eevee({ idx: 3, cp: 14, a: 4, d: 12, s: 14, iv: 66.7, el: 'Jolteon', rl: 60.0 }),
+    ]));
+    const j = mon(res.pokemon, 'Jolteon', 1234);
+    expect(j.wonMasterSlot).toBe(true);
+    expect(j.slots).toContain('M');
+    expect(j.nickname).toMatch(/Ⓜ/);
+    expect(j.nickname).not.toMatch(/\d+m$/); // not the placeholder/review Xm format
+    expect(j.decision).toBe('keep');
+  });
+
+  it('demoted-from-M Jolteon (lost to hundo Eevee→Vaporeon) keeps a keep decision', () => {
+    // Jolteon 98% wins M in main loop. Hundo Eevee→Vaporeon takes the non-shadow Master pick.
+    // After the hasBattleSlot-reset fix, demoted Jolteon must reach best_overall (keep), not review.
+    const res = analyse(toCSV([
+      named({ idx: 1, name: 'Jolteon', num: 135, cp: 1234, a: 15, d: 15, s: 14, iv: 97.8 }),
+      eevee({ idx: 2, cp: 100, a: 15, d: 15, s: 15, iv: 100.0, eu: 'Vaporeon', ru: 60.0 }),
+    ]));
+    const j = mon(res.pokemon, 'Jolteon', 1234);
+    // Hundo Eevee beats Jolteon in masterCmp — Jolteon loses M but must not fall to review.
+    expect(j.decision).toBe('keep');
+    expect(j.nickname).not.toMatch(/\d+m$/);
+  });
+});
+
 // ─── Global smoke test on the real export, if present ────────────────────────
 
 describe('Branching families — collision guard on export_187 (smoke test)', () => {
