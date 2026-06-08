@@ -1,0 +1,35 @@
+name: Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  zap-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies and start local server
+        run: |
+          cd pokevault-refactor
+          npm ci
+          npx serve . -p 8080 &
+          sleep 5
+      - name: OWASP ZAP Baseline Scan
+        run: |
+          docker run --network=host \
+            -v $(pwd):/zap/wrk/:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:8080 \
+            -r report_html.html \
+            -a \
+            -I
+        continue-on-error: true
+
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: report_html.html

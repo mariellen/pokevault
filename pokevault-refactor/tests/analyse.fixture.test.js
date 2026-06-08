@@ -392,10 +392,11 @@ describe('Group 10 — Nick format', () => {
     expect(hasCircled).toBe(true);
   });
 
-  it('Magikarp CP:10 is trade decision (far below threshold)', () => {
+  it('Magikarp CP:10 gets ML placeholder (no league data → no ML keeper → grey star review)', () => {
     const p = find('Magikarp', 10);
-    // Magikarp has no league data in fixture — should be trade
-    expect(p.decision).toBe('trade');
+    // No league rank data → ML placeholder fires (best unslotted member in family)
+    expect(p.decision).toBe('review');
+    expect(p.isMlPlaceholder).toBe(true);
   });
 });
 
@@ -441,8 +442,8 @@ describe('Group 11 — Shadow/Lucky coexistence', () => {
   it('Lucky Qwilfish CP:443 holds Master slot independently of normal CP:440', () => {
     const lucky = find('Qwilfish', 443);
     const normal = find('Qwilfish', 440);
-    expect(lucky.slots).toContain('M'); // ivAvg=95.6 → ML winner in lucky group
-    expect(normal.slots).toContain('M'); // ivAvg=93.3 → ML winner in normal group
+    expect(lucky.slots).toContain('M'); // Lucky wins non-shadow Master (95.6%+5pp beats normal 93.3%)
+    expect(normal.slots).not.toContain('M'); // normal loses to Lucky in one-winner Master pick
     expect(lucky.isLucky).toBe(true);
     expect(lucky.isFavorite).toBe(true);
     expect(lucky.suggestStar).toBe(true);
@@ -1092,7 +1093,7 @@ describe('Group 26 — Nick Symbol Overhaul', () => {
 
   // 2. Hundo + Master League → Ⓜ not Ⓡ, with Ⓗ
   it('15/15/15 + Master slot → nick contains Ⓜ100Ⓗ (not Ⓡ)', () => {
-    const p = makeP({ slots: ['M'] });
+    const p = makeP({ slots: ['M'], wonMasterSlot: true });
     const nick = buildNickname(p, 'M');
     expect(nick).toContain('Ⓜ');
     expect(nick).toContain('100');
@@ -1246,41 +1247,43 @@ describe('Group 27b — Gmax Snorlax: best-IV keeps (Ⓧ in nick), dupe gets vis
     expect(p.decision).toBe('keep');
   });
 
-  it('Snorlax CP:2448 (best Gmax) → nickname contains Ⓧ and is SnorlaxⓂ98Ⓧ', () => {
-    // CP:2448 wins ML slot (best non-lucky Snorlax, ivAvg=97.8) → nick via ML handler + Ⓧ suffix
+  it('Snorlax CP:2448 (best Gmax) → nickname contains Ⓧ and is SnorlaxⓊ96Ⓧ', () => {
+    // Lucky Snorlax wins Master slot; CP:2448 (non-lucky) demoted → holds Gmax slot instead.
+    // Gmax nick picks best capped league ≥90% (Ultra 96%), so SnorlaxⓊ96Ⓧ.
     const p = g27bFind('Snorlax', 2448);
     expect(p.nickname).toContain('Ⓧ');
-    expect(p.nickname).toBe('SnorlaxⓂ98Ⓧ');
+    expect(p.nickname).toBe('SnorlaxⓊ96Ⓧ');
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
 
-  it('Snorlax CP:200 (best Gmax without league slot, 71.1%) → decision=keep', () => {
+  it('Snorlax CP:200 (no Gmax slot, Lucky winner holds Master) → decision=trade', () => {
+    // CP:2448 holds Gmax slot (no M slot after demotion); CP:200 has no slot.
     const p = g27bFind('Snorlax', 200);
     expect(p).toBeDefined();
     expect(p.isGigantamax).toBe(true);
-    expect(p.decision).toBe('keep');
+    expect(p.decision).toBe('trade');
   });
 
-  it('Snorlax CP:200 (best Gmax without league slot) → starType is green', () => {
+  it('Snorlax CP:200 (no slot) → starType is visibility', () => {
     const p = g27bFind('Snorlax', 200);
-    expect(p.starType).toBe('green');
+    expect(p.starType).toBe('visibility');
   });
 });
 
-// 27c: Raikou Legendary (no overrides) — best keeps with best_overall, dupe trades with visibility
-describe('Group 27c — Raikou Legendary: best keeps (best_overall), dupe gets visibility star', () => {
-  // Uses global result — Raikou rows auto-classified as Legendary (no Dmax/Gmax)
+// 27c: Raikou Legendary — best wins Master slot (Ⓜ93), dupe trades with visibility
+describe('Group 27c — Raikou Legendary: best wins Master slot (Ⓜ93), dupe gets visibility star', () => {
+  // Uses global result — Raikou rows auto-classified as Legendary (now enter M competition).
 
-  it('Raikou CP:2900 (best, 93.3%) → decision=keep, slots includes best_overall', () => {
+  it('Raikou CP:2900 (best, 93.3%) → decision=keep, slots includes M', () => {
     const p = find('Raikou', 2900);
     expect(p).toBeDefined();
     expect(p.decision).toBe('keep');
-    expect(p.slots).toContain('best_overall');
+    expect(p.slots).toContain('M');
   });
 
-  it('Raikou CP:2900 (best Legendary) → nickname is RaikouⓇ93', () => {
+  it('Raikou CP:2900 (best Legendary) → nickname is RaikouⓂ93', () => {
     const p = find('Raikou', 2900);
-    expect(p.nickname).toBe('RaikouⓇ93');
+    expect(p.nickname).toBe('RaikouⓂ93');
   });
 
   it('Raikou CP:2700 (dupe, 77.8%) → decision=trade', () => {
@@ -1499,7 +1502,8 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
     g27eResult = loader.createWithOverrides(overrides).analyse(csv);
   });
 
-  it('Entei CP:3200 (Dmax hundo, 15/15/15) → decision=keep, slots includes dynamax', () => {
+  it('Entei CP:3200 (Dmax hundo, 15/15/15) → decision=keep, slots includes M', () => {
+    // Legendaries now enter M competition; 15/15/15 Entei wins Master slot (not Dmax slot).
     const p = g27eFind('Entei', 3200);
     expect(p).toBeDefined();
     expect(p.isDynamax).toBe(true);
@@ -1507,7 +1511,7 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
     expect(p.defIV).toBe(15);
     expect(p.staIV).toBe(15);
     expect(p.decision).toBe('keep');
-    expect(p.slots).toContain('dynamax');
+    expect(p.slots).toContain('M');
   });
 
   it('Entei CP:3200 (Dmax hundo) → nickname is EnteiⓂ100ⒹⒽ', () => {
@@ -1517,32 +1521,33 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
   });
 });
 
-// ─── Group 29 — Skwovet UL slot held by CP:750; GL held by CP:496 (100%) ───────
-// Locks in the sameEvoConflicts fix: UL slot retained by the best UL candidate
-// (CP:750 at 98.58%) rather than being released to the runner-up (Greedent CP:1438).
-// GL is won by CP:496 (100%) which beats CP:750 (99.5%) on rank — CP:750 drops to UL only.
+// ─── Group 29 — Greedent CP:1438 wins UL (Option C affordable-first) ─────────
+// Option C two-pass: affordable candidates (dust ≤ 300k for UL) win Pass 1.
+// Greedent CP:1438 (92.09% UL, affordable as final evo) beats expensive Skwovet CP:750 (98.58% UL).
+// GL is still won by Skwovet CP:496 (100%, affordable, dustG=0).
+// Behaviour changed intentionally by Feature 2 Option C (brief 2026-05-29).
 
-describe('Group 29 — Skwovet CP:750 retains UL (98.58%); CP:496 wins GL (100%)', () => {
-  it('Skwovet CP:750 (98.58% UL) → slots contains U', () => {
-    const p = find('Skwovet', 750);
+describe('Group 29 — Greedent CP:1438 wins UL (Option C); Skwovet CP:750 loses UL to affordable candidate', () => {
+  it('Greedent CP:1438 (92.09% UL, affordable) → wins UL slot (Option C Pass 1)', () => {
+    const p = find('Greedent', 1438);
     expect(p).toBeDefined();
     expect(p.slots).toContain('U');
+    expect(p.decision).toBe('keep');
   });
 
-  it('Skwovet CP:750 does NOT hold GL — CP:496 (100%) wins it via higher rank', () => {
+  it('Skwovet CP:750 (98.58% UL, expensive dustU) → does NOT hold UL slot (Option C)', () => {
+    const p = find('Skwovet', 750);
+    expect(p.slots).not.toContain('U');
+  });
+
+  it('Skwovet CP:750 does NOT hold GL either — CP:496 (100%) wins it', () => {
     const p = find('Skwovet', 750);
     expect(p.slots).not.toContain('G');
   });
 
-  it('Skwovet CP:750 (UL slot) → decision=keep', () => {
+  it('Skwovet CP:750 (no league slot) → decision=review', () => {
     const p = find('Skwovet', 750);
-    expect(p.decision).toBe('keep');
-  });
-
-  it('Greedent CP:1438 (92.09% UL) → does NOT hold UL slot (Skwovet CP:750 wins it)', () => {
-    const p = find('Greedent', 1438);
-    expect(p).toBeDefined();
-    expect(p.slots).not.toContain('U');
+    expect(p.decision).toBe('review');
   });
 });
 
@@ -1570,23 +1575,24 @@ describe('Group 30 — Skwovet CP:496 (99.78% GL) wins and is kept — regressio
     expect(p.nickname).toContain('100');
   });
 
-  it('Skwovet CP:750 retains UL (98.58%) while CP:496 holds GL — both kept concurrently', () => {
-    const p750 = find('Skwovet', 750);
+  it('Skwovet CP:496 holds GL; Greedent CP:1438 holds UL (Option C affordable-first)', () => {
+    // Option C: affordable Greedent CP:1438 wins UL in Pass 1; Skwovet CP:750 (expensive) loses UL.
     const p496 = find('Skwovet', 496);
+    const greedent = find('Greedent', 1438);
     expect(p496.slots).toContain('G');
-    expect(p750.slots).toContain('U');
+    expect(greedent.slots).toContain('U');
   });
 });
 
-// ─── Group 31 — Mewtwo best_overall: highest-IV wins, lower-IV does NOT ─────────
-// Legendaries skip ML and are assigned best_overall by highest ivAvg per species.
-// CP:2368 (93.3% IV, fav=1) should win; CP:2352 (88.9% IV) should not.
+// ─── Group 31 — Mewtwo M slot: highest-IV wins Master, lower-IV does NOT ─────────
+// Legendaries now enter M competition; highest ivAvg wins Master slot (Ⓜ).
+// CP:2368 (93.3% IV, fav=1) wins M; CP:2352 (88.9% IV) does not.
 
 describe('Group 31 — Mewtwo best-IV wins best_overall (Legendary regression guard)', () => {
-  it('Mewtwo CP:2368 (93.3% IV, highest) → slots contains best_overall', () => {
+  it('Mewtwo CP:2368 (93.3% IV, highest) → slots contains M', () => {
     const p = find('Mewtwo', 2368);
     expect(p).toBeDefined();
-    expect(p.slots).toContain('best_overall');
+    expect(p.slots).toContain('M');
   });
 
   it('Mewtwo CP:2368 → decision=keep', () => {
@@ -1594,9 +1600,9 @@ describe('Group 31 — Mewtwo best-IV wins best_overall (Legendary regression gu
     expect(p.decision).toBe('keep');
   });
 
-  it('Mewtwo CP:2368 (best Legendary) → nickname contains Ⓡ and 93', () => {
+  it('Mewtwo CP:2368 (best Legendary) → nickname contains Ⓜ and 93', () => {
     const p = find('Mewtwo', 2368);
-    expect(p.nickname).toContain('Ⓡ');
+    expect(p.nickname).toContain('Ⓜ');
     expect(p.nickname).toContain('93');
   });
 
@@ -1817,24 +1823,24 @@ describe('Group 42 — B5: shadow purify-p suffix toggling', () => {
   });
 });
 
-// ─── Group 43 — B6: expensive GL winner + affordable backup (cyan star) ──────────
-// When the GL winner's effective dust exceeds the affordable threshold (150k for GL),
-// a cheaper backup at the same rounded rank gets G_affordable + cyan star (suggestStarCheaper).
-// Tentacruel CP:1450 (96.10% GL, dustG=200k > 150k) → expensive winner → isExpensiveWinner=true.
-// Tentacruel CP:1420 (96.00% GL, dustG=100k ≤ 150k) → affordable backup → suggestStarCheaper=true.
+// ─── Group 43 — B6: affordable candidate wins GL outright (Option C) ────────────
+// Option C: affordable CP:1430 (dustG=100k ≤ 150k, 96% GL) wins GL in Pass 1.
+// Expensive CP:1450 (dustG=200k > 150k) does not win GL — filtered out of Pass 1 and
+// no other league slot is available for it. Behaviour changed by Feature 2 Option C (brief 2026-05-29).
 
-describe('Group 43 — B6: expensive GL winner + affordable backup pair', () => {
-  it('B6: Tentacruel CP:1450 (dustG=200k, 96% GL) wins GL with isExpensiveWinner flag', () => {
-    const p = find('Tentacruel', 1450);
-    expect(p).toBeDefined();
-    expect(p.slots).toContain('G');
-    expect(p.isExpensiveWinner).toBe(true);
-  });
-  it('B6: Tentacruel CP:1430 (dustG=100k, 96% GL) is the affordable backup (isAffordableWinner=true, G_affordable slot)', () => {
+describe('Group 43 — B6: affordable GL winner wins slot outright (Option C)', () => {
+  it('B6: Tentacruel CP:1430 (dustG=100k, 96% GL) wins GL directly (isAffordableWinner=true, G slot)', () => {
     const p = find('Tentacruel', 1430);
     expect(p).toBeDefined();
     expect(p.isAffordableWinner).toBe(true);
-    expect(p.slots).toContain('G_affordable');
+    expect(p.slots).toContain('G');
+    expect(p.decision).toBe('keep');
+  });
+  it('B6: Tentacruel CP:1450 (dustG=200k, expensive) does NOT win GL (Option C Pass 1 skips it)', () => {
+    const p = find('Tentacruel', 1450);
+    expect(p).toBeDefined();
+    expect(p.slots).not.toContain('G');
+    expect(p.isExpensiveWinner).toBeFalsy();
   });
 });
 
@@ -1909,11 +1915,14 @@ describe('Group 46 — One-slot: Marowak wins GL only; Cubone CP:12 wins LL as c
     const p = find('Cubone', 12);
     expect(p.slots).not.toContain('best_overall'); // has a real LL slot
   });
-  it('non-legendary with no rank data (Magikarp CP:10) still does NOT get best_overall', () => {
+  it('non-legendary with no rank data (Magikarp CP:10) does NOT get best_overall — gets ML placeholder instead', () => {
     const p = find('Magikarp', 10);
     expect(p).toBeDefined();
     expect(p.slots).not.toContain('best_overall');
-    expect(p.decision).toBe('trade');
+    // ML placeholder fires: family has no ML keeper, Magikarp has no league slot
+    expect(p.isMlPlaceholder).toBe(true);
+    expect(p.slots).toContain('M');
+    expect(p.decision).toBe('review');
   });
 });
 
@@ -1998,5 +2007,51 @@ describe('Group 48 — One-slot motivating example: Marowak wins GL; Cubone wins
   it('Sawk CP:500 wins LL after CP:190 holds GL only (cascade)', () => {
     expect(find('Sawk', 500).slots).toContain('L');
     expect(find('Sawk', 500).decision).toBe('keep');
+  });
+});
+
+// ─── Group 49 — ML placeholder: grey star for families with no ML keeper ──────
+// Rule: if a family has no member with slots.includes('M') after all passes,
+// the highest-ivAvg member with no league slot gets isMlPlaceholder=true,
+// slots=['M'], decision='review', starType='grey', nick = Name+ivAvg+'m'.
+//
+// Test 1 — fires: Magikarp CP:10 (35.6% ivAvg, no league ranks, no ML floor)
+//   → ML placeholder assigned, starType='grey', nick 'Magikarp36m'
+// Test 2 — does not fire: Feraligatr family has confirmed ML (CP:2498 hundo → M slot)
+//   → placeholder does NOT fire; CP:2498 isMlPlaceholder must be false
+// Test 3 — does not fire: Marowak/Cubone family — Marowak has G, Cubone has L,
+//   no unslotted member remains → placeholder cannot find a candidate
+
+describe('Group 49 — ML placeholder: grey star for families with no ML keeper', () => {
+  it('49a: Magikarp CP:10 (no league ranks, ivAvg=35.6%) gets ML placeholder slot', () => {
+    const p = find('Magikarp', 10);
+    expect(p).toBeDefined();
+    expect(p.slots).toContain('M');
+    expect(p.isMlPlaceholder).toBe(true);
+  });
+
+  it('49b: Magikarp CP:10 placeholder → decision=review, starType=grey', () => {
+    const p = find('Magikarp', 10);
+    expect(p.decision).toBe('review');
+    expect(p.starType).toBe('grey');
+  });
+
+  it('49c: Magikarp CP:10 placeholder → nickname contains ivAvg rounded + m suffix (Magikarp36m)', () => {
+    const p = find('Magikarp', 10);
+    expect(p.nickname).toMatch(/36m/);
+  });
+
+  it('49d: Feraligatr family already has confirmed ML (CP:2498 hundo) → placeholder does NOT fire', () => {
+    const p = find('Feraligatr', 2498);
+    expect(p.slots).toContain('M');
+    expect(p.isMlPlaceholder).toBeFalsy(); // confirmed ML, not a placeholder
+  });
+
+  it('49e: Marowak/Cubone family — all members have slots → no ML placeholder assigned', () => {
+    // Marowak CP:494 wins G; Cubone CP:12 wins L — no unslotted member remains
+    const marowak = find('Marowak', 494);
+    const cubone = find('Cubone', 12);
+    expect(marowak.isMlPlaceholder).toBeFalsy();
+    expect(cubone.isMlPlaceholder).toBeFalsy();
   });
 });

@@ -41,6 +41,7 @@ const DUST_THRESHOLDS = {
 // ── Analysis thresholds ───────────────────────────────────
 const RULES = {
   keepThreshold:        90,     // min rank% to qualify for a confirmed keep slot
+  luckyMasterMargin:     5,     // Lucky Pokémon get +5pp bonus in Master non-shadow winner comparison
   dustTier1:           100000,  // $ — flag dust over this
   dustTier2:           150000,  // $$ — flag dust over this; also triggers affordable backup
   dustTier3:           200000,  // $$$ — flag dust over this
@@ -65,6 +66,11 @@ const GENDER_DIMORPHIC = new Set([
   'Combee',               // only female can evolve to Vespiquen
   'Wooper',               // Paldean Wooper male/female differ
 ]);
+
+// ── Gender-locked evolution species ──────────────────────────────
+// Species where gender is required to determine evolution eligibility.
+// When gender is missing/unknown, evo targets are cleared to prevent incorrect slot assignment.
+const GENDER_LOCKED_EVO = new Set(['Combee', 'Kirlia', 'Snorunt', 'Burmy']);
 
 // ── Special family overrides ──────────────────────────────
 // Pokémon that need custom family grouping behaviour
@@ -104,10 +110,6 @@ const FORM_NICK_PREFIXES = {
   'Alola':'Alol', 'Galar':'Galr', 'Hisui':'Hisu', 'Paldea':'Pald',
   // Deoxys
   'Attack':'Atk', 'Defense':'Def', 'Speed':'Spd',
-  // Giratina / Dialga
-  'Origin':'Orig',
-  // Forces of Nature (Tornadus/Thundurus/Landorus/Enamorus)
-  'Therian':'Ther',
   // Groudon / Kyogre
   'Primal':'Prml',
   // Wormadam

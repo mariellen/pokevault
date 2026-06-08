@@ -7,10 +7,7 @@
 
 // Assign to window so supabase.js can reach it across script boundaries.
 // (const at the top level of a classic script is NOT a window property.)
-// TEMP DEBUG — remove after auth confirmed
-console.log('[auth] init url:', SUPABASE_URL, '| key prefix:', SUPABASE_KEY?.substring(0, 30));
 window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-window.sc = window.supabaseClient; // TEMP: expose for console inspection
 
 // Cached session JWT — updated on every auth state change so supabaseFetch
 // can read it synchronously without a second async getSession() call.
@@ -80,6 +77,15 @@ function setLoggedIn(user) {
 }
 
 function setLoggedOut() {
+  // Clear any loaded collection so a subsequent sign-in doesn't briefly show the previous user's data
+  if (typeof overridesCache !== 'undefined') overridesCache = {};
+  if (typeof allPokemon !== 'undefined' && allPokemon.length > 0) {
+    allPokemon = []; filteredFamilies = []; families = [];
+    const mc = document.getElementById('main-content');
+    if (mc) mc.innerHTML = '';
+    if (typeof renderSummary === 'function') renderSummary([]);
+  }
+
   const emailEl    = document.getElementById('userEmail');
   const loginBtn   = document.getElementById('loginBtn');
   const logoutBtn  = document.getElementById('logoutBtn');
