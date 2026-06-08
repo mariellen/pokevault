@@ -9,6 +9,7 @@ node_modules/
 
 # Legacy notes
 *.txt
+!pokevault-refactor/robots.txt
 RULES_original.md
 
 # OS / editor
