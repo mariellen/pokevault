@@ -27,6 +27,7 @@ jobs:
           fail_action: false
           issue_title: 'DO_NOT_CREATE'
           token: ${{ secrets.GITHUB_TOKEN }}
+          artifact_name: zap-report
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
         if: always()
