@@ -9,24 +9,29 @@
 // Install with: https://nodejs.org — then `npm install` in the pokevault-refactor folder.
 
 const path = require('path');
+const fs = require('fs');
 const { analyse, findMergeCandidates } = require('./loader');
 const { loadCSV } = require('./csvParser');
 
+// Personal export — not committed to the repo. Tests skip gracefully on CI.
 const CSV_PATH = path.join(
   'C:', 'ClaudeCode', 'from Claude', '20260427-1030', 'poke_genie_export 132.csv'
 );
+const CSV_EXISTS = fs.existsSync(CSV_PATH);
+const describeIfCSV = CSV_EXISTS ? describe : describe.skip;
 
 let result;
 let csv;
 
 beforeAll(() => {
+  if (!CSV_EXISTS) return;
   csv = loadCSV(CSV_PATH);
   result = analyse(csv);
 });
 
 // ─── 1a. Keep count smoke test ───────────────────────────────────────────────
 
-describe('Keep count smoke test', () => {
+describeIfCSV('Keep count smoke test', () => {
   it('keep count is in a reasonable range', () => {
     // Exact count depends on which CSV export is used.
     // TESTING_STRATEGY.md targets 2,393 ±10 for poke_genie_export_76.csv.
@@ -45,7 +50,7 @@ describe('Keep count smoke test', () => {
 
 // ─── 1b. Slot assignment correctness ─────────────────────────────────────────
 
-describe('Slot assignment — Glaceon CP:1500', () => {
+describeIfCSV('Slot assignment — Glaceon CP:1500', () => {
   let glaceon1500;
 
   beforeAll(() => {
@@ -73,7 +78,7 @@ describe('Slot assignment — Glaceon CP:1500', () => {
   });
 });
 
-describe('Slot assignment — Eevee family', () => {
+describeIfCSV('Slot assignment — Eevee family', () => {
   it('At most one Eevee-family pokemon wins each evo stage per league', () => {
     const eeveeFamily = result.families.find(f =>
       f.members.some(p => p.name === 'Eevee')
@@ -118,7 +123,7 @@ describe('Slot assignment — Eevee family', () => {
 
 // ─── 1c. Cyan cross-league check ─────────────────────────────────────────────
 
-describe('Cyan star — does not bleed across leagues', () => {
+describeIfCSV('Cyan star — does not bleed across leagues', () => {
   it('cheaperAlternativeLeagues only contains leagues where the pokemon holds a slot', () => {
     // cheaperAlternativeLeagues is pruned after conflict resolution, so every
     // remaining entry must correspond to an actual slot the pokemon currently holds.
@@ -143,7 +148,7 @@ describe('Cyan star — does not bleed across leagues', () => {
 
 // ─── 1d. Nick generation ─────────────────────────────────────────────────────
 
-describe('Nick generation', () => {
+describeIfCSV('Nick generation', () => {
   it('All nicks are at most 12 characters', () => {
     result.pokemon.forEach(p => {
       if (!p.nickname) return;
@@ -196,7 +201,7 @@ describe('Nick generation', () => {
 
 // ─── 1e. Family grouping ─────────────────────────────────────────────────────
 
-describe('Family grouping — GENDER_SPLIT_SPECIES', () => {
+describeIfCSV('Family grouping — GENDER_SPLIT_SPECIES', () => {
   it('Frillish male and female are in separate families', () => {
     const frillishFams = result.families.filter(f =>
       f.members.some(p => p.name === 'Frillish')
@@ -229,7 +234,7 @@ describe('Family grouping — GENDER_SPLIT_SPECIES', () => {
   });
 });
 
-describe('Family grouping — Normal form normalisation', () => {
+describeIfCSV('Family grouping — Normal form normalisation', () => {
   it('Growlithe (form=Normal) and Arcanine are in the same family', () => {
     // Before fix: 'Normal' was in FORM_SPLIT_FORMS → separate family per form
     // After fix: 'Normal' normalised to '' → groups with base form
@@ -258,7 +263,7 @@ describe('Family grouping — Normal form normalisation', () => {
 
 // ─── 1f. Purify logic ────────────────────────────────────────────────────────
 
-describe('Purify logic', () => {
+describeIfCSV('Purify logic', () => {
   it('No purify candidate has a purified CP that busts the league cap', () => {
     // The 92% threshold matches the purify modal filter in app.js
     const LEAGUE_CAPS = { L: 500, G: 1500, U: 2500 };
@@ -285,7 +290,7 @@ describe('Purify logic', () => {
 
 // ─── 1g. STANDALONE_SPECIES evo vote filtering ───────────────────────────────
 
-describe('Family grouping — STANDALONE_SPECIES evo vote filtering', () => {
+describeIfCSV('Family grouping — STANDALONE_SPECIES evo vote filtering', () => {
   it('Scyther and Scizor are in the same family (Kleavor votes ignored)', () => {
     const scytherFam = result.families.find(f =>
       f.members.some(p => p.name === 'Scyther')
@@ -312,11 +317,14 @@ describe('Family grouping — STANDALONE_SPECIES evo vote filtering', () => {
 
 // ─── 1h. Cyan star — Slowpoke regression (_136 CSV) ─────────────────────────
 
+// Personal export — not committed to the repo. Tests skip gracefully on CI.
 const CSV_PATH_136 = path.join(
   'C:', 'ClaudeCode', 'from Claude', '20260428-0754', 'poke_genie_export 136.csv'
 );
+const CSV_136_EXISTS = fs.existsSync(CSV_PATH_136);
+const describeIfCSV136 = CSV_136_EXISTS ? describe : describe.skip;
 
-describe('Cyan star regression — _136 CSV', () => {
+describeIfCSV136('Cyan star regression — _136 CSV', () => {
   // The PENDING_CHANGES description of Slowpoke CP:215 vs CP:207 had incorrect fav values
   // and the two pokemon turned out to be in different families (Galarian vs regular Slowpoke).
   // The actual verified cyan case in Little league is CP:441 (winner) vs CP:211 (starred, same rank).

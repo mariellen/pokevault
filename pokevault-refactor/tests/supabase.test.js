@@ -53,6 +53,8 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
 
   it('marks session failed and records saved_records if a batch upsert errors', async () => {
     // Fix 2a adds 3 retries per batch — mock must fail ALL attempts for the second batch
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const patches = [];
     const mockFetch = async (method, path, body) => {
       if (method === 'POST' && path === 'sync_sessions') return [{ id: 'sess-1' }];
@@ -68,6 +70,8 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
 
     const { saveCollectionToCloud } = supabaseLoader.createEnv({ supabaseFetch: mockFetch });
     await saveCollectionToCloud(makePokemon(250));
+    errSpy.mockRestore();
+    warnSpy.mockRestore();
 
     const failPatch = patches.find(p => p.body.status === 'failed');
     expect(failPatch).toBeDefined();
@@ -76,6 +80,7 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
   });
 
   it('continues syncing if sync_sessions insert fails (degrade gracefully)', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const upsertBatches = [];
     const mockFetch = async (method, path, body) => {
       if (method === 'POST' && path === 'sync_sessions') return null; // session insert fails
@@ -86,6 +91,7 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
 
     const { saveCollectionToCloud } = supabaseLoader.createEnv({ supabaseFetch: mockFetch });
     await saveCollectionToCloud(makePokemon(250));
+    warnSpy.mockRestore();
 
     expect(upsertBatches).toEqual([200, 50]);
   });
@@ -111,6 +117,7 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
 
   it('phase-2 stale-row DELETE failure is non-fatal — upserts still complete and session marked complete', async () => {
     // Fix 2a: the cleanup DELETE (after all upserts) is non-fatal. Upserts must still happen.
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const upsertBatches = [];
     const patches = [];
     const mockFetch = async (method, path, body) => {
@@ -123,6 +130,7 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
 
     const { saveCollectionToCloud } = supabaseLoader.createEnv({ supabaseFetch: mockFetch });
     await saveCollectionToCloud(makePokemon(100));
+    warnSpy.mockRestore();
 
     expect(upsertBatches.length).toBe(1); // upserts still happened
     const completePatch = patches.find(p => p.body.status === 'complete');
