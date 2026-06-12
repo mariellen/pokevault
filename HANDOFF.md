@@ -19,7 +19,7 @@ _Nothing waiting for you right now._
 ### Nick Override
 **Status:** Implementation complete — awaiting Opus post-check
 **Owner:** PIPELINE
-**Next action:** Run Opus post-review against `reviews/nick-override-impl-summary.md`; feature branch `feature/nick-override` ready for PR (28 new tests green; 4 pre-existing csp.test.js failures are unrelated). PR URL: _pending — `gh` CLI unavailable in this environment; see impl-summary §6._
+**Next action:** Run Opus post-review against `reviews/nick-override-impl-summary.md`. PR: https://github.com/mariellen/pokevault/pull/11 (28 new tests green; 4 pre-existing csp.test.js failures are unrelated). Then approve/merge.
 _Updated: 13 Jun 2026_
 
 ### Playwright Expansion

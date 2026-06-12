@@ -118,4 +118,6 @@ Required-test coverage (Opus list → test):
 
 ## 6. PR URL
 
-_To be filled in once the PR is opened (see HANDOFF.md next-action)._
+https://github.com/mariellen/pokevault/pull/11
+
+_(Opened via the GitHub REST API — `gh` CLI is not installed in this environment.)_
