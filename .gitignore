@@ -1,5 +1,7 @@
 # Personal collection data — never commit
 *.csv
+# Exception: synthetic E2E fixture (no personal data — required by Playwright CI)
+!pokevault-refactor/tests/e2e/fixtures/synthetic-collection.csv
 
 # Node.js dependencies
 node_modules/
