@@ -10,13 +10,7 @@ PokéVault is a Pokémon GO collection manager. It parses a Pokégenie CSV expor
 
 `pokevault-refactor/` is the canonical source of truth. All changes are made directly here.
 
-The single-file HTML files (`pokevault_v3_NNN.html`) are retired — the last committed one is stale. Ignore them.
-
-**Workflow between Claude Code and claude.ai sessions:**
-- Claude Code works directly in `pokevault-refactor/` and commits after each session
-- When starting a claude.ai session, Mariellen uploads the individual JS files that changed (analyse.js, app.js, etc.)
-- claude.ai ports those files into a working HTML for UI testing, then provides the modified JS back as download
-- Claude Code ports the claude.ai JS changes back into the refactor files and commits
+The single-file HTML files (`pokevault_v3_NNN.html`) are retired — ignore them.
 
 ---
 
@@ -33,64 +27,142 @@ pokevault-refactor/
 │   ├── supabase.js   — cloud sync (overrides + collection)
 │   ├── data.js       — BEST_MOVES, SHADOW_MOVES, LEGENDARY/MYTHICAL/ULTRA_BEAST sets
 │   └── app.js        — entry point, filters, family rendering, event handlers
+├── tests/            — Jest test suite (572+ passing)
+│   ├── analyse.test.js
+│   ├── analyse.fixture.test.js
+│   ├── analyse.expensive_winner.test.js
+│   ├── analyse.master_league.test.js
+│   ├── analyse.branching_evo.test.js
+│   ├── analyse.dust_tiebreak.test.js
+│   ├── supabase.test.js
+│   └── moves.test.js
+├── .github/
+│   └── workflows/
+│       ├── test.yml      — Jest on every push
+│       ├── e2e.yml       — Playwright on PR to main
+│       ├── security.yml  — OWASP ZAP on PR to main
+│       └── deploy.yml    — auto S3 sync + CloudFront on merge to main
+├── briefs/           — coordinator-written implementation briefs
+├── reviews/          — Opus pre/post review outputs + impl summaries
+├── pipeline.py       — orchestration script
+├── HANDOFF.md        — current state of all in-flight threads
+└── RULES.md          — business logic reference (keep in sync with changes)
 ```
 
 ---
 
 ## Rules & documentation
 
-- **`/RULES.md`** (repo root) — single source of truth for all business logic and pending changes
-- `pokevault-refactor/RULES.md` has been removed — do not recreate it
-- When logic changes are made in the HTML, RULES.md at the root is updated to match
-- When porting to the refactor, read `/RULES.md` first, then read the HTML for exact implementation
+- **`/RULES.md`** (repo root) — single source of truth for all business logic
+- Update `RULES.md` as part of every relevant fix or feature
+- The coordinator also maintains `PokéVault_Business_Rules.md` externally —
+  keep `/RULES.md` in sync with any rule changes
+
+---
+
+## ⚠️ WORKFLOW — branch + PR (no manual deploys)
+
+**All work goes through GitHub Actions. Never run `aws s3 sync` manually.**
+
+1. Create a feature branch: `git checkout -b feature/description`
+2. Implement on the feature branch
+3. Commit and push
+4. Open a PR to `main`
+5. GitHub Actions runs automatically:
+   - Jest unit tests (every push)
+   - Playwright E2E tests (PRs to main)
+   - OWASP ZAP security scan (PRs to main)
+6. Tests must be green before merge
+7. Coordinator reviews and approves the PR
+8. Merge → auto-deploys to S3 + CloudFront invalidation
+
+**Branch protection is enforced** — direct pushes to `main` are blocked.
+
+### Version bumps
+Bump the version number in `index.html` as part of every PR before merge.
+Current version: check `index.html` for the latest.
+
+### After implementing — HANDOFF.md
+Update `HANDOFF.md` and write `reviews/[brief-name]-impl-summary.md`.
+Include the PR URL in the HANDOFF.md next action block.
 
 ---
 
 ## Infrastructure
 
 - **Hosted:** AWS S3 + CloudFront → `pokevault.mariellen.com.au`
+- **S3 bucket:** `pokevault.mariellen.com.au` (ROOT — not `/pokevault-refactor/`)
+- **CloudFront:** `E2IMCPUABUXY1Y`
+- **Deploy:** automatic via `.github/workflows/deploy.yml` on merge to main
 - **Supabase:** `jsozfpsfvvnnmipsksoh.supabase.co` (overrides + collection sync)
-- **Deploy:** `aws s3 sync pokevault-refactor/ s3://pokevault.mariellen.com.au/ --exclude "*.md"` — **ROOT, not /pokevault-refactor/**
-- **Cache bust:** `aws cloudfront create-invalidation --distribution-id E2IMCPUABUXY1Y --paths "/*"`
+- **GA4:** `G-8TPX6P50XM`
 
 ---
 
 ## Key conventions
 
-- **Star colours:** Gold=already starred ✓, Green=should star, Cyan=cheaper alt at same rank (check before acting), Blue=best but expensive dust, Red=starred but shouldn't be
-- **Star sort order:** Gold(0) → Green(1) → Cyan(2) → Blue(3) → Red(4) → None(5)
+- **Star colours:** Gold=already starred ✓, Green=should star, Cyan=cheaper alt
+  at same rank (check before acting), Blue=best but expensive dust,
+  Red=starred but shouldn't be, Grey=ML placeholder
+- **Star sort order:** Gold(0) → Green(1) → Cyan(2) → Blue(3) → Grey(3.5) →
+  Red(4) → Purple(5) → None(6)
 - **Slot suffixes:** `_affordable` = within dust budget. Never use `_backup`.
-- **Nickname format:** circled letters (Ⓖ Ⓤ Ⓛ) for ≥90% rank; plain letters below. Lucky/Shadow/Master = Ⓡ prefix (intentionally shared — all mean "Raid/Master candidate").
-- **evolvedNameG/U/L** — from Pokégenie CSV columns `Name (G)`, `Name (U)`, `Name (L)`. Per-Pokémon recommended evolutions for each league based on IVs.
-- **primaryName** — family display name; computed from member counts, preferring non-evo-target species.
-- **termMatchesViaEvo** — true when search matches via evolvedNameG/U/L (e.g. "Umbreon" finds Eevee family).
+- **Nickname format:** circled letters (Ⓖ Ⓤ Ⓛ Ⓜ) for league slots.
+  Suffix order: `[name][slot][IV%][Ⓓ/Ⓧ][Ⓗ][※][*]`
+- **evolvedNameG/U/L** — from Pokégenie CSV `Name (G/U/L)` columns.
+  Per-Pokémon recommended evolutions for each league based on IVs.
+- **primaryName** — family display name; computed from member counts.
+- **termMatchesViaEvo** — true when search matches via evolvedNameG/U/L.
 - **🔍 Me** — copies filtered GO search string for this form only
-- **🔍 + Fam** — copies all family species names comma-joined (e.g. `Geodude,Graveler,Golem`)
+- **🔍 + Fam** — copies all family species names comma-joined
 
 ---
 
 ## Test suite
 
-- `pokevault-refactor/tests/analyse.test.js` — Phase 1 unit tests (keep count, slots, nicks, family grouping, purify)
-- `pokevault-refactor/tests/moves.test.js` — deterministic move data tests (5 species)
-- Fixture: `poke_genie_export 132.csv` (Mariellen's collection, April 2026)
-- Run: `cd pokevault-refactor && npm install && npx jest`
+Run: `cd pokevault-refactor && npm test`
+
+- Tests use `testEnvironment: 'node'` (loader uses `new Function`)
+- Fixture CSVs in `tests/` — personal exports are gitignored, use `it.skip`
+  pattern when file not present (same as `export187.csv` smoke tests)
+- Never hardcode absolute paths — use `path.join(__dirname, 'filename.csv')`
+- 572+ tests passing — suite must stay green on every PR
 
 ---
 
-## Known pending work
+## Handoff protocol
 
-See `PENDING_CHANGES (2).md` (in handoff folder) for full list. Key items:
+### Updating HANDOFF.md
+When you complete any task, update `HANDOFF.md` before finishing:
 
-- **Nuzleaf cyan bug** — CP:498 (100% Little) showing green instead of cyan when CP:499 (99.8% Little) is already starred
-- **Shadow slot displacement** — shadows competing for same slot as regular winner; should coexist
-- **Pikachu +Fam button** — Pichu/Raichu ending up in separate families; likely costume variant grouping issue
-- **Shiny nick** — should use league nick + ※ suffix; nick not regenerating when shiny override is ticked
-- **Cloud save resilience** — draft status on save, prompt to complete/discard on partial saves
+```
+### [Thread name]
+**Status:** [What you did / what state it's in now]
+**Owner:** YOU
+**Next action:** [One specific sentence — include PR URL if applicable]
+_Updated: [date]_
+```
+
+Move to correct section:
+- `## 🔴 NEEDS YOU NOW` — Mariellen needs to decide or approve the PR
+- `## ✅ RECENTLY COMPLETED` — fully done and merged
+
+### Writing impl-summary
+After implementing, write `reviews/[brief-name]-impl-summary.md`:
+
+1. **What changed** — file names and what you did
+2. **Why** — how this addresses the brief
+3. **Test results** — final test count, any skips
+4. **PR URL** — link to the open PR
+5. **Deviations** — if you couldn't follow Opus guidance exactly, explain why
+6. **Open questions** — list rather than guess
 
 ---
 
-## Rules for this project
+## Pipeline routing (pipeline.py)
 
-- Always test against the user's real Pokégenie CSV — many edge cases only surface with real data
-- Auth/RLS work tracked in SUPABASE_AUTH_PLAN.md
+Briefs in `briefs/` have a `ROUTE:` header:
+- `ROUTE: DIRECT` — goes straight to Claude Code
+- `ROUTE: OPUS-FIRST` — Opus pre-reviews, Mariellen approves, then Claude Code implements, Opus post-reviews
+
+Check `python pipeline.py --status` to see current state of all threads.
