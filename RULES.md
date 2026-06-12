@@ -59,8 +59,12 @@ Master league groups by `evolvedNameU || evolvedNameG || name` (final evo only).
 Only final evolution stage competes. A Pokémon is excluded if any family member shares its `stageName` but has a higher evo available.
 
 ### Sort within each group
-1. `Math.round(rankPct)` descending — 99.8% rounds to 100, beats 99.3%
-2. Cheapest effective dust as tiebreaker (Lucky: dust/2)
+1. `Math.round(rankPct)` descending — 99.6% and 99.9% both round to 100 and are **tied**
+2. Already-evolved wins the tie (evolution cost is implicit)
+3. Cheapest effective dust wins the tie (Lucky: dust/2; null/missing dust = 0 for capped leagues — already at cap)
+4. Higher raw rank as a final deterministic tiebreak only (never overrides dust)
+
+See `tests/analyse.dust_tiebreak.test.js` for regression coverage.
 
 ### Protection rule
 If best candidate rounds to 100% in a lower league with a different evo target → skip it for this league, try next candidate. Only fires when lower rounds to 100 AND current rounds to < 100.
