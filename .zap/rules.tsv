@@ -1,2 +1,7 @@
 # ZAP rule suppressions
 # Format: RULE_ID	IGNORE	Reason
+10017	IGNORE	Cross-domain JS from Google Analytics and Supabase — expected third party scripts
+90005	IGNORE	Sec-Fetch-Dest is browser-controlled, not server-configurable
+90004	IGNORE	COEP not required for this app type
+10049	IGNORE	Static site caching is intentional
+10027	IGNORE	Code comments in JS files — not sensitive information disclosure
