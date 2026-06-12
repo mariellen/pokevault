@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PokéVault v3.5.45</title>
+  <title>PokÃ©Vault v3.5.45</title>
   <!-- Security headers -->
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="X-Frame-Options" content="DENY">
@@ -24,10 +24,10 @@
 </head>
 <body>
 <header>
-  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.44</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">📂</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
-  <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
+  <div class="logo">PokÃ©<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.46</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">ðŸ“‚</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
+  <div id="hdr-stats"><span>Import your PokÃ©genie CSV to begin</span></div>
   <div style="display:flex;align-items:center;gap:12px">
-    <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" class="btn-donation" title="Support PokéVault">☕ Support</a>
+    <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" class="btn-donation" title="Support PokÃ©Vault">â˜• Support</a>
     <div id="sync-status" style="font-size:11px;color:var(--muted)">Connecting...</div>
     <div id="authSection" class="auth-section">
       <span id="userEmail" class="user-email"></span>
@@ -40,8 +40,8 @@
 <!-- Login modal -->
 <div id="loginModal" class="login-modal-overlay" onclick="if(event.target===this)closeLoginModal()">
   <div class="login-box">
-    <button class="login-close" onclick="closeLoginModal()">✕</button>
-    <h2>Sign in to PokéVault</h2>
+    <button class="login-close" onclick="closeLoginModal()">âœ•</button>
+    <h2>Sign in to PokÃ©Vault</h2>
     <p>Save your collection and access it from any device.</p>
     <button class="btn btn-google" onclick="signInWithGoogle()">
       <img src="https://www.google.com/favicon.ico" width="14" height="14" style="vertical-align:middle"> Sign in with Google
@@ -50,22 +50,22 @@
     <div class="magic-link-section">
       <input type="email" id="magicLinkEmail" placeholder="your@email.com" onkeydown="if(event.key==='Enter')sendMagicLink()">
       <button class="btn" id="magicLinkBtn" onclick="sendMagicLink()">Send magic link</button>
-      <p class="auth-note" id="magicLinkSent" style="display:none;color:var(--green)">✓ Check your email for a login link</p>
+      <p class="auth-note" id="magicLinkSent" style="display:none;color:var(--green)">âœ“ Check your email for a login link</p>
     </div>
-    <p class="auth-note">PokéVault works without signing in — your analysis runs locally and stays on this device.</p>
+    <p class="auth-note">PokÃ©Vault works without signing in â€” your analysis runs locally and stays on this device.</p>
   </div>
 </div>
 
 <div id="upload-section">
   <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-    <div style="font-size:36px;margin-bottom:10px">📦</div>
-    <h2>Import Pokégenie Export</h2>
+    <div style="font-size:36px;margin-bottom:10px">ðŸ“¦</div>
+    <h2>Import PokÃ©genie Export</h2>
     <p>Drop your CSV here or click to browse</p>
-    <p style="margin-top:6px;font-size:11px;color:var(--great)">Supports full Pokégenie CSV export format</p>
+    <p style="margin-top:6px;font-size:11px;color:var(--great)">Supports full PokÃ©genie CSV export format</p>
   </div>
   <div style="text-align:center;margin-top:16px">
     <button class="btn cloud-btn" id="cloudLoadBtn" onclick="handleCloudLoad()" style="padding:10px 24px;font-size:13px;display:none">
-      ☁ Load last collection from cloud
+      â˜ Load last collection from cloud
     </button>
     <div id="cloud-load-status" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
   </div>
@@ -75,15 +75,15 @@
 <div id="loading-section">
   <div id="loading-msg">READING FILE...</div>
   <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-  <div id="loading-sub">Large collections (40,000+) may take 5–15 seconds</div>
+  <div id="loading-sub">Large collections (40,000+) may take 5â€“15 seconds</div>
 </div>
 
 <div id="error-section">
   <div class="error-box">
-    <h3>⚠ Import Failed</h3>
+    <h3>âš  Import Failed</h3>
     <div id="error-msg"></div>
     <div class="error-detail" id="error-detail"></div>
-    <button class="btn" onclick="location.reload()">↺ Try Again</button>
+    <button class="btn" onclick="location.reload()">â†º Try Again</button>
   </div>
 </div>
 
@@ -93,8 +93,8 @@
     <div class="save-overlay-title">Saving to cloud...</div>
     <div class="save-overlay-count" id="saveOverlayCount">0</div>
     <div class="save-progress-bar"><div class="save-progress-fill" id="saveProgressFill"></div></div>
-    <div class="save-progress-text" id="saveProgressText">of 0 Pokémon</div>
-    <div class="save-overlay-note">Please wait — do not close this tab</div>
+    <div class="save-progress-text" id="saveProgressText">of 0 PokÃ©mon</div>
+    <div class="save-overlay-note">Please wait â€” do not close this tab</div>
   </div>
 </div>
 
@@ -103,10 +103,10 @@
   <div class="pv-modal">
     <div class="pv-modal-header">
       <div>
-        <div class="pv-modal-title">🎨 Set Forms &amp; Patterns</div>
+        <div class="pv-modal-title">ðŸŽ¨ Set Forms &amp; Patterns</div>
         <div class="pv-modal-sub" id="cleanup-modal-sub">Loading...</div>
       </div>
-      <button class="pv-modal-close" onclick="closeCleanupModal()">✕</button>
+      <button class="pv-modal-close" onclick="closeCleanupModal()">âœ•</button>
     </div>
     <div id="cleanup-search-row" style="display:none;padding:6px 16px;border-bottom:1px solid var(--border)">
       <input type="text" id="cleanupSearch" placeholder="Search species (e.g. Furfrou)..." autocomplete="off"
@@ -124,15 +124,15 @@
   <div class="pv-modal" style="max-width:780px">
     <div class="pv-modal-header">
       <div>
-        <div class="pv-modal-title">🌟 Shadow Purify Candidates</div>
+        <div class="pv-modal-title">ðŸŒŸ Shadow Purify Candidates</div>
         <div class="pv-modal-sub" id="purify-modal-sub">Loading...</div>
       </div>
-      <button class="pv-modal-close" onclick="closePurifyModal()">✕</button>
+      <button class="pv-modal-close" onclick="closePurifyModal()">âœ•</button>
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
       <span style="color:var(--muted);font-size:11px">Sort:</span>
-      <button id="purify-sort-rank" onclick="purifySort='rank';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Rank ↓</button>
-      <button id="purify-sort-dust" onclick="purifySort='dust';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Dust ↑</button>
+      <button id="purify-sort-rank" onclick="purifySort='rank';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Rank â†“</button>
+      <button id="purify-sort-dust" onclick="purifySort='dust';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Dust â†‘</button>
       <button id="purify-sort-league" onclick="purifySort='league';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">League</button>
       <span style="color:var(--muted);font-size:11px;margin-left:8px">Filter:</span>
       <button id="purify-filter-all" onclick="purifyLeagueFilter='';openPurifyModal()" style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">All</button>
@@ -152,10 +152,10 @@
   <div class="pv-modal" style="max-width:700px">
     <div class="pv-modal-header">
       <div>
-        <div class="pv-modal-title">✨ Shiny Collection</div>
+        <div class="pv-modal-title">âœ¨ Shiny Collection</div>
         <div class="pv-modal-sub" id="shiny-modal-sub">Loading...</div>
       </div>
-      <button class="pv-modal-close" onclick="closeShinyModal()">✕</button>
+      <button class="pv-modal-close" onclick="closeShinyModal()">âœ•</button>
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
       <span style="color:var(--muted);font-size:11px">Filter:</span>
@@ -169,17 +169,17 @@
   </div>
 </div>
 
-<!-- Collection Completion / Pokédex modal -->
+<!-- Collection Completion / PokÃ©dex modal -->
 <div class="pv-modal-overlay" id="dex-modal" onclick="if(event.target===this)closeDexModal()">
   <div class="pv-modal" style="max-width:760px">
     <div class="pv-modal-header">
       <div>
-        <div class="pv-modal-title">📖 Collection Tracker</div>
+        <div class="pv-modal-title">ðŸ“– Collection Tracker</div>
         <div class="pv-modal-sub" id="dex-modal-sub">Loading...</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="copyCurrentLink()" title="Copy link to this view" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:2px 4px">🔗</button>
-        <button class="pv-modal-close" onclick="closeDexModal()">✕</button>
+        <button onclick="copyCurrentLink()" title="Copy link to this view" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:2px 4px">ðŸ”—</button>
+        <button class="pv-modal-close" onclick="closeDexModal()">âœ•</button>
       </div>
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -191,20 +191,20 @@
       <button id="dex-cat-myth"   class="dex-filter-btn" onclick="dexCat='Mythical';renderDexModal()">Mythical</button>
       <button id="dex-cat-ub"     class="dex-filter-btn" onclick="dexCat='Ultra Beast';renderDexModal()">Ultra Beast</button>
       <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
-      <button id="dex-qual-shiny" class="dex-filter-btn" onclick="dexQualShiny=!dexQualShiny;renderDexModal()">✨ Shiny</button>
-      <button id="dex-qual-lucky" class="dex-filter-btn" onclick="dexQualLucky=!dexQualLucky;renderDexModal()">🍀 Lucky</button>
-      <button id="dex-qual-dmax"  class="dex-filter-btn" onclick="dexQualDmax=!dexQualDmax;if(dexQualDmax){dexQualGmax=false;}renderDexModal()">Ⓓ Dynamax</button>
-      <button id="dex-qual-gmax"  class="dex-filter-btn" onclick="dexQualGmax=!dexQualGmax;if(dexQualGmax){dexQualDmax=false;}renderDexModal()">Ⓧ Gigantamax</button>
-      <button id="dex-qual-hundo" class="dex-filter-btn" onclick="dexQualHundo=!dexQualHundo;renderDexModal()">Ⓗ Hundos</button>
-      <button id="dex-types-btn"  class="dex-filter-btn" onclick="toggleDexTypes()">🔥 Types ▾</button>
+      <button id="dex-qual-shiny" class="dex-filter-btn" onclick="dexQualShiny=!dexQualShiny;renderDexModal()">âœ¨ Shiny</button>
+      <button id="dex-qual-lucky" class="dex-filter-btn" onclick="dexQualLucky=!dexQualLucky;renderDexModal()">ðŸ€ Lucky</button>
+      <button id="dex-qual-dmax"  class="dex-filter-btn" onclick="dexQualDmax=!dexQualDmax;if(dexQualDmax){dexQualGmax=false;}renderDexModal()">â’¹ Dynamax</button>
+      <button id="dex-qual-gmax"  class="dex-filter-btn" onclick="dexQualGmax=!dexQualGmax;if(dexQualGmax){dexQualDmax=false;}renderDexModal()">â“ Gigantamax</button>
+      <button id="dex-qual-hundo" class="dex-filter-btn" onclick="dexQualHundo=!dexQualHundo;renderDexModal()">â’½ Hundos</button>
+      <button id="dex-types-btn"  class="dex-filter-btn" onclick="toggleDexTypes()">ðŸ”¥ Types â–¾</button>
       <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
-      <button id="dex-solo"        class="dex-filter-btn" onclick="dexSolo=!dexSolo;if(dexSolo)dexSpare=false;renderDexModal()" title="Have view: species you own only one of">👤 Solo</button>
-      <button id="dex-spare"       class="dex-filter-btn" onclick="dexSpare=!dexSpare;if(dexSpare)dexSolo=false;renderDexModal()" title="Have view: species you own 2 or more of">📦 Spares</button>
-      <button id="dex-excl-evolve"  class="dex-filter-btn" onclick="dexExcludeEvolvable=!dexExcludeEvolvable;renderDexModal()" title="Missing view: hide species you can get by evolving">✗ Evolvable</button>
+      <button id="dex-solo"        class="dex-filter-btn" onclick="dexSolo=!dexSolo;if(dexSolo)dexSpare=false;renderDexModal()" title="Have view: species you own only one of">ðŸ‘¤ Solo</button>
+      <button id="dex-spare"       class="dex-filter-btn" onclick="dexSpare=!dexSpare;if(dexSpare)dexSolo=false;renderDexModal()" title="Have view: species you own 2 or more of">ðŸ“¦ Spares</button>
+      <button id="dex-excl-evolve"  class="dex-filter-btn" onclick="dexExcludeEvolvable=!dexExcludeEvolvable;renderDexModal()" title="Missing view: hide species you can get by evolving">âœ— Evolvable</button>
       <button id="dex-excl-family" class="dex-filter-btn" onclick="dexExcludeFamily=!dexExcludeFamily;renderDexModal()" title="Missing view: hide species where any family member is lucky or shiny">Excl. Family</button>
-      <button id="dex-shiny-avail" class="dex-filter-btn" style="display:none" onclick="dexShinyAvailOnly=!dexShinyAvailOnly;renderDexModal()" title="Missing+Shiny: hide species with no shiny released in GO">✨ Available only</button>
-      <button id="dex-excl-lucky"  class="dex-filter-btn" onclick="dexExcludeLucky=!dexExcludeLucky;renderDexModal()" title="Have view: hide species where all are lucky (untradeable)">🍀 Excl. Lucky</button>
-      <button id="dex-excl-keeps"  class="dex-filter-btn" onclick="dexExcludeKeeps=!dexExcludeKeeps;renderDexModal()" title="Have view: hide species with nothing tradeable after luckies and starred">⭐ Excl. Keeps</button>
+      <button id="dex-shiny-avail" class="dex-filter-btn" style="display:none" onclick="dexShinyAvailOnly=!dexShinyAvailOnly;renderDexModal()" title="Missing+Shiny: hide species with no shiny released in GO">âœ¨ Available only</button>
+      <button id="dex-excl-lucky"  class="dex-filter-btn" onclick="dexExcludeLucky=!dexExcludeLucky;renderDexModal()" title="Have view: hide species where all are lucky (untradeable)">ðŸ€ Excl. Lucky</button>
+      <button id="dex-excl-keeps"  class="dex-filter-btn" onclick="dexExcludeKeeps=!dexExcludeKeeps;renderDexModal()" title="Have view: hide species with nothing tradeable after luckies and starred">â­ Excl. Keeps</button>
     </div>
     <div id="dex-types-row" style="display:none;padding:6px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:4px"></div>
     <div class="pv-modal-body" id="dex-modal-body">
@@ -218,13 +218,13 @@
   <div class="pv-modal" style="max-width:740px">
     <div class="pv-modal-header">
       <div>
-        <div class="pv-modal-title">🔀 Merge Candidates</div>
+        <div class="pv-modal-title">ðŸ”€ Merge Candidates</div>
         <div class="pv-modal-sub" id="merge-modal-sub">Loading...</div>
       </div>
-      <button class="pv-modal-close" onclick="closeMergeModal()">✕</button>
+      <button class="pv-modal-close" onclick="closeMergeModal()">âœ•</button>
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:10px;color:var(--muted)">
-      Same-IV Pokémon at different CP where at least one has no catch date — likely the same individual scanned before and after a power-up. Use Pokégenie merge to consolidate.
+      Same-IV PokÃ©mon at different CP where at least one has no catch date â€” likely the same individual scanned before and after a power-up. Use PokÃ©genie merge to consolidate.
     </div>
     <div class="pv-modal-body" id="merge-modal-body">
       <div class="pv-modal-empty">Load your collection first</div>
@@ -237,15 +237,15 @@
   <div class="pv-modal" style="max-width:820px">
     <div class="pv-modal-header">
       <div>
-        <div class="pv-modal-title">🗑 Cull — Settled Families</div>
+        <div class="pv-modal-title">ðŸ—‘ Cull â€” Settled Families</div>
         <div class="pv-modal-sub" id="cull-modal-sub">Loading...</div>
       </div>
-      <button class="pv-modal-close" onclick="closeCullModal()">✕</button>
+      <button class="pv-modal-close" onclick="closeCullModal()">âœ•</button>
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span>These families have confirmed keepers (gold ★) and no unresolved recommendations. Everything else is safe to trade or delete.</span>
+      <span>These families have confirmed keepers (gold â˜…) and no unresolved recommendations. Everything else is safe to trade or delete.</span>
       <input type="text" id="cullSearchBox" placeholder="Search family..." oninput="openCullModal()" style="font-size:11px;padding:3px 7px;background:var(--surf);color:var(--text);border:1px solid var(--border);border-radius:4px;width:140px">
-      <button id="cullPracticalBtn" class="btn" onclick="toggleCullPractical(this)" title="Hide families where the only keeper is an expensive ($$$/$$$$) winner" aria-label="Practical filter">💰 Practical</button>
+      <button id="cullPracticalBtn" class="btn" onclick="toggleCullPractical(this)" title="Hide families where the only keeper is an expensive ($$$/$$$$) winner" aria-label="Practical filter">ðŸ’° Practical</button>
     </div>
     <div class="pv-modal-body" id="cull-modal-body">
       <div class="pv-modal-empty">Load your collection first</div>
@@ -258,10 +258,10 @@
   <div class="pv-modal">
     <div class="pv-modal-header">
       <div>
-        <div class="pv-modal-title">✨ Mark Special Pokémon</div>
-        <div class="pv-modal-sub" id="special-modal-sub">New Pokémon that may need flags set</div>
+        <div class="pv-modal-title">âœ¨ Mark Special PokÃ©mon</div>
+        <div class="pv-modal-sub" id="special-modal-sub">New PokÃ©mon that may need flags set</div>
       </div>
-      <button class="pv-modal-close" onclick="closeSpecialModal()">✕</button>
+      <button class="pv-modal-close" onclick="closeSpecialModal()">âœ•</button>
     </div>
     <div class="pv-modal-body" id="special-modal-body">
       <div class="pv-modal-empty">Load your collection first</div>
@@ -272,23 +272,23 @@
 <div id="dashboard">
   <div class="toolbar">
     <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="searchBox" placeholder="Search Pokémon...">
-      <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear search">✕</button>
+      <span class="search-icon">ðŸ”</span>
+      <input type="text" id="searchBox" placeholder="Search PokÃ©mon...">
+      <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear search">âœ•</button>
     </div>
     <label class="evo-toggle"><input type="checkbox" id="evoToggle"> Include evolutions</label>
-    <button class="btn active" data-f="all" onclick="setDecFilter('all',this)" aria-label="Show all Pokémon">All</button>
-    <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)" style="display:none" aria-label="Filter: Trade">↗ Trade</button>
-    <button class="btn" data-f="review" onclick="setDecFilter('review',this)" style="display:none" aria-label="Filter: Review">⚠ Review</button>
-    <button class="btn" id="dmaxFilterBtn" onclick="toggleDmaxFilter(this)" aria-label="Filter: Dynamax">Ⓓ Dynamax</button>
-    <button class="btn" id="gmaxFilterBtn" onclick="toggleGmaxFilter(this)" aria-label="Filter: Gigantamax">Ⓧ Gigantamax</button>
+    <button class="btn active" data-f="all" onclick="setDecFilter('all',this)" aria-label="Show all PokÃ©mon">All</button>
+    <button class="btn" data-f="trade" onclick="setDecFilter('trade',this)" style="display:none" aria-label="Filter: Trade">â†— Trade</button>
+    <button class="btn" data-f="review" onclick="setDecFilter('review',this)" style="display:none" aria-label="Filter: Review">âš  Review</button>
+    <button class="btn" id="dmaxFilterBtn" onclick="toggleDmaxFilter(this)" aria-label="Filter: Dynamax">â’¹ Dynamax</button>
+    <button class="btn" id="gmaxFilterBtn" onclick="toggleGmaxFilter(this)" aria-label="Filter: Gigantamax">â“ Gigantamax</button>
     <button class="league-btn btn lb-L" data-l="L" onclick="toggleLeague('L',this)" aria-label="Filter: Little League">Little</button>
     <button class="league-btn btn lb-G" data-l="G" onclick="toggleLeague('G',this)" aria-label="Filter: Great League">Great</button>
     <button class="league-btn btn lb-U" data-l="U" onclick="toggleLeague('U',this)" aria-label="Filter: Ultra League">Ultra</button>
     <button class="league-btn btn lb-M" data-l="M" onclick="toggleLeague('M',this)" aria-label="Filter: Master League">Master</button>
-    <button class="btn active" id="sortCountBtn" onclick="cycleSortMode(this)" aria-label="Cycle sort mode">★ Stars</button>
+    <button class="btn active" id="sortCountBtn" onclick="cycleSortMode(this)" aria-label="Cycle sort mode">â˜… Stars</button>
     <select id="nickConvention" title="Nick format" onchange="setNickConvention(this.value)" aria-label="Nickname format" style="font-size:11px;padding:2px 4px;background:var(--surf);color:var(--text);border:1px solid var(--border);border-radius:4px;cursor:pointer">
-      <option value="pvpvault">⭐ PvP</option>
+      <option value="pvpvault">â­ PvP</option>
       <option value="ivpct">% IV</option>
       <option value="rawiv">Raw IV</option>
       <option value="moves">Moves</option>
@@ -300,35 +300,35 @@
         title="Families with more members than this show in red"
         aria-label="Large family threshold">
     </label>
-    <button class="btn" id="hundoBtn" data-f="hundo" onclick="cycleHundoFilter(this)" aria-label="Filter: Hundos">✚ Hundos</button>
-    <button class="btn" id="bestLeagueBtn" onclick="filterBestInLeague(this)" title="Show only families with new unstarred league winners" aria-label="Filter: Best in League">🏆 Best in League</button>
-    <button class="btn" id="costlyBtn" onclick="filterCostlyWinners(this)" title="Show only costly (blue star) recommendations" aria-label="Filter: Costly winners">💰 Costly</button>
-    <button class="btn" id="practicalBtn" onclick="togglePractical(this)" title="Hide expensive ($$$/$$$$ dust) slot winners — focus on what you can actually power up" aria-label="Toggle Practical mode">💰 Practical</button>
+    <button class="btn" id="hundoBtn" data-f="hundo" onclick="cycleHundoFilter(this)" aria-label="Filter: Hundos">âœš Hundos</button>
+    <button class="btn" id="bestLeagueBtn" onclick="filterBestInLeague(this)" title="Show only families with new unstarred league winners" aria-label="Filter: Best in League">ðŸ† Best in League</button>
+    <button class="btn" id="costlyBtn" onclick="filterCostlyWinners(this)" title="Show only costly (blue star) recommendations" aria-label="Filter: Costly winners">ðŸ’° Costly</button>
+    <button class="btn" id="practicalBtn" onclick="togglePractical(this)" title="Hide expensive ($$$/$$$$ dust) slot winners â€” focus on what you can actually power up" aria-label="Toggle Practical mode">ðŸ’° Practical</button>
     <button class="btn" data-f="canEvolve" onclick="setDecFilter('canEvolve',this)" aria-label="Filter: Can Evolve">Can Evolve</button>
     <button class="btn" data-f="neverEvolved" onclick="setDecFilter('neverEvolved',this)" aria-label="Filter: Never Evolved">Never Evolved</button>
-    <button class="btn" onclick="openMergeModal()" title="Find merge candidates — same-IV Pokémon at different CP" aria-label="Open Merge modal">🔀 Merge</button>
-    <button class="btn" onclick="openCullModal()" title="Families with confirmed keepers — everything else is safe to cull" aria-label="Open Cull modal">🗑 Cull</button>
-    <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates" aria-label="Open Purify modal">🌟 Purify</button>
-    <button class="btn" onclick="openShinyModal()" title="Shiny Pokémon tagged via overrides" aria-label="Open Shinies modal">✨ Shinies</button>
-    <button class="btn" onclick="openDexModal()" title="Collection Tracker — see what you have and what's missing" aria-label="Open Pokédex tracker">📖 Pokédex</button>
-    <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc" aria-label="Set forms">🎨 Set Forms</button>
-    <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax" aria-label="Mark Special Pokémon">✨ Mark Special</button>
-    <button class="btn" id="movesToggleBtn" onclick="toggleMovesColumn(this)" title="Show/hide moves column" aria-label="Toggle moves column">Moves ⟨/⟩</button>
-    <button class="btn export-btn" onclick="exportCSV()" aria-label="Export to CSV">⬇ Export</button>
-    <button class="btn" onclick="copyCurrentLink()" title="Copy link to current view" aria-label="Copy deep link">🔗</button>
+    <button class="btn" onclick="openMergeModal()" title="Find merge candidates â€” same-IV PokÃ©mon at different CP" aria-label="Open Merge modal">ðŸ”€ Merge</button>
+    <button class="btn" onclick="openCullModal()" title="Families with confirmed keepers â€” everything else is safe to cull" aria-label="Open Cull modal">ðŸ—‘ Cull</button>
+    <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates" aria-label="Open Purify modal">ðŸŒŸ Purify</button>
+    <button class="btn" onclick="openShinyModal()" title="Shiny PokÃ©mon tagged via overrides" aria-label="Open Shinies modal">âœ¨ Shinies</button>
+    <button class="btn" onclick="openDexModal()" title="Collection Tracker â€” see what you have and what's missing" aria-label="Open PokÃ©dex tracker">ðŸ“– PokÃ©dex</button>
+    <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc" aria-label="Set forms">ðŸŽ¨ Set Forms</button>
+    <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax" aria-label="Mark Special PokÃ©mon">âœ¨ Mark Special</button>
+    <button class="btn" id="movesToggleBtn" onclick="toggleMovesColumn(this)" title="Show/hide moves column" aria-label="Toggle moves column">Moves âŸ¨/âŸ©</button>
+    <button class="btn export-btn" onclick="exportCSV()" aria-label="Export to CSV">â¬‡ Export</button>
+    <button class="btn" onclick="copyCurrentLink()" title="Copy link to current view" aria-label="Copy deep link">ðŸ”—</button>
   </div>
   <div id="anon-import-bar" style="display:none;flex-direction:column;gap:0;border-bottom:1px solid var(--border);background:var(--surf)">
     <div style="display:flex;align-items:center;gap:12px;padding:7px 16px;font-size:12px;color:var(--muted)">
-      <span style="flex:1">You're viewing a demo collection. Try it with your own Pokégenie CSV:</span>
-      <button class="btn" onclick="document.getElementById('tryOwnInput').click()" style="font-size:11px;white-space:nowrap">📦 Import your own CSV</button>
+      <span style="flex:1">You're viewing a demo collection. Try it with your own PokÃ©genie CSV:</span>
+      <button class="btn" onclick="document.getElementById('tryOwnInput').click()" style="font-size:11px;white-space:nowrap">ðŸ“¦ Import your own CSV</button>
       <input type="file" id="tryOwnInput" accept=".csv" style="display:none">
     </div>
-    <div style="padding:4px 16px 6px;font-size:11px;color:var(--muted)">If you find PokéVault useful, <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">☕ buy me a coffee</a></div>
+    <div style="padding:4px 16px 6px;font-size:11px;color:var(--muted)">If you find PokÃ©Vault useful, <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none">â˜• buy me a coffee</a></div>
   </div>
   <div id="main-content"></div>
 </div>
 
-<!-- Load order matters: config → data → supabase → auth → pokemon_go_base_stats → analyse → render → app -->
+<!-- Load order matters: config â†’ data â†’ supabase â†’ auth â†’ pokemon_go_base_stats â†’ analyse â†’ render â†’ app -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/data.js"></script>

@@ -18,6 +18,7 @@ create table if not exists pokemon_overrides (
   is_costumed boolean default false,
   manual_decision text default '',
   notes text default '',
+  nick text default null,        -- user-authored nick override; null = no override, '' = "no nick"
   updated_at timestamptz default now()
 );
 alter table pokemon_overrides disable row level security;
@@ -325,7 +326,15 @@ function applyOverridesToPokemon() {
   const toRerender = [];
   allPokemon.forEach(p => {
     const ov = overridesCache[p.stableKey];
-    if (!ov) return;
+    if (!ov) {
+      // Override record gone entirely — if this Pokémon previously had a nick
+      // override, restore its suggested nick and re-render.
+      if (p.nickOverridden && typeof applyNickOverride === 'function') {
+        applyNickOverride(p, null, p.suggestedNickname);
+        toRerender.push(p);
+      }
+      return;
+    }
     const nickAffected = ov.is_shiny || ov.is_dynamax || ov.is_gigantamax
                       || ov.special_form || ov.vivillon_pattern;
     if (ov.is_shiny) { p.isShiny = true; if (!p.slots.includes('shiny')) p.slots.push('shiny'); }
@@ -344,12 +353,21 @@ function applyOverridesToPokemon() {
     if (ov.special_form) p.specialForm = ov.special_form;
     if (ov.manual_decision) p.manualDecision = ov.manual_decision;
     if (ov.notes) p.notes = ov.notes;
+    // Recompute the suggested nick when a nick-affecting flag changed, then apply
+    // the user-authored nick override (if any) on top of it.
+    let suggested = (p.suggestedNickname !== undefined) ? p.suggestedNickname : p.nickname;
     if (nickAffected) {
       if (typeof buildNickname === 'function' && typeof getNickSlot === 'function') {
-        p.nickname = buildNickname(p, getNickSlot(p));
+        suggested = buildNickname(p, getNickSlot(p));
       }
-      toRerender.push(p);
     }
+    const hadOverride = p.nickOverridden;
+    if (typeof applyNickOverride === 'function') {
+      applyNickOverride(p, ov, suggested);
+    } else if (nickAffected) {
+      p.nickname = suggested;
+    }
+    if (nickAffected || p.nickOverridden || hadOverride) toRerender.push(p);
   });
   // Re-render rows where nick-affecting overrides were applied
   toRerender.forEach(p => {
@@ -379,6 +397,54 @@ async function saveOverride(pokemonIdx, fields) {
   const payload = Object.assign({pokemon_index: pokemonIdx, updated_at: new Date().toISOString(), user_id: userId}, fields);
   await supabaseFetch('POST', 'pokemon_overrides', payload);
   updateSyncStatus('✓ Saved', 'ok');
+}
+
+// Save a user-authored nick override with an optimistic local update + rollback.
+//   nick === null/undefined → clears the override (suggested nick returns)
+//   nick === ''             → a real override meaning "no nick"
+//   any other value         → trimmed + truncated to MAX_NICK_LENGTH, then stored
+// Returns true on success (or offline), false if a connected write failed (state reverted).
+async function saveNickOverride(pokemonIdx, nick) {
+  const value = (typeof clampNick === 'function')
+    ? clampNick(nick)
+    : (nick == null ? null : String(nick).trim().slice(0, 64));
+
+  const p = (typeof allPokemon !== 'undefined' && Array.isArray(allPokemon))
+    ? allPokemon.find(x => x.stableKey === pokemonIdx) : null;
+
+  // Snapshot for rollback
+  const prevCache = overridesCache[pokemonIdx] ? Object.assign({}, overridesCache[pokemonIdx]) : null;
+  const prev = p ? { nickname: p.nickname, suggestedNickname: p.suggestedNickname, nickOverridden: p.nickOverridden } : null;
+
+  // Optimistic local update — Pokémon object
+  if (p) {
+    if (value !== null) {
+      if (p.suggestedNickname === undefined || p.suggestedNickname === null) p.suggestedNickname = p.nickname;
+      p.nickname = value;
+      p.nickOverridden = true;
+    } else {
+      if (p.suggestedNickname !== undefined && p.suggestedNickname !== null) p.nickname = p.suggestedNickname;
+      p.nickOverridden = false;
+    }
+  }
+  // Optimistic local update — cache (field-level merge, never clobber other fields)
+  overridesCache[pokemonIdx] = Object.assign(overridesCache[pokemonIdx] || {}, { nick: value, pokemon_index: pokemonIdx });
+
+  if (!supabaseConnected) { updateSyncStatus('✓ Saved (offline)', 'ok'); return true; }
+  const userId = await getCurrentUserId();
+  if (!userId) return true;
+
+  const payload = { pokemon_index: pokemonIdx, nick: value, updated_at: new Date().toISOString(), user_id: userId };
+  const res = await supabaseFetch('POST', 'pokemon_overrides', payload);
+  if (res === null) {
+    // Write failed — roll back local state and cache.
+    if (prevCache) overridesCache[pokemonIdx] = prevCache; else delete overridesCache[pokemonIdx];
+    if (p && prev) { p.nickname = prev.nickname; p.suggestedNickname = prev.suggestedNickname; p.nickOverridden = prev.nickOverridden; }
+    updateSyncStatus('⚠ Nick save failed — reverted', 'warn');
+    return false;
+  }
+  updateSyncStatus('✓ Saved', 'ok');
+  return true;
 }
 
 async function deleteOverride(pokemonIdx) {

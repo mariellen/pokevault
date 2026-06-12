@@ -136,18 +136,18 @@ function buildRow(p){
     return alts.map(a=>`<span style="display:block;font-size:9px;font-family:monospace;color:${a.col};opacity:0.8;cursor:pointer;white-space:nowrap"
       data-nick="${a.nick.replace(/"/g,'&quot;')}"
       onclick="event.stopPropagation();event.preventDefault();navigator.clipboard.writeText(this.dataset.nick).then(()=>{this.style.opacity='1';setTimeout(()=>this.style.opacity='0.8',800)}).catch(()=>{const t=document.createElement('textarea');t.value=this.dataset.nick;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);this.style.opacity='1';setTimeout(()=>this.style.opacity='0.8',800)})"
-      title="Alt: ${a.label} League — click to copy">${a.nick}</span>`).join('');
+      title="Alt: ${a.label} League — click to copy">${esc(a.nick)}</span>`).join('');
   })();
 
   // Per-league evo indicators
   const evoIndicators=(()=>{
-    if(p.targetEvo) return `<div class="target-evo">${p.evoIndicator||''}${p.targetEvo}</div>`;
+    if(p.targetEvo) return `<div class="target-evo">${p.evoIndicator||''}${esc(p.targetEvo)}</div>`;
     const seen=new Set();
     const parts=[];
     [[p.evolvedNameG,'var(--great)','G'],[p.evolvedNameU,'var(--ultra)','U'],[p.evolvedNameL,'var(--little)','L']].forEach(([evo,col,lg])=>{
       if(evo&&evo!==p.name&&!seen.has(evo)){
         seen.add(evo);
-        parts.push(`<span style="color:${col};font-size:9px;opacity:0.6">${lg}→${evo}</span>`);
+        parts.push(`<span style="color:${col};font-size:9px;opacity:0.6">${lg}→${esc(evo)}</span>`);
       }
     });
     return parts.length?`<div class="target-evo" style="font-style:italic">${parts.join(' ')}</div>`:'';
@@ -166,10 +166,9 @@ function buildRow(p){
       ${evoIndicators}
     </td>
     <td style="font-size:11px;color:var(--muted)">${p.cp||'--'}</td>
-    <td class="${p.suggestStar?'nick-starred':'nick-suggested'}" style="cursor:pointer"
-        data-nick="${(p.nickname||'').replace(/"/g,'&quot;')}"
-        onclick="copyNick(this.querySelector('.main-nick'),this.dataset.nick)" title="Click to copy nickname">
-      <span class="main-nick">${esc(p.nickname)}</span>${altNicks}
+    <td class="${p.suggestStar?'nick-starred':'nick-suggested'}${p.nickOverridden?' nick-overridden':''}"
+        data-nick="${esc(p.nickname)}" data-key="${esc(p.stableKey)}">
+      <span class="main-nick" style="cursor:pointer" onclick="event.stopPropagation();copyNick(this,this.closest('td').dataset.nick)" title="Click to copy nickname">${esc(p.nickname)}</span>${p.nickOverridden?'<span class="nick-ovr-badge" title="Custom nick — your override">✏</span>':''}<button class="nick-edit-btn" onclick="event.stopPropagation();beginNickEdit(this.closest('td').dataset.key,this.closest('td'))" title="Edit nick">✎</button>${p.nickOverridden?`<button class="nick-reset-btn" onclick="event.stopPropagation();resetNick(this.closest('td').dataset.key)" title="Reset to suggested nick">↺</button>`:''}${altNicks}
       ${evoSearchTag?`<div style="margin-top:2px">${evoSearchTag}</div>`:''}
     </td>
     <td>

@@ -5,6 +5,16 @@
 'use strict';
 
 // ── Supabase credentials ──────────────────────────────────
+// SUPABASE_KEY is the Supabase **anon (public) key** — a JWT whose payload
+// decodes to {"role":"anon", ...}. It is DESIGNED to ship in the browser
+// bundle; access is gated server-side by Row-Level Security (RLS) policies,
+// not by the secrecy of this token. It is NOT the service_role key (which must
+// never reach a client) and rotating it would not improve security.
+//
+// ZAP rule 10094 ("Base64 Disclosure") flags this token because it is base64.
+// VERDICT: accept — public-by-design, no secret disclosed. Suppress 10094 with
+// this justification rather than obfuscating (re-encoding hides nothing and ZAP
+// would still flag it). See reviews/csp-hardening-impl-summary.md.
 const SUPABASE_URL = 'https://jsozfpsfvvnnmipsksoh.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impzb3pmcHNmdnZubm1pcHNrc29oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4ODQ2OTksImV4cCI6MjA4OTQ2MDY5OX0.Qyqo4cF1C_2STXPcMoob9jMRt_VoESmhJqTQkux6i30';
 
@@ -23,6 +33,23 @@ const PERFECT   = '100'; // Shown when rank rounds to 100% (✪ fails in GO afte
 const NUNDO     = '⓪';  // 0/0/0 Pokémon
 const SHINY_SFX = '※'; // Shiny suffix
 const HUNDO_SFX = 'Ⓗ'; // Appended to ANY nick where IVs are 15/15/15
+
+// ── Nick override (user-authored nicknames) ──────────────
+// A user can override PokéVault's suggested nick with their own (e.g. to match an
+// established Pokégenie convention). GO's in-game nick cap is 12, but we allow
+// headroom (64) for Pokégenie-style conventions. Enforced on client + write.
+const MAX_NICK_LENGTH = 64;
+
+// Sanitise a user-authored nick before storing/applying.
+//   • null / undefined  → returns null  ("no override — use the suggested nick")
+//   • ''                → returns ''     (a VALID override meaning "no nick")
+//   • any other value   → coerced to string, trimmed, truncated to MAX_NICK_LENGTH
+// The null-vs-empty-string distinction is load-bearing: callers MUST use `!= null`
+// checks, never truthiness, so an empty override is not collapsed into "no override".
+function clampNick(value) {
+  if (value === null || value === undefined) return null;
+  return String(value).trim().slice(0, MAX_NICK_LENGTH);
+}
 
 // ── League caps (CP) ─────────────────────────────────────
 const LEAGUE_CAPS = { L: 500, G: 1500, U: 2500, M: Infinity };
