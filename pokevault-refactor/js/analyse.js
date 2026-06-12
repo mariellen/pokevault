@@ -859,7 +859,16 @@ function analyse(rows) {
         // Effective dust = half for Lucky; treat 0 explicitly as free (already powered up)
         const effectiveDust = p => {
           const leagueDust = lg==='L'?p.dustL:lg==='G'?p.dustG:lg==='U'?p.dustU:null;
-          const d = (leagueDust !== null && leagueDust !== undefined) ? leagueDust : (p.dustCostBest || 999999);
+          // Business Rules: missing/null dust = 0 (already at/above cap, no investment needed) —
+          // the most affordable outcome. For capped leagues (L/G/U) a null/undefined dust is
+          // treated as 0 so a powered-up Pokémon always WINS the dust tiebreak. Only Master
+          // (uncapped, leagueDust === null by definition) falls back to dustCostBest.
+          let d;
+          if (lg !== 'M') {
+            d = (leagueDust === null || leagueDust === undefined) ? 0 : leagueDust;
+          } else {
+            d = (leagueDust !== null && leagueDust !== undefined) ? leagueDust : (p.dustCostBest || 999999);
+          }
           return p.isLucky ? Math.round(d/2) : d;
         };
 
@@ -879,14 +888,21 @@ function analyse(rows) {
         eligible.sort((a, b) => {
           const ra = a[rankField]||0, rb = b[rankField]||0;
           const roundedA = Math.round(ra), roundedB = Math.round(rb);
+          // Rank comparison uses ROUNDED integer values — the same values shown in nicks/UI.
+          // 99.6% and 99.9% both round to 100% and are treated as TIED (Business Rules §
+          // "Rank comparison and dust tiebreak"). Only a difference in the *rounded* rank
+          // decides on rank alone; otherwise we fall through to the dust tiebreak below.
           if (roundedA !== roundedB) return roundedB - roundedA;
-          // Prefer higher actual rank before evolved preference — higher real rank always wins
-          if (Math.abs(ra - rb) > 0.01) return rb - ra;
-          // Prefer already-evolved (p.name === stageName) over pre-evos at tied actual rank
+          // Tied on rounded rank → prefer already-evolved (p.name === stageName) over a pre-evo
+          // (evolution cost is implicit), then cheapest effective dust wins the tie.
           const aIsEvolved = (a.name === stageName) ? 0 : 1;
           const bIsEvolved = (b.name === stageName) ? 0 : 1;
           if (aIsEvolved !== bIsEvolved) return aIsEvolved - bIsEvolved;
-          return effectiveDust(a) - effectiveDust(b);
+          const da = effectiveDust(a), db = effectiveDust(b);
+          if (da !== db) return da - db;
+          // Fully tied on rounded rank, evolved-state and dust → higher raw rank as a final,
+          // deterministic tiebreak (does NOT override the dust comparison above).
+          return rb - ra;
         });
 
         // Option C+D: affordable-first two-pass. ML always single pass (Option D — exempt by design).

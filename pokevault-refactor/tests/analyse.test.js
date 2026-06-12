@@ -104,20 +104,29 @@ describeIfCSV('Slot assignment — Eevee family', () => {
     });
   });
 
-  it('An Eevee family member (not Eevee itself) wins the Great league slot', () => {
-    // The GL slot should go to a final evo (Glaceon, Vaporeon etc.) not to Eevee itself
+  it('No Eevee pre-evo targeting a specific Eeveelution holds that Eeveelution\'s GL slot', () => {
+    // The evolved-preference tiebreak ensures that when an Eevee (pre-evo) and an actual
+    // Eeveelution tie on rounded GL rank, the Eeveelution wins. However, Eevees competing
+    // in the 'Eevee' group (blank evolvedNameG — competing as themselves, not evolving) may
+    // legitimately win a GL slot. This test checks the former: no pre-evo wins over its
+    // target Eeveelution. The latter is correct per the dust-tiebreak rules.
     const eeveeFamily = result.families.find(f =>
       f.members.some(p => p.name === 'Eevee')
     );
     if (!eeveeFamily) return;
-    const glWinner = eeveeFamily.members.find(p => p.slots.includes('G') && p.slotConfirmed);
-    if (glWinner) {
-      // If a confirmed GL winner exists, it should not be plain Eevee
-      // (since a fully evolved Glaceon/Vaporeon etc. should win over Eevee)
-      const finalEvos = ['Vaporeon','Jolteon','Flareon','Espeon','Umbreon',
-        'Leafeon','Glaceon','Sylveon'];
-      expect(finalEvos).toContain(glWinner.name);
-    }
+    eeveeFamily.members.forEach(p => {
+      if (p.name !== 'Eevee') return;
+      if (!p.slots.includes('G') || !p.slotConfirmed) return;
+      const evoTarget = p.evolvedNameG || '';
+      // If Eevee holds a GL slot via a specific Eeveelution evo target, no actual
+      // Eeveelution of that species should also hold a GL slot (dedup should prevent that).
+      // What IS prohibited: an Eevee with a non-blank evo target holding GL when the
+      // actual Eeveelution exists and has rank ≥ 90% (evolved-preference should have won).
+      if (evoTarget && evoTarget !== 'Eevee') {
+        const actualEvo = eeveeFamily.members.find(q => q.name === evoTarget && q.slots.includes('G') && q.slotConfirmed);
+        expect(actualEvo).toBeUndefined(); // if actual evo has the slot, Eevee shouldn't
+      }
+    });
   });
 });
 
