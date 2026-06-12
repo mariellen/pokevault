@@ -166,3 +166,62 @@ Briefs in `briefs/` have a `ROUTE:` header:
 - `ROUTE: OPUS-FIRST` — Opus pre-reviews, Mariellen approves, then Claude Code implements, Opus post-reviews
 
 Check `python pipeline.py --status` to see current state of all threads.
+
+---
+
+## Autonomy & Boundaries
+
+### Proceed without asking for approval
+These are routine operations — complete them automatically:
+
+**Navigation & inspection:**
+- `Set-Location` / `cd` — change directory
+- `Get-ChildItem` / `ls` / `dir` — list files
+- `git status` / `git log` / `git diff` / `git branch -a` — read-only git
+- `python pipeline.py --status` — check pipeline state
+
+**Git workflow:**
+- `git checkout -b feature/...` — create feature branch
+- `git checkout main` — switch to main
+- `git fetch origin` / `git pull` — update local
+- `git add` — stage files
+- `git commit` — commit changes
+- `git push origin feature/...` — push feature branch
+- `git stash` / `git stash pop` — stash management
+- `git rebase origin/main` — rebase onto main
+- `git merge --no-ff` — merge commit
+
+**Node / testing:**
+- `npm install` / `npm ci` — install packages
+- `npm test` / `npx jest` — run test suite
+- `npx jest tests/specific.test.js` — run specific test file
+- `npx serve . -p 8080` — start local server
+
+**File operations within repo:**
+- Reading any file in the repo
+- Writing or editing any file under `pokevault-refactor/` or repo root
+- Creating new files within the repo directory
+
+### Always ask before proceeding
+These can cause irreversible damage — never auto-approve:
+
+**Destructive git:**
+- `git push --force` or `git push -f` — only with explicit coordinator approval
+- `git branch -D` — force delete branch
+- `git reset --hard` — discard uncommitted changes
+
+**AWS / infrastructure:**
+- `aws s3 rm` — deleting S3 files (read the exact path carefully)
+- `aws s3 sync` with `--delete` flag — verify path is bucket root
+- Any CloudFront distribution changes
+- Any IAM changes
+
+**Supabase:**
+- Any SQL schema changes (ALTER TABLE, DROP, CREATE POLICY)
+- Any RLS policy changes
+
+**System / outside repo:**
+- Any operation on `C:/` outside the repo directory
+- Any operation on paths not under `C:\ClaudeCode\pokevault\`
+- Installing global npm packages (`npm install -g`)
+- Any network request not to GitHub, npm, or the project's own AWS/Supabase endpoints
