@@ -28,7 +28,11 @@ async function initAuth() {
     _accessToken = session?.access_token || null;  // keep cache current
     if (session) {
       setLoggedIn(session.user);
-      if (event === 'SIGNED_IN') closeLoginModal();
+      if (event === 'SIGNED_IN') {
+        closeLoginModal();
+        // GA4: Google OAuth completed. Guarded — trackEvent lives in app.js.
+        if (typeof trackEvent === 'function') trackEvent('sign_in');
+      }
     } else {
       setLoggedOut();
     }
@@ -60,6 +64,9 @@ async function sendMagicLink() {
 }
 
 async function signOut() {
+  // Fire BEFORE signOut() — a subsequent state-clear/reload can kill an
+  // in-flight GA beacon. Guarded — trackEvent lives in app.js.
+  if (typeof trackEvent === 'function') trackEvent('sign_out');
   await window.supabaseClient.auth.signOut();
 }
 
