@@ -38,3 +38,29 @@ module.exports.createEnv = function({ supabaseFetch = async () => ({}), updateSy
   );
   return factory(supabaseFetch, updateSyncStatus);
 };
+
+/**
+ * Environment for testing the nick-override storage path (saveNickOverride).
+ * Injects supabaseFetch, updateSyncStatus, clampNick (real impl from loader.js)
+ * and an allPokemon array. Exposes setters so a test can flip supabaseConnected
+ * and seed the override cache.
+ */
+module.exports.createNickEnv = function({
+  supabaseFetch = async () => ({}),
+  updateSyncStatus = () => {},
+  clampNick = v => (v == null ? null : String(v).trim().slice(0, 64)),
+  allPokemon = [],
+} = {}) {
+  const factory = new Function(
+    'supabaseFetch', 'updateSyncStatus', 'clampNick', 'allPokemon',
+    SHIMS + stripped +
+    '\nreturn {' +
+    '  saveNickOverride,' +
+    '  applyOverridesToPokemon,' +
+    '  getCache: () => overridesCache,' +
+    '  setCache: (c) => { overridesCache = c; },' +
+    '  setConnected: (v) => { supabaseConnected = v; },' +
+    '};'
+  );
+  return factory(supabaseFetch, updateSyncStatus, clampNick, allPokemon);
+};

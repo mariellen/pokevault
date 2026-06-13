@@ -17,10 +17,10 @@ _Nothing waiting for you right now._
 ## ⏳ WAITING FOR AN AGENT
 
 ### Nick Override
-**Status:** Pre-review complete → see `reviews\nick-override-opus-pre.md`
-**Owner:** YOU
-**Next action:** Review findings, then press Enter to dispatch Claude Code (or Ctrl+C to pause)
-_Updated: 13 Jun 2026 08:20_
+**Status:** Implementation complete — awaiting Opus post-check
+**Owner:** PIPELINE
+**Next action:** Run Opus post-review against `reviews/nick-override-impl-summary.md`. PR: https://github.com/mariellen/pokevault/pull/11 (28 new tests green; 4 pre-existing csp.test.js failures are unrelated). Then approve/merge.
+_Updated: 13 Jun 2026_
 
 ### Playwright Expansion
 **Status:** Pipeline complete · Opus says: **APPROVE WITH NOTES.**

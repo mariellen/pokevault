@@ -239,8 +239,33 @@ Manual flags stored in `pokemon_overrides` table, keyed by `stableKey`.
 | `vivillon_pattern` | text | Vivillon form (e.g. "Polar") |
 | `manual_decision` | text | Force keep/trade/review |
 | `notes` | text | Free text notes |
+| `nick` | text | User-authored nick override (v3.5.48); `null` = none, `''` = "no nick" |
 
 Overrides are applied **after** analysis, so manual decisions override computed ones.
+
+### Nick override (inline editing — v3.5.48)
+
+Users can replace PokéVault's suggested nick with their own (e.g. to match an
+established Pokégenie convention). Tap the **✎** next to a nick to edit inline;
+**Enter** or blur commits, **Esc** cancels. When an override is active the nick is
+shown in an accent colour with a **✏** badge and a **↺ reset-to-suggested** button.
+
+- **Authoritative & CSV-immune:** the suggested nick is recomputed on every CSV
+  upload / cloud reload, then the override (if any) is re-applied on top
+  (`applyNickOverride`, the final step of `analyse()`).
+- **`null` vs `''`:** `null`/absent = no override (use suggested); empty string is a
+  *valid* override meaning "no nick". `clampNick()` preserves this distinction —
+  callers must use `!= null`, never truthiness.
+- **Max length:** capped at `MAX_NICK_LENGTH` (64) on both client and write. (GO's
+  in-game cap is 12; the headroom accommodates Pokégenie conventions.)
+- **Safety:** the nick is rendered as escaped text (`esc()`); the editor is a
+  controlled `<input>`, never `contenteditable` — no stored-XSS path.
+- **Reset:** clears the override (`nick: null`), restoring the suggested nick.
+- **Optimistic + rollback:** local state updates immediately; a failed Supabase
+  write reverts both the Pokémon object and the override cache.
+- **Evolution:** like every other override, the nick is keyed to `stableKey`, which
+  includes `PokemonNumber` — so evolving a Pokémon (number change) orphans the
+  override. This is consistent with all existing per-Pokémon overrides.
 
 **Stable key format:** `PokemonNumber|Form|Gender|AtkIV|DefIV|StaIV|CatchDate||OriginalScanDate`. Original Scan Date is always present (set on first scan, never changes), so 100% of Pokémon have a stable key regardless of catch date. The override panel no longer shows a catch-date warning.
 
