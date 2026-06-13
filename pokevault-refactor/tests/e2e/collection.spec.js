@@ -146,6 +146,10 @@ test('Nick copy → "Copied!" toast appears and the copied string equals the nic
   const expectedNick = await nickCell.getAttribute('data-nick');
   expect((expectedNick || '').length).toBeGreaterThan(0);
 
+  // Wait for any existing toast (e.g. cloud-save "✓ Saved N Pokémon to cloud")
+  // to clear before clicking, so it doesn't overwrite the "Copied!" toast.
+  await expect(page.locator('#pv-toast')).not.toBeVisible({ timeout: 10000 });
+
   await nickCell.click();
 
   await expect(page.locator('#pv-toast')).toHaveText('Copied!');
