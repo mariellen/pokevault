@@ -144,6 +144,29 @@ function buildFamilyMap(rows) {
 // (defined in config.js)
 // (defined in config.js)
 
+// ── Nick override (post-derivation merge) ─────────────────
+// Applies a user-authored nick override on top of the derived (suggested) nick.
+// The override is authoritative and CSV-immune: the suggested nick is recomputed on
+// every analyse() run, then the override (if present) is re-applied on top here.
+//   ov.nick == null (null/undefined) → no override, use the suggested nick
+//   ov.nick === ''                   → a real override meaning "no nick"
+// Stores the derived value in p.suggestedNickname so a later reset can restore it,
+// and sets p.nickOverridden for the render layer's distinct indicator.
+function applyNickOverride(p, ov, suggestedNick) {
+  const derived = suggestedNick !== undefined ? suggestedNick
+                : (p.suggestedNickname !== undefined ? p.suggestedNickname : p.nickname);
+  p.suggestedNickname = derived;
+  const overrideNick = ov ? ov.nick : undefined;
+  if (overrideNick !== null && overrideNick !== undefined) {
+    p.nickname = clampNick(overrideNick);
+    p.nickOverridden = true;
+  } else {
+    p.nickname = derived;
+    p.nickOverridden = false;
+  }
+  return p;
+}
+
 function buildNickname(p, slot, convention) {
   const iv = Math.round(p.ivAvg||0);
   const atkIV=p.atkIV||0, defIV=p.defIV||0, staIV=p.staIV||0;
@@ -1693,6 +1716,17 @@ function analyse(rows) {
       }
     }
   });
+
+  // ── Nick override (post-derivation) ───────────────────────
+  // Final step: re-apply user-authored nick overrides on top of the fully derived
+  // suggested nicks. Runs last so it survives every earlier nick reassignment
+  // (slots, $-strip, ML placeholders) and a fresh CSV upload alike.
+  if (typeof overridesCache !== 'undefined') {
+    parsed.forEach(p => {
+      const ov = overridesCache[p.stableKey];
+      applyNickOverride(p, ov, p.nickname);
+    });
+  }
 
   // Build family list
   const famList=Object.entries(byFamily).map(([key,members])=>{

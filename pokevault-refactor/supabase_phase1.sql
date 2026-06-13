@@ -29,3 +29,11 @@ CREATE POLICY "anon_full_access" ON pokemon_moves
 ALTER TABLE pokemon_collection ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
 ALTER TABLE pokemon_overrides  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
 ALTER TABLE pokemon_moves      ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id);
+
+-- ── 1d. Nick override (v3.5.48) ───────────────────────────────
+-- User-authored nick override. NULL = no override (use the suggested nick);
+-- '' (empty string) = a real override meaning "no nick". The null-vs-empty
+-- distinction is load-bearing in the app (see clampNick / applyNickOverride).
+-- The existing FOR ALL anon/owner policy already scopes column-level writes, so
+-- no policy change is required for this new column.
+ALTER TABLE pokemon_overrides  ADD COLUMN IF NOT EXISTS nick text DEFAULT NULL;

@@ -9,6 +9,52 @@
 // window.location.hash before applyHashState() can read it on first cloud load.
 let initialHash = window.location.hash;
 
+// ═══════════════════════════════════════════════
+// GA4 EVENT TRACKING
+// Fire-and-forget telemetry. Must NEVER break the app, NEVER leak user PII.
+// (ticket: ga4-event-tracking — see reviews/ga4-event-tracking-impl-summary.md)
+// ═══════════════════════════════════════════════
+
+// Hardened helper: `=== 'function'` (not `!== 'undefined'`) so a defined-but-broken
+// gtag can't throw, and a try/catch so analytics never aborts a user action.
+function trackEvent(name, params = {}) {
+  try {
+    if (typeof gtag === 'function') gtag('event', name, params);
+  } catch (e) {
+    // analytics must never break the app
+    if (typeof console !== 'undefined') console.debug('trackEvent failed', name, e);
+  }
+}
+
+// PII redaction: nicknames are free-text and frequently contain personal data.
+// Send a SHAPE descriptor only — never the raw nick. Satisfies "which nick
+// formats are most common" with zero PII egress.
+function buildNickShape(nick) {
+  const n = nick || '';
+  return {
+    nick_length: n.length,
+    has_iv_pattern: /\d{1,2}\/\d{1,2}\/\d{1,2}/.test(n),
+    has_cp: /\bcp\s*\d+/i.test(n),
+  };
+}
+
+// Same PII reasoning for search terms — users search by personal labels.
+function buildSearchShape(term) {
+  const t = term || '';
+  return { term_length: t.length, is_numeric: /^\d+$/.test(t) };
+}
+
+// Debounced search tracking — fire once, 500ms after the last keystroke,
+// to avoid flooding GA4 with every character typed. Module-scoped timer is
+// fine for the singleton search box.
+let _searchTrackTimer;
+function trackSearchDebounced(term) {
+  clearTimeout(_searchTrackTimer);
+  _searchTrackTimer = setTimeout(() => {
+    trackEvent('search', buildSearchShape(term));
+  }, 500);
+}
+
 // Dmax/Gmax filter flags (mutually exclusive)
 let showDynamaxOnly = false;
 let showGigantamaxOnly = false;
@@ -81,6 +127,49 @@ function reconcileShinyDecisions(pokemon) {
       p.reason = `Shiny duplicate — ${keeper.name} ${Math.round(keeper.ivAvg||0)}% IV is keeper`;
     });
   });
+}
+
+// ═══════════════════════════════════════════════
+// SCAN-DATE SORT (ticket: sort-scan-date)
+// Sort families by their most-recently-scanned member (newest first).
+// Scan date is a per-Pokémon attribute, so the family key is the MAX
+// (newest) member scan date. Missing/unparseable dates always sort to the
+// BOTTOM — for BOTH directions (per Opus review: "sort to bottom" is the
+// hard rule; do not let missing entries float to the top in ascending mode).
+// ═══════════════════════════════════════════════
+
+// Per-Pokémon scan timestamp (ms) or null when missing/unparseable.
+// Uses parsePokegenieDate (defined later, hoisted) so chronological — not
+// lexical — comparison is guaranteed across Pokégenie's date formats.
+function parseScanDateMs(p) {
+  const raw = p && p.scanDate;
+  if (!raw || !String(raw).trim()) return null;
+  const iso = parsePokegenieDate(raw); // '' on failure, else 'YYYY-MM-DDTHH:MM'
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : t;
+}
+
+// Family-level key = newest member scan date, or null if none parse.
+// reduce(...Math.max) avoids spread call-stack limits on large families.
+function familyScanKey(fam) {
+  const times = (fam.members || [])
+    .map(parseScanDateMs)
+    .filter(t => t !== null);
+  return times.length ? times.reduce((a, b) => Math.max(a, b), -Infinity) : null;
+}
+
+// Comparator for Array.sort on the families array.
+// dir: 'desc' = newest first (primary brief option), 'asc' = oldest first.
+// Missing-date families are always pinned last regardless of direction.
+function compareFamiliesByScanDate(a, b, dir) {
+  const ka = familyScanKey(a), kb = familyScanKey(b);
+  const aMissing = ka === null, bMissing = kb === null;
+  if (aMissing && bMissing) return a.primaryName.localeCompare(b.primaryName);
+  if (aMissing) return 1;   // a to bottom
+  if (bMissing) return -1;  // b to bottom
+  if (ka !== kb) return dir === 'asc' ? ka - kb : kb - ka;
+  return a.primaryName.localeCompare(b.primaryName); // stable tie-break
 }
 
 // ═══════════════════════════════════════════════
@@ -368,6 +457,10 @@ function applyFilters(){
       const d=familyStarPriority(a)-familyStarPriority(b);
       return d!==0?d:a.primaryName.localeCompare(b.primaryName);
     });
+  }else if(sortMode==='scanDateDesc'){
+    filteredFamilies.sort((a,b)=>compareFamiliesByScanDate(a,b,'desc'));
+  }else if(sortMode==='scanDateAsc'){
+    filteredFamilies.sort((a,b)=>compareFamiliesByScanDate(a,b,'asc'));
   }else{
     filteredFamilies.sort((a,b)=>a.primaryName.localeCompare(b.primaryName));
   }
@@ -475,10 +568,10 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
     if (slotWinner) topNick = buildNickname(slotWinner, primaryLeague);
     const topNickEsc = topNick.replace(/'/g,'&#39;');
     const topStr = slotWinner
-      ? ` &nbsp;·&nbsp; <strong>Top pick:</strong> <span style="font-family:monospace;color:var(--cyan);cursor:pointer" onclick="navigator.clipboard.writeText('${topNickEsc}')" title="Click to copy">${topNick}</span> CP:${slotWinner.cp} ${Math.round(slotWinner[primaryRankField]||0)}% ${primaryLeagueName}`
+      ? ` &nbsp;·&nbsp; <strong>Top pick:</strong> <span style="font-family:monospace;color:var(--cyan);cursor:pointer" onclick="navigator.clipboard.writeText('${topNickEsc}')" title="Click to copy">${esc(topNick)}</span> CP:${slotWinner.cp} ${Math.round(slotWinner[primaryRankField]||0)}% ${primaryLeagueName}`
       : '';
     evoSearchBanner = `<div style="background:rgba(0,212,255,0.08);border-left:3px solid var(--cyan);padding:8px 14px;font-size:11px;color:var(--muted);margin-bottom:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      🔍 <strong style="color:var(--text)">${term.charAt(0).toUpperCase()+term.slice(1)}</strong>: ${parts.join(' · ')}${topStr}
+      🔍 <strong style="color:var(--text)">${esc(term.charAt(0).toUpperCase()+term.slice(1))}</strong>: ${parts.join(' · ')}${topStr}
     </div>`;
   }
 
@@ -534,11 +627,11 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
       if (p.name.toLowerCase().includes(term)) { p._evoSearchTag = ''; return; }
       const tags = [];
       if ((p.evolvedNameG||'').toLowerCase().includes(term))
-        tags.push(`<span style="color:var(--great);font-size:9px">G→${p.evolvedNameG}</span>`);
+        tags.push(`<span style="color:var(--great);font-size:9px">G→${esc(p.evolvedNameG)}</span>`);
       if ((p.evolvedNameU||'').toLowerCase().includes(term))
-        tags.push(`<span style="color:var(--ultra);font-size:9px">U→${p.evolvedNameU}</span>`);
+        tags.push(`<span style="color:var(--ultra);font-size:9px">U→${esc(p.evolvedNameU)}</span>`);
       if ((p.evolvedNameL||'').toLowerCase().includes(term))
-        tags.push(`<span style="color:var(--little);font-size:9px">L→${p.evolvedNameL}</span>`);
+        tags.push(`<span style="color:var(--little);font-size:9px">L→${esc(p.evolvedNameL)}</span>`);
       p._evoSearchTag = tags.join(' ');
     });
   } else {
@@ -595,7 +688,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   </div>`;
 }
 
-function toggleFamily(id){const el=document.getElementById(id);if(el)el.classList.toggle('open');}
+function toggleFamily(id){const el=document.getElementById(id);if(!el)return;const nowOpen=el.classList.toggle('open');if(nowOpen)trackEvent('family_expand');}
 function goPage(p){page=p;renderPage();window.scrollTo(0,180);}
 
 function clearSearch(){
@@ -615,10 +708,28 @@ function familyStarPriority(fam){
   if(m.some(p=>p.starType==='red'))    return 5;
   return 6;
 }
+// Sort-mode cycle order and button labels. Scan-date options are ADDITIVE —
+// 'star' remains the default (render.js), the new modes are appended to the
+// tail of the cycle. (ticket: sort-scan-date)
+const SORT_CYCLE = ['star','count','name','scanDateDesc','scanDateAsc'];
+const SORT_BTN_LABELS = {
+  star:'★ Stars',
+  count:'Sort by Count',
+  name:'A-Z Name',
+  scanDateDesc:'Scan date ↓',
+  scanDateAsc:'Scan date ↑',
+};
+function nextSortMode(mode){
+  const i=SORT_CYCLE.indexOf(mode);
+  return SORT_CYCLE[(i+1)%SORT_CYCLE.length]||'star';
+}
+// Fire-and-forget GA4 sort telemetry (shared with ga4-event-tracking brief).
+function trackSortChange(mode){ trackEvent('sort_change', { sort: mode }); }
 function cycleSortMode(btn){
-  if(sortMode==='star'){sortMode='count';btn.textContent='Sort by Count';btn.classList.add('active');}
-  else if(sortMode==='count'){sortMode='name';btn.textContent='A-Z Name';btn.classList.remove('active');}
-  else{sortMode='star';btn.textContent='★ Stars';btn.classList.add('active');}
+  sortMode=nextSortMode(sortMode);
+  btn.textContent=SORT_BTN_LABELS[sortMode]||'★ Stars';
+  btn.classList.toggle('active', sortMode!=='name');
+  trackSortChange(sortMode);
   applyFilters();
 }
 
@@ -646,11 +757,18 @@ function setNickConvention(val) {
   currentNickConvention = val;
   localStorage.setItem('nickConvention', val);
   if (!allPokemon.length) return;
-  allPokemon.forEach(p => { p.nickname = buildNickname(p, getNickSlot(p), val); });
+  allPokemon.forEach(p => {
+    const suggested = buildNickname(p, getNickSlot(p), val);
+    const ov = (typeof overridesCache !== 'undefined') ? overridesCache[p.stableKey] : null;
+    // Re-apply any nick override on top of the recomputed suggested nick.
+    if (typeof applyNickOverride === 'function') applyNickOverride(p, ov, suggested);
+    else p.nickname = suggested;
+  });
   applyFilters();
 }
 
 function setDecFilter(f,btn){
+  trackEvent('filter_click', { filter: f });
   // Toggle off if clicking the already-active filter
   if(decFilter===f){ decFilter='all'; document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected')); applyFilters(); return; }
   decFilter=f;
@@ -663,6 +781,7 @@ function setDecFilter(f,btn){
 }
 
 function toggleDmaxFilter(btn){
+  trackEvent('filter_click', { filter: 'dmax' });
   showDynamaxOnly=!showDynamaxOnly;
   if(showDynamaxOnly){ showGigantamaxOnly=false; document.getElementById('gmaxFilterBtn')?.classList.remove('active'); }
   btn.classList.toggle('active',showDynamaxOnly);
@@ -670,6 +789,7 @@ function toggleDmaxFilter(btn){
 }
 
 function toggleGmaxFilter(btn){
+  trackEvent('filter_click', { filter: 'gmax' });
   showGigantamaxOnly=!showGigantamaxOnly;
   if(showGigantamaxOnly){ showDynamaxOnly=false; document.getElementById('dmaxFilterBtn')?.classList.remove('active'); }
   btn.classList.toggle('active',showGigantamaxOnly);
@@ -682,6 +802,7 @@ function toggleMovesColumn(btn){
 }
 
 function cycleHundoFilter(btn){
+  trackEvent('filter_click', { filter: 'hundo' });
   hundoMode=(hundoMode+1)%4;
   // Clear other filter buttons and sum-card highlights
   document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active','act-trade','act-review','act-protected'));
@@ -700,24 +821,28 @@ function cycleHundoFilter(btn){
 }
 
 function toggleLeague(l,btn){
+  trackEvent('filter_click', { filter: 'league_' + l });
   if(leagueFilters.has(l)){leagueFilters.delete(l);btn.classList.remove('active');}
   else{leagueFilters.add(l);btn.classList.add('active');}
   applyFilters();
 }
 
 function filterBestInLeague(btn){
+  trackEvent('filter_click', { filter: 'best_in_league' });
   bestLeagueOnly=btn.classList.toggle('active');
   if(bestLeagueOnly){ costlyOnly=false; document.getElementById('costlyBtn')?.classList.remove('active'); }
   applyFilters();
 }
 
 function filterCostlyWinners(btn){
+  trackEvent('filter_click', { filter: 'costly' });
   costlyOnly=btn.classList.toggle('active');
   if(costlyOnly){ bestLeagueOnly=false; document.getElementById('bestLeagueBtn')?.classList.remove('active'); }
   applyFilters();
 }
 
 function togglePractical(btn){
+  trackEvent('filter_click', { filter: 'practical' });
   practicalMode=btn.classList.toggle('active');
   applyFilters();
 }
@@ -743,6 +868,7 @@ const LEAGUE_SYMS_P={L:'ⓛ',G:'Ⓖ',U:'Ⓤ',M:'Ⓡ'};
 
 function openPurifyModal(){
   if(!allPokemon.length){alert('Load your collection first');return;}
+  trackEvent('purify_modal_open');
   const modal=document.getElementById('purify-modal');
   const body=document.getElementById('purify-modal-body');
   const sub=document.getElementById('purify-modal-sub');
@@ -813,14 +939,14 @@ function openPurifyModal(){
     return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
         padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px${isHundoOnly?';background:rgba(255,215,0,0.05)':''}">
       <div>
-        <div style="font-weight:700;color:var(--text)">${p.name}${p.purifyEvo&&p.purifyEvo!==p.name?' <span style="color:var(--muted);font-size:11px;font-weight:400">→ '+p.purifyEvo+'</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
+        <div style="font-weight:700;color:var(--text)">${esc(p.name)}${p.purifyEvo&&p.purifyEvo!==p.name?' <span style="color:var(--muted);font-size:11px;font-weight:400">→ '+esc(p.purifyEvo)+'</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
           ${p.purifyHundo?'<span style="color:var(--gold);font-size:10px"> ✨ Becomes hundo!</span>':''}
         </div>
         <div style="color:var(--muted);font-size:11px">IVs: ${ivStr} → ${purifiedIvStr}${lg?' · <span style="color:'+lgColor+';font-weight:700">'+lgName+'</span> est. <span style="font-weight:700;color:var(--green)">'+p.purifyRankPct+'%</span>':''} · dust: <span style="color:var(--cyan)">${purifyDust>0?purifyDust.toLocaleString():'at cap'}</span></div>
       </div>
       <button class="copy-search-btn" onclick="copyGoSearch('${p.name}&cp${p.cp}&shadow',this)" title="Copy name+CP+shadow to find in GO/Pokégenie">🔍</button>
       <button class="copy-search-btn" onclick="copyGoSearch('${ivStr}',this)" title="Copy IVs to search in Pokégenie">IV</button>
-      <span onclick="copyGoSearch('${purifyNick}',this)" style="font-family:monospace;color:var(--gold);cursor:pointer;font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;white-space:nowrap" title="Click to copy purified nick">${purifyNick}</span>
+      <span onclick="copyGoSearch('${purifyNick}',this)" style="font-family:monospace;color:var(--gold);cursor:pointer;font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;white-space:nowrap" title="Click to copy purified nick">${esc(purifyNick)}</span>
     </div>`;
   }).join('');
 
@@ -847,6 +973,7 @@ function isShinyTradeable(p){
 
 function openShinyModal(){
   if(!allPokemon.length){alert('Load your collection first');return;}
+  trackEvent('shinies_modal_open');
   const modal=document.getElementById('shiny-modal');
   const body=document.getElementById('shiny-modal-body');
   const sub=document.getElementById('shiny-modal-sub');
@@ -908,7 +1035,7 @@ function openShinyModal(){
     return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
         padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px">
       <div>
-        <div style="font-weight:700;color:var(--text)">${p.name}${p.form?' <span style="color:var(--muted);font-size:11px;font-weight:400">('+p.form+')</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
+        <div style="font-weight:700;color:var(--text)">${esc(p.name)}${p.form?' <span style="color:var(--muted);font-size:11px;font-weight:400">('+esc(p.form)+')</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
           ${tradeable?'<span style="color:var(--red);font-size:10px;margin-left:4px">Trade?</span>':''}
         </div>
         <div style="color:var(--muted);font-size:11px">IVs: ${ivStr} · <span style="color:${ivColor}">${iv}%</span> · ${slotStr}
@@ -917,7 +1044,7 @@ function openShinyModal(){
       </div>
       <span style="font-size:10px;padding:2px 6px;border-radius:4px" class="${decClass}">${decLabel}</span>
       <button class="copy-search-btn" data-copy="${searchStr}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search for this Pokémon">🔍 Me</button>
-      <span onclick="copyGoSearch('${nick.replace(/'/g,"\\'").replace(/&/g,'&amp;')}',this)" style="font-family:monospace;color:var(--gold);cursor:pointer;font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;white-space:nowrap" title="Click to copy nick">${nick||'—'}</span>
+      <span onclick="copyGoSearch('${nick.replace(/'/g,"\\'").replace(/&/g,'&amp;')}',this)" style="font-family:monospace;color:var(--gold);cursor:pointer;font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;white-space:nowrap" title="Click to copy nick">${nick?esc(nick):'—'}</span>
     </div>`;
   }).join('');
 
@@ -1289,7 +1416,7 @@ function renderDexHaveView(body, filteredSpecies) {
       return `<div class="dex-row">
   <div class="dex-row-main">
     <span class="dex-num">#${numStr}</span>
-    <button class="dex-name-link" onclick="dexNavigate('${safeName}')">${s.name}</button>
+    <button class="dex-name-link" onclick="dexNavigate('${safeName}')">${esc(s.name)}</button>
     <span class="dex-types">${s.type1}${type2str}</span>
     ${rightHtml}
   </div>
@@ -1495,14 +1622,14 @@ function renderDexMissingView(body, filteredSpecies) {
       }
       if (parts.length) {
         parts.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-        familyLuckyHtml = `<span class="dex-family-lucky">${parts.map(p => `${p.count}🍀 ${p.name}`).join(', ')}</span>`;
+        familyLuckyHtml = `<span class="dex-family-lucky">${parts.map(p => `${p.count}🍀 ${esc(p.name)}`).join(', ')}</span>`;
       }
     }
 
     return `<div class="dex-row dex-row-missing${!s.is_in_go ? ' dex-not-in-go' : ''}" onclick="navigator.clipboard?.writeText('${safeName}')" title="Tap to copy GO search string">
   <div class="dex-row-main">
     <span class="dex-num">#${numStr}</span>
-    <button class="dex-name-link" onclick="event.stopPropagation();dexNavigate('${safeName}')">${s.name}</button>
+    <button class="dex-name-link" onclick="event.stopPropagation();dexNavigate('${safeName}')">${esc(s.name)}</button>
     <span class="dex-types">${s.type1}${type2str}</span>
     ${noticeHtml}
     ${canEvolveHtml}
@@ -1515,6 +1642,7 @@ function renderDexMissingView(body, filteredSpecies) {
 // ── Cull modal ──────────────────────────────────
 function openCullModal(focusFam){
   if(!allPokemon.length){alert('Load your collection first');return;}
+  trackEvent('cull_modal_open');
   const modal=document.getElementById('cull-modal');
   const body=document.getElementById('cull-modal-body');
   const sub=document.getElementById('cull-modal-sub');
@@ -1590,15 +1718,15 @@ function openCullModal(focusFam){
       const nickEscAttr=nick.replace(/"/g,'&quot;');
       return `<div style="font-size:11px;color:var(--muted);padding-left:4px;margin-top:2px">
         <span style="color:${p.isMlPlaceholder?'var(--muted)':'var(--gold)'}">${p.isMlPlaceholder?'☆':'★'}</span>
-        ${p.name} CP:${p.cp}
-        ${nick?`<span style="font-family:monospace;color:${p.isMlPlaceholder?'var(--muted)':'var(--green)'};cursor:pointer" data-nick="${nickEscAttr}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy">${nick}</span>`:''}
+        ${esc(p.name)} CP:${p.cp}
+        ${nick?`<span style="font-family:monospace;color:${p.isMlPlaceholder?'var(--muted)':'var(--green)'};cursor:pointer" data-nick="${nickEscAttr}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy">${esc(nick)}</span>`:''}
         ${p.isMlPlaceholder?'<span style="font-size:9px;color:var(--dim)">(ML placeholder)</span>':''}
       </div>`;
     }).join('');
 
     return `<div style="padding:8px 16px;border-bottom:1px solid var(--border)${cullBorderStyle?';'+cullBorderStyle:''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span data-name="${nameEsc}" onclick="navigateToFamily(this.dataset.name)" style="font-weight:700;font-size:13px;cursor:pointer;color:var(--cyan)" title="View family in main list">${fam.primaryName}</span>
+        <span data-name="${nameEsc}" onclick="navigateToFamily(this.dataset.name)" style="font-weight:700;font-size:13px;cursor:pointer;color:var(--cyan)" title="View family in main list">${esc(fam.primaryName)}</span>
         <span style="color:var(--muted);font-size:11px">${fam.members.length}</span>
         <span style="font-size:11px">: <span style="color:var(--red)">${redCount}★</span> &nbsp;<span style="color:var(--gold)">${luckyCount}🍀</span>&nbsp; <span style="color:var(--muted)">${unstarredCount}🗑</span></span>
         <button class="copy-search-btn" data-copy="${searchEsc}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 Fam</button>
@@ -1647,14 +1775,14 @@ function openMergeModal(scrollToKey){
       return da.localeCompare(db);
     });
 
-    const famEsc=cand.family.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    const famEsc=esc(cand.family); // esc() is safe in both the data-attr and the visible "<fam> family" text node
     const memberRows=sorted.map(p=>{
       const iv=`${p.atkIV}/${p.defIV}/${p.staIV}`;
       const catchStr=p.catchDate||'<span style="color:var(--gold)">no date</span>';
       const origStr=p.originalScanDate||'—';
       const searchStr=(p.name.toLowerCase()+'&cp'+(p.cp||0)).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
       return `<div style="padding:3px 0 3px 12px">
-        <button class="merge-copy-btn" data-search="${searchStr}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO search: ${searchStr}"><span style="font-weight:700;font-size:12px">${p.name} CP:${p.cp} ${iv}</span></button>
+        <button class="merge-copy-btn" data-search="${searchStr}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO search: ${searchStr}"><span style="font-weight:700;font-size:12px">${esc(p.name)} CP:${p.cp} ${iv}</span></button>
         <div style="font-size:9px;color:var(--muted);margin-top:1px">catch:${catchStr}&nbsp;&nbsp;orig:${origStr}</div>
       </div>`;
     }).join('');
@@ -1803,8 +1931,8 @@ function openCleanupModal(){
         const cleanNameEsc=p.name.replace(/"/g,'&quot;');
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
-            <div class="pv-modal-name"><a href="#" data-name="${cleanNameEsc}" onclick="event.preventDefault();cleanupNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${p.name}</a></div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV${cleanNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${cleanNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${cleanNick}</span>`:''} · ${p.catchDate||'no catch date'} · ${stableTag}</div>
+            <div class="pv-modal-name"><a href="#" data-name="${cleanNameEsc}" onclick="event.preventDefault();cleanupNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${esc(p.name)}</a></div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV${cleanNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${cleanNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(cleanNick)}</span>`:''} · ${p.catchDate||'no catch date'} · ${stableTag}</div>
           </div>
           <div class="pv-modal-controls">
             <select class="pv-modal-select" onchange="setOverride('${p.stableKey}','special_form',this.value);allPokemon.find(x=>x.stableKey==='${p.stableKey}').specialForm=this.value;">${opts}</select>
@@ -1903,8 +2031,8 @@ function openSpecialModal(){
         const specNickEsc=specNick.replace(/"/g,'&quot;');
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
-            <div class="pv-modal-name"><a href="#" data-name="${p.name.replace(/"/g,'&quot;')}" onclick="event.preventDefault();specialNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${p.name}</a></div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV${specNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${specNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${specNick}</span>`:''} · ${displayDate}</div>
+            <div class="pv-modal-name"><a href="#" data-name="${p.name.replace(/"/g,'&quot;')}" onclick="event.preventDefault();specialNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${esc(p.name)}</a></div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV${specNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${specNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(specNick)}</span>`:''} · ${displayDate}</div>
           </div>
           <div class="pv-modal-controls">
             <label class="pv-modal-cb"><input type="checkbox" class="special-cb-shiny" data-key="${p.stableKey}" ${p.isShiny?'checked':''} onchange="setOverride('${p.stableKey}','is_shiny',this.checked);allPokemon.find(x=>x.stableKey==='${p.stableKey}').isShiny=this.checked;updateSelectAllHeader('shiny')"> ✨ Shiny</label>
@@ -1999,6 +2127,7 @@ function processCloudRows(rows) {
         document.getElementById('loading-section').style.display='none';
         document.getElementById('dashboard').style.display='block';
         renderSummary(allPokemon); applyFilters();
+        trackEvent('cloud_load', { pokemon_count: allPokemon.length });
         if (initialHash && initialHash !== '#' && initialHash !== '') {
           history.replaceState(null, '', initialHash);
           initialHash = '';
@@ -2006,7 +2135,7 @@ function processCloudRows(rows) {
         applyHashState();
         const filenameEl=document.getElementById('csvFilename');
         if(filenameEl){filenameEl.textContent='';filenameEl.style.display='none';}
-        document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
+        document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();trackSearchDebounced(searchTerm);document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
         document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
         loadOverrides();
         clearIncompleteWarningIfHealthy(rows.length);
@@ -2104,7 +2233,12 @@ function setOverride(idx, field, value) {
     } else if (slots.includes('shiny') || slots.includes('shiny_lower')) ns = 'shiny';
     else if (slots.includes('lucky')) { const ll=['U','G','L','M'].find(l=>(p['rankPct'+l]||0)>=90); ns=ll||'M'; }
     else ns = 'review';
-    p.nickname = buildNickname(p, ns);
+    const suggested = buildNickname(p, ns);
+    // Re-apply any nick override on top of the recomputed suggested nick so toggling
+    // shiny/dmax/etc. doesn't silently discard a user's custom nick.
+    const ovNick = (typeof overridesCache !== 'undefined') ? overridesCache[p.stableKey] : null;
+    if (typeof applyNickOverride === 'function') applyNickOverride(p, ovNick, suggested);
+    else p.nickname = suggested;
   }
   // Re-render this row so star colour, nick, and decision badge update immediately
   const tr = document.querySelector(`tr[data-idx="${p.idx}"]`);
@@ -2124,14 +2258,9 @@ function setOverride(idx, field, value) {
       const vt = nameTd.querySelector('.poke-variants');
       if (vt) vt.innerHTML = variantTags(p);
     }
-    // Update nick cell when nick was rebuilt
-    if (NICK_FIELDS.has(field)) {
-      const nickTd = tr.cells[3];
-      if (nickTd && nickTd.firstChild) {
-        nickTd.firstChild.nodeValue = p.nickname;
-        nickTd.dataset.nick = p.nickname;
-      }
-    }
+    // Update nick cell when nick was rebuilt (re-renders the full cell so the
+    // override indicator / reset affordance stay in sync with the new structure).
+    if (NICK_FIELDS.has(field)) rerenderNickCell(p);
   }
   // Save to Supabase
   saveOverride(idx, {[field]: value});
@@ -2145,6 +2274,11 @@ async function clearOverride(idx) {
   if (!p) return;
   p.isShiny = false; p.isDynamax = false; p.isGigantamax = false;
   p.vivillonPattern = ''; p.manualDecision = ''; p.notes = '';
+  // Clearing all overrides also drops any nick override → restore suggested nick.
+  if (p.nickOverridden && typeof applyNickOverride === 'function') {
+    applyNickOverride(p, null, p.suggestedNickname);
+    if (typeof rerenderNickCell === 'function') rerenderNickCell(p);
+  }
   await deleteOverride(idx);
   updateSyncStatus('✓ Cleared', 'ok');
   if (allPokemon.length) renderSummary(allPokemon);
@@ -2177,10 +2311,85 @@ function copyNick(el, text) {
     document.body.removeChild(ta);
   });
   showToast('Copied!');
+  // PII redaction: send only a shape descriptor, never the raw nick.
+  trackEvent('nick_copy', buildNickShape(text));
   const orig = el.textContent;
   el.textContent = '✓ Copied!';
   el.style.color = 'var(--green)';
   setTimeout(()=>{ el.textContent=orig; el.style.color=''; }, 1500);
+}
+
+// ═══════════════════════════════════════════════
+// NICK OVERRIDE — inline editing
+// ═══════════════════════════════════════════════
+// Pure decision helper for the edit input's keydown: Enter commits, Esc cancels.
+// Extracted so the lifecycle is unit-testable without a DOM.
+function nickEditKey(key, value) {
+  if (key === 'Enter') return { action: 'commit', value };
+  if (key === 'Escape' || key === 'Esc') return { action: 'cancel' };
+  return { action: 'none' };
+}
+
+// Tap the nick → swap the displayed span for a controlled <input>. Enter/blur commits,
+// Esc reverts. A controlled input (never contenteditable) keeps user text inert — the
+// value is only ever read as a string and re-rendered through esc(), so no XSS path.
+function beginNickEdit(stableKey, cellEl) {
+  if (!cellEl || cellEl.querySelector('.nick-edit-input')) return; // already editing
+  const p = allPokemon.find(x => x.stableKey === stableKey);
+  if (!p) return;
+  const span = cellEl.querySelector('.main-nick');
+  const current = (p.nickname != null) ? p.nickname : '';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'nick-edit-input';
+  input.value = current;
+  input.maxLength = (typeof MAX_NICK_LENGTH !== 'undefined') ? MAX_NICK_LENGTH : 64;
+  let done = false;
+  input.addEventListener('keydown', (e) => {
+    const r = nickEditKey(e.key, input.value);
+    if (r.action === 'commit') { e.preventDefault(); done = true; commitNickEdit(stableKey, r.value); }
+    else if (r.action === 'cancel') { e.preventDefault(); done = true; cancelNickEdit(stableKey); }
+  });
+  input.addEventListener('blur', () => { if (!done) { done = true; commitNickEdit(stableKey, input.value); } });
+  if (span) span.replaceWith(input); else cellEl.appendChild(input);
+  input.focus();
+  input.select();
+}
+
+async function commitNickEdit(stableKey, value) {
+  // Trim + cap on the client (defense-in-depth; saveNickOverride clamps again at write).
+  const clean = (typeof clampNick === 'function') ? clampNick(value) : String(value == null ? '' : value).trim().slice(0, 64);
+  const ok = await saveNickOverride(stableKey, clean);
+  const p = allPokemon.find(x => x.stableKey === stableKey);
+  if (p) rerenderNickCell(p);
+  return ok;
+}
+
+function cancelNickEdit(stableKey) {
+  // No write — just re-render the cell from current state.
+  const p = allPokemon.find(x => x.stableKey === stableKey);
+  if (p) rerenderNickCell(p);
+}
+
+async function resetNick(stableKey) {
+  // Clear the override (null), restoring the suggested nick.
+  const ok = await saveNickOverride(stableKey, null);
+  const p = allPokemon.find(x => x.stableKey === stableKey);
+  if (p) rerenderNickCell(p);
+  return ok;
+}
+
+// Re-render just the nick cell for a Pokémon after an edit. Null-safe (no-op when
+// the row isn't in the DOM, e.g. in tests).
+function rerenderNickCell(p) {
+  if (typeof document === 'undefined') return;
+  const tr = document.querySelector(`tr[data-idx="${p.idx}"]`);
+  if (!tr || typeof buildRow !== 'function') return;
+  const tmp = document.createElement('tbody');
+  tmp.innerHTML = buildRow(p);
+  const newTr = tmp.children[0];
+  const newNick = newTr && newTr.cells ? newTr.cells[3] : null;
+  if (newNick && tr.cells && tr.cells[3]) tr.cells[3].replaceWith(newNick);
 }
 
 function copyNicks(famKey, btnEl) {
@@ -2208,6 +2417,7 @@ function copyNicks(famKey, btnEl) {
 // EXPORT
 // ═══════════════════════════════════════════════
 function exportCSV(){
+  trackEvent('export_click');
   const h=['Family','Name','Form','CP','SuggestedNickname','Decision','Reason','Slots','TargetEvo',
     'IV%','Atk/Def/Sta','Level','LittleRank%','GreatRank%','UltraRank%','MasterIV%',
     'DustCost','QuickMove','ChargeMove1','ChargeMove2','TMNotes',
@@ -2305,6 +2515,7 @@ function handleFile(file){
               document.getElementById('loading-section').style.display='none';
               document.getElementById('dashboard').style.display='block';
               renderSummary(allPokemon);applyFilters();
+              trackEvent('csv_upload', { pokemon_count: allPokemon.length });
               if (initialHash && initialHash !== '#' && initialHash !== '') {
                 history.replaceState(null, '', initialHash);
                 initialHash = '';
@@ -2314,7 +2525,7 @@ function handleFile(file){
               if(filenameEl){filenameEl.textContent=' · '+file.name;filenameEl.style.display='inline';}
               loadOverrides();
               handleCloudSave(allPokemon);  // guards on auth internally
-              document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
+              document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();trackSearchDebounced(searchTerm);document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
               document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
             },50);
           }catch(err){clearTimeout(watchdog);setLoadInProgress(false);showError('Analysis failed',err.message+'\n'+(err.stack||'').split('\n').slice(0,3).join('\n'));}
@@ -2369,6 +2580,7 @@ async function handleCloudSave(pokemon) {
       if (textEl) textEl.textContent = `of ${tot.toLocaleString()} Pokémon`;
     });
     showToast(`✓ Saved ${total.toLocaleString()} Pokémon to cloud`);
+    trackEvent('cloud_save', { pokemon_count: total });
   } catch (err) {
     showToast('Save failed — check sync status');
     console.error('handleCloudSave error:', err);
