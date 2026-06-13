@@ -90,6 +90,18 @@ Thresholds: Little 100k | Great 150k | Ultra 300k | Master ∞
 | Great | 150k | 250k | 350k |
 | Ultra | 300k | 400k | 500k |
 
+### Dynamax / Gigantamax slots (per evolution target)
+Best Dmax/Gmax candidate gets the `dynamax`/`gigantamax` slot; if it already holds a
+league slot, the best remaining candidate **without** a league slot inherits it (same
+best-without-league-slot rule as Shadow).
+
+Candidate pools are keyed by **final evolution target** (`evolvedNameU || evolvedNameG ||
+name`) — the same base the Dmax/Gmax nick uses — **not** by species name. In a branching
+family (Eevee) this means two Dynamax Eevee rows pointing at different evolutions
+(`→Vaporeon` vs `→Flareon`) each surface their own keeper instead of collapsing into a
+single `Eevee` pool. Already-evolved final forms key on their own name, so single-stage
+species are unaffected. See `tests/analyse.eevee_master.test.js`.
+
 ---
 
 ## 5. Decisions

@@ -1153,13 +1153,21 @@ function analyse(rows) {
     if(purified.length) purified[0].slots.push('purified');
     members.filter(p=>p.isLucky).forEach(p=>p.slots.push('lucky'));
     members.filter(p=>p.isNundo).forEach(p=>p.slots.push('nundo'));
-    // Dynamax: best-IV per species gets 'dynamax' slot, unless it already holds a league slot.
-    // Best-without-league-slot: if best-IV holds a league slot, the best remaining candidate
-    // without a league slot inherits the Dmax/Gmax slot (regardless of IV gap — same as shadow).
+    // Dynamax: best-IV per evolution target gets 'dynamax' slot, unless it already holds a
+    // league slot. Best-without-league-slot: if best-IV holds a league slot, the best remaining
+    // candidate without a league slot inherits the Dmax/Gmax slot (regardless of IV gap — same
+    // as shadow).
+    // Branching families (Eevee): key by the final evolution target — the same base
+    // buildNickname uses for the dynamax nick (evolvedNameU||evolvedNameG||name) — so two
+    // Dynamax Eevee rows pointing at DIFFERENT evolutions (→Vaporeon vs →Flareon) each get
+    // their own keeper instead of collapsing into one 'Eevee' pool. For an already-evolved
+    // final form the target equals its own name, so single-stage species are unaffected.
+    const maxTargetKey = p => p.evolvedNameU || p.evolvedNameG || p.name;
     const dmaxCandidates = {};
     members.filter(p => p.isDynamax).forEach(p => {
-      if (!dmaxCandidates[p.name]) dmaxCandidates[p.name] = [];
-      dmaxCandidates[p.name].push(p);
+      const k = maxTargetKey(p);
+      if (!dmaxCandidates[k]) dmaxCandidates[k] = [];
+      dmaxCandidates[k].push(p);
     });
     Object.values(dmaxCandidates).forEach(cands => {
       cands.sort((a, b) => (b.ivAvg||0) - (a.ivAvg||0) || (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
@@ -1172,8 +1180,9 @@ function analyse(rows) {
     // Gigantamax: same best-without-league-slot logic
     const gmaxCandidates = {};
     members.filter(p => p.isGigantamax).forEach(p => {
-      if (!gmaxCandidates[p.name]) gmaxCandidates[p.name] = [];
-      gmaxCandidates[p.name].push(p);
+      const k = maxTargetKey(p);
+      if (!gmaxCandidates[k]) gmaxCandidates[k] = [];
+      gmaxCandidates[k].push(p);
     });
     Object.values(gmaxCandidates).forEach(cands => {
       cands.sort((a, b) => (b.ivAvg||0) - (a.ivAvg||0) || (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));

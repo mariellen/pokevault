@@ -32,6 +32,12 @@ _Updated: 13 Jun 2026_
 
 ## ⏳ WAITING FOR AN AGENT
 
+### Eevee Master + Dynamax Regression
+**Status:** Implementation complete — awaiting Opus post-check. v3.5.49 on branch `feature/eevee-master-dynamax-regression`. Opus pre-review was blocked (files not attached), so the trace was done in Claude Code. Issue 1 (Glaceon Master `…98m` placeholder) was already fixed by the prior Jolteon `hasBattleSlot` reset — only the missing non-shiny-Glaceon Master test was added. Issue 2 (Dynamax not separated per Eevee evolution) was a real bug: Dmax/Gmax pools keyed by `p.name` collapsed branching Eevees into one pool — fixed by keying on evolution target. New `analyse.eevee_master.test.js` (12 tests). Engine suites 322/322; the 4 pre-existing `csp.test.js` failures are unrelated (separate CSP thread).
+**Owner:** PIPELINE
+**Next action:** Push branch, open PR, run Opus post-review — see `reviews/eevee-master-dynamax-regression-impl-summary.md`
+_Updated: 13 Jun 2026_
+
 ### Playwright Expansion
 **Status:** Pipeline complete · Opus says: **APPROVE WITH NOTES.**
 **Owner:** YOU
