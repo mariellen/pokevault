@@ -14,10 +14,14 @@ Requires:
   export ANTHROPIC_API_KEY=your-key
 """
 
+from __future__ import annotations
+
 import argparse
 import asyncio
 import os
+import re
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +33,185 @@ DEFAULT_REVIEW_MODEL = "claude-opus-4-8"   # swap to "claude-fable-5" to try Fab
 HANDOFF_FILE         = Path("HANDOFF.md")
 REVIEWS_DIR          = Path("reviews")
 BRIEFS_DIR           = Path("briefs")
+
+# Anchor every file lookup to where pipeline.py lives, NOT the current working
+# directory — so resolution is the same no matter where you run the script from.
+REPO_ROOT            = Path(__file__).resolve().parent
+
+# ── File-attachment config ────────────────────────────────────────────────────
+# Markdown headers (case-insensitive, prefix match) that introduce a file list.
+FILE_SECTION_HEADERS = ("files needed", "files attached", "files to review")
+# Path-resolution prefixes, tried in order. "" means "exact path from repo root".
+RESOLVE_PREFIXES     = ("", "pokevault-refactor/js", "pokevault-refactor/tests", "reviews")
+# Self-imposed cap on embedded file payload (input context, not the 4096 output cap).
+MAX_FILE_TOKENS      = 100_000
+# Conservative chars/token proxy for source code (no tokenizer dependency).
+CHARS_PER_TOKEN      = 4
+
+# ── File attachment: parse → resolve → embed (shared by all pipeline handoffs) ─
+
+def parse_brief_file_list(brief_text: str) -> list[str]:
+    """Extract file paths listed as bullets under a Files-needed/attached/review header."""
+    paths: list[str] = []
+    capturing = False
+    seen_bullet = False
+    for line in brief_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            header = stripped.lstrip("#").strip().lower()
+            capturing = any(header.startswith(h) for h in FILE_SECTION_HEADERS)
+            seen_bullet = False
+            continue
+        if not capturing:
+            continue
+        m = re.match(r"^[-*]\s+(.+)$", stripped)
+        if m:
+            seen_bullet = True
+            raw = m.group(1).strip()
+            # Drop any "→ resolve to ..." annotation, backticks, and trailing prose.
+            raw = raw.split("→")[0].split("->")[0].strip().strip("`").strip()
+            token = raw.split()[0].strip("`,") if raw else ""
+            if token:
+                paths.append(token)
+        elif stripped == "":
+            continue
+        elif seen_bullet:
+            # Prose after the bullet list ends the section.
+            capturing = False
+    # De-duplicate, preserving order.
+    seen: set[str] = set()
+    out: list[str] = []
+    for p in paths:
+        if p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
+
+
+def _exists_normalized(path: Path) -> Path | None:
+    """Existence check that tolerates NFC/NFD unicode mismatch (e.g. the é in PokéVault)."""
+    if path.exists():
+        return path
+    parent = path.parent
+    if not parent.is_dir():
+        return None
+    target = unicodedata.normalize("NFC", path.name)
+    for entry in parent.iterdir():
+        if unicodedata.normalize("NFC", entry.name) == target:
+            return entry
+    return None
+
+
+def resolve_brief_path(listed: str, repo_root: Path = REPO_ROOT) -> Path | None:
+    """Resolve a brief-listed path to a real file confined under repo_root, or None."""
+    listed = listed.strip().strip("`")
+    rel = Path(listed)
+    root = repo_root.resolve()
+    for prefix in RESOLVE_PREFIXES:
+        base = root / prefix if prefix else root
+        # Try the full listed path under the prefix, then just the basename.
+        # The basename attempt fixes paths like `tests/foo.test.js` against the
+        # `pokevault-refactor/tests/` prefix (which would otherwise double `tests/`).
+        for candidate in (base / rel, base / rel.name):
+            hit = _exists_normalized(candidate)
+            if hit is None:
+                continue
+            try:
+                hit.resolve().relative_to(root)   # reject anything escaping repo root
+            except ValueError:
+                continue
+            return hit
+    return None
+
+
+def gather_brief_files(brief_text: str, repo_root: Path = REPO_ROOT):
+    """Resolve + read every file listed in the brief. Returns (found, missing).
+
+    found:   list of (repo-relative path str, file contents)
+    missing: list of items that could not be resolved or read
+    """
+    found: list[tuple[str, str]] = []
+    missing: list[str] = []
+    for item in parse_brief_file_list(brief_text):
+        resolved = resolve_brief_path(item, repo_root)
+        if resolved is None:
+            missing.append(item)
+            continue
+        try:
+            text = resolved.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError) as e:
+            missing.append(f"{item} (unreadable: {e})")
+            continue
+        rel = resolved.resolve().relative_to(repo_root.resolve())
+        found.append((str(rel), text))
+    return found, missing
+
+
+def _file_block(path: str, contents: str, note: str | None = None) -> str:
+    opener = f"=== FILE: {path} ==="
+    if note:
+        opener += f"  [{note}]"
+    return f"{opener}\n{contents}\n=== END FILE ==="
+
+
+def build_embedded_files_block(
+    brief_text: str,
+    repo_root: Path = REPO_ROOT,
+    max_tokens: int = MAX_FILE_TOKENS,
+) -> str:
+    """Inline file contents for a model with NO filesystem access (the Opus calls).
+
+    Files are emitted smallest-first so the largest (e.g. analyse.js) is last and
+    absorbs any truncation, guaranteeing smaller files always get through whole.
+    Returns "" when the brief lists no files at all.
+    """
+    found, missing = gather_brief_files(brief_text, repo_root)
+    for m in missing:
+        print(f"  ⚠️  Listed file not found / unreadable: {m}")
+    if not found and not missing:
+        return ""
+
+    found.sort(key=lambda ft: len(ft[1]))   # ascending size → largest last
+    budget = max_tokens * CHARS_PER_TOKEN
+    used = 0
+    blocks: list[str] = []
+    for relpath, text in found:
+        remaining = budget - used
+        if remaining <= 0:
+            blocks.append(_file_block(relpath, "", note="omitted — token budget exhausted"))
+            continue
+        if len(text) > remaining:
+            blocks.append(_file_block(
+                relpath, text[:remaining],
+                note=f"truncated to ~{remaining // CHARS_PER_TOKEN} tokens to fit budget",
+            ))
+            used = budget
+        else:
+            blocks.append(_file_block(relpath, text))
+            used += len(text)
+
+    header = ("## Attached Files\n\n"
+              "The following files referenced by the brief are included for review:\n")
+    if missing:
+        header += "\n> ⚠️ Could not attach: " + ", ".join(missing) + "\n"
+    return header + "\n" + "\n\n".join(blocks)
+
+
+def build_file_manifest(brief_text: str, repo_root: Path = REPO_ROOT) -> str:
+    """List resolved file paths for a consumer that reads files itself (Claude Code).
+
+    Claude Code has Read/Glob/Grep, so it gets live paths rather than stale inline
+    copies. Returns "" when the brief lists no files.
+    """
+    found, missing = gather_brief_files(brief_text, repo_root)
+    if not found and not missing:
+        return ""
+    lines = ["## Files referenced by this brief (read them with your Read tool):"]
+    for relpath, _ in found:
+        lines.append(f"- `{relpath}`")
+    for m in missing:
+        lines.append(f"- ⚠️ `{m}` — listed in brief but not found at expected paths")
+    return "\n".join(lines)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -201,11 +384,14 @@ async def run_claude_code(brief_path: Path, opus_review_path: Path, thread_name:
 
     brief_content = read(brief_path)
     opus_content  = read(opus_review_path)
+    file_manifest = build_file_manifest(brief_content)
 
     prompt = f"""You are implementing a fix for PokéVault based on a coordinator brief and an Opus architecture review.
 
 ## Bug Brief
 {brief_content}
+
+{file_manifest}
 
 ## Opus Pre-Implementation Review
 {opus_content}
@@ -272,9 +458,14 @@ async def run_pipeline(brief_path: Path, skip_pre_review: bool = False, model: s
     else:
         update_handoff(thread_name, "Pre-review in progress", "Wait — reviewer is analysing", "REVIEWER")
 
+        attached = build_embedded_files_block(brief_content)
+        pre_user_content = f"## Bug Brief\n\n{brief_content}"
+        if attached:
+            pre_user_content += f"\n\n{attached}"
+
         opus_pre = call_opus(
             system_prompt=PRE_REVIEW_SYSTEM,
-            user_content=f"## Bug Brief\n\n{brief_content}",
+            user_content=pre_user_content,
             label="Pre-implementation review",
             model=model,
         )
@@ -337,16 +528,23 @@ async def run_pipeline(brief_path: Path, skip_pre_review: bool = False, model: s
 
     impl_summary = read(impl_summary_path) if impl_summary_path.exists() else impl_result or "(No summary file written)"
 
-    opus_post = call_opus(
-        system_prompt=POST_REVIEW_SYSTEM,
-        user_content=f"""## Original Brief
+    # Re-attach the files under review so Opus can verify against real code.
+    # (v1: brief-listed files. Future: parse modified files from the impl-summary.)
+    post_attached = build_embedded_files_block(brief_content)
+    post_user_content = f"""## Original Brief
 {brief_content}
 
 ## Pre-Implementation Review
 {opus_pre}
 
 ## What Claude Code Did
-{impl_summary}""",
+{impl_summary}"""
+    if post_attached:
+        post_user_content += f"\n\n{post_attached}"
+
+    opus_post = call_opus(
+        system_prompt=POST_REVIEW_SYSTEM,
+        user_content=post_user_content,
         label="Post-implementation review",
         model=model,
     )
@@ -386,7 +584,30 @@ def main():
     parser.add_argument("--model",           default=DEFAULT_REVIEW_MODEL,
                                              help="Review model to use (default: claude-opus-4-8). Try: claude-fable-5")
     parser.add_argument("--status",          action="store_true", help="Print current HANDOFF.md and exit")
+    parser.add_argument("--dry-run",          action="store_true",
+                                             help="Preview the assembled prompts (with attached files) without calling any model")
     args = parser.parse_args()
+
+    if args.dry_run:
+        if not args.brief:
+            print("--dry-run needs --brief")
+            return
+        bp = Path(args.brief)
+        if not bp.exists():
+            print(f"❌ Brief not found: {bp}")
+            return
+        bc = read(bp)
+        block = build_embedded_files_block(bc)
+        manifest = build_file_manifest(bc)
+        print("=" * 60)
+        print("DRY RUN — Opus pre-review payload (system prompt omitted)")
+        print("=" * 60)
+        print(f"## Bug Brief\n\n{bc}" + (f"\n\n{block}" if block else "\n\n(no files listed in brief)"))
+        print("\n" + "=" * 60)
+        print("DRY RUN — Claude Code file manifest")
+        print("=" * 60)
+        print(manifest or "(no files listed in brief)")
+        return
 
     if args.status:
         if HANDOFF_FILE.exists():
