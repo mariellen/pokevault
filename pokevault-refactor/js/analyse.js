@@ -1006,7 +1006,14 @@ function analyse(rows) {
           // (rankM≥70 but <90) keeps the holding nick (…87m) and is not a real Master keeper.
           if (lg === 'M' && !best2.isShadow && isConfirmed) best2.wonMasterSlot = true;
           best2.targetEvo = stageName !== best2.name ? stageName : '';
-          best2.slotConfirmed = isConfirmed || !!best2.slotConfirmed; // purify loop may have already confirmed
+          // Bug 2 (June 2026): a TENTATIVE (sub-90) assignment must not inherit a stale
+          // slotConfirmed from a different league/pass. Preserve confirmation only when genuinely
+          // earned — this rank is ≥90, OR the Pokémon already holds a confirmed capped/Master slot,
+          // OR it is a purify-push slot that qualifies at its purified rank.
+          best2.slotConfirmed = isConfirmed
+            || best2.slots.some(s => RULES.leagues.includes(s)
+                 && (s === 'M' ? (best2.ivAvg||0) : (best2['rankPct'+s]||0)) >= RULES.keepThreshold)
+            || (best2.isPurifySlot && (best2.purifyRankPct||0) >= RULES.keepThreshold);
           if (!isConfirmed) best2.slots.push(lg+'_tentative');
           const eDustCheck = effectiveDust(best2);
           // Use league-specific evo key so a stage final for Little isn't blocked by a Great evo
@@ -1123,14 +1130,17 @@ function analyse(rows) {
           p.slotConfirmed = false; // prevent stale confirmed state carrying to capped-league wins
           if (p.targetEvo && p.name === p.targetEvo) p.targetEvo = '';
         });
-        // Promote the winner if it came from the extra-candidate pool (didn't win in the loop).
-        if (!winner.wonMasterSlot) {
-          if (!winner.slots.includes('M')) winner.slots.push('M');
-          winner.slots = winner.slots.filter(s => s !== 'M_tentative');
-          winner.wonMasterSlot = true;
-          winner.hasBattleSlot = true;
-          winner.slotConfirmed = true;
-        }
+        // Bug 1 (June 2026): ALWAYS re-affirm the winner's Master state, regardless of how it won.
+        // A Lucky that won its own variant group already has wonMasterSlot=true, so the old
+        // `if (!winner.wonMasterSlot)` guard skipped re-affirming slotConfirmed — leaving the
+        // (isLucky && !slotConfirmed) guard in hasLeagueSlot to drop the winner to the Ⓡ fallback
+        // instead of Ⓜ. Unconditional affirmation makes loop-winners and extra-candidate winners
+        // behave identically (idempotent for loop-winners: every flag was already set).
+        if (!winner.slots.includes('M')) winner.slots.push('M');
+        winner.slots = winner.slots.filter(s => s !== 'M_tentative');
+        winner.wonMasterSlot = true;
+        winner.hasBattleSlot = true;
+        winner.slotConfirmed = true;
         // A confirmed Master keeper exists for the family, so strip any TENTATIVE M slot
         // (…87m / Ⓡ raid holding) from other non-shadows — only one non-shadow Master slot.
         members.forEach(p => {
@@ -1220,7 +1230,13 @@ function analyse(rows) {
       else if (leagueSlot === 'M') p.dustCostBest = 0;
       else p.dustCostBest = p.dustMin || 0;
 
-      const hasLeagueSlot=p.slots.some(s=>RULES.leagues.includes(s)||s.endsWith('_affordable'))&&!(isLegendary&&p.slots.includes('best_overall')&&!p.slotConfirmed)&&!((p.isLucky||p.isShiny)&&!p.slotConfirmed);
+      // Bug 2 (June 2026): a Lucky/Shiny only "holds a league slot" for nick purposes when it owns
+      // a CONFIRMED (≥90) capped/Master slot — not merely a tentative one whose slotConfirmed may
+      // have leaked true. A sub-90 tentative slot must fall through to the Ⓡ/shiny holding nick.
+      const hasConfirmedCappedSlot = p.slots.some(s => RULES.leagues.includes(s)
+        && ((s === 'M' ? (p.ivAvg||0) : (p['rankPct'+s]||0)) >= RULES.keepThreshold
+            || (p.isPurifySlot && s === p.purifyLeague && (p.purifyRankPct||0) >= RULES.keepThreshold)));
+      const hasLeagueSlot=p.slots.some(s=>RULES.leagues.includes(s)||s.endsWith('_affordable'))&&!(isLegendary&&p.slots.includes('best_overall')&&!p.slotConfirmed)&&!((p.isLucky||p.isShiny)&&!hasConfirmedCappedSlot);
       const hasAffordableBackup=p.slots.some(s=>s.endsWith('_affordable'));
       const hasProtectedSlot=isLegendary&&p.slots.length>0;
       const qualifiesAny=RULES.leagues.some(l=>(p[`rankPct${l}`]||0)>=RULES.keepThreshold);
