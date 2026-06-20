@@ -231,8 +231,11 @@ function sortFamilyBy(thEl,col){
     if(th.dataset.col===col) th.classList.add(dir===1?'sort-asc':'sort-desc');
   });
 
+  // Render only the rows the active filters leave visible — a column re-sort must
+  // not re-reveal rows hidden by a league / Dmax / Gmax / search / practical filter
+  // (#23). fam.members keeps the new sort order; we just drop the filtered-out rows.
   const tbody=card.querySelector('tbody');
-  if(tbody) tbody.innerHTML=fam.members.map(p=>buildRow(p)).join('');
+  if(tbody) tbody.innerHTML=fam.members.filter(p=>isMemberVisible(p,fam)).map(p=>buildRow(p)).join('');
 }
 
 // ═══════════════════════════════════════════════
@@ -546,6 +549,39 @@ function renderPage(){
   document.getElementById('main-content').innerHTML=html+pagHtml;
 }
 
+// ── Row visibility — single source of truth ──────────────────────────────────
+// Decides whether one family-member row should be shown given the active filters.
+// Used by BOTH renderFamilyFiltered (initial paint) AND sortFamilyBy (column
+// re-sort) so re-sorting a filtered family can never re-reveal rows the filters
+// hid (regression #23: filters were lost when the sort order changed).
+//   • _leagueFiltered — set by renderPage from the league / Dmax / Gmax filters
+//   • hidden          — manual per-row hide
+//   • practicalMode   — hides expensive slot winners
+//   • search term     — when it matches only via an evo target, non-matching rows hide
+// `opts` lets unit tests inject {term, practical}; production reads the globals
+// (declared in render.js). `typeof` guards keep it safe under the loader, where
+// those globals are absent.
+function isMemberVisible(p, fam, opts){
+  if(p._leagueFiltered||p.hidden) return false;
+  const practical = (opts && 'practical' in opts) ? opts.practical
+    : (typeof practicalMode!=='undefined' && practicalMode);
+  if(practical && p.isExpensiveWinner) return false;
+  const rawTerm = (opts && 'term' in opts) ? opts.term
+    : (typeof searchTerm!=='undefined' ? searchTerm : '');
+  const term = (rawTerm||'').toLowerCase();
+  if(!term) return true;
+  const matchesViaEvo = fam && !fam.primaryName.toLowerCase().includes(term) &&
+    fam.members.some(q=>
+      (q.evolvedNameG||'').toLowerCase().includes(term)||
+      (q.evolvedNameU||'').toLowerCase().includes(term)||
+      (q.evolvedNameL||'').toLowerCase().includes(term));
+  if(!matchesViaEvo) return true; // name/dex search keeps the whole family visible
+  if(p.name.toLowerCase().includes(term)) return true;
+  if((p.targetEvo||'').toLowerCase().includes(term)) return true;
+  return (p.evolvedNameG||'').toLowerCase().includes(term)||
+         (p.evolvedNameU||'').toLowerCase().includes(term);
+}
+
 function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const {key,members,primaryName}=fam;
   const goldCount=members.filter(p=>p.isFavorite&&p.suggestStar).length;
@@ -601,16 +637,8 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
     </div>`;
   }
 
-  const memberMatchesTerm = p => {
-    if (!term || !termMatchesViaEvo) return true;
-    if (p.name.toLowerCase().includes(term)) return true;
-    if ((p.targetEvo||'').toLowerCase().includes(term)) return true;
-    return (p.evolvedNameG||'').toLowerCase().includes(term) ||
-           (p.evolvedNameU||'').toLowerCase().includes(term);
-  };
-
-  const visible=members.filter(p=>!p._leagueFiltered&&!p.hidden&&memberMatchesTerm(p)&&!(practicalMode&&p.isExpensiveWinner));
-  const hidden=members.filter(p=>p._leagueFiltered||p.hidden||!memberMatchesTerm(p)||(practicalMode&&p.isExpensiveWinner));
+  const visible=members.filter(p=>isMemberVisible(p,fam));
+  const hidden=members.filter(p=>!isMemberVisible(p,fam));
   const filteredNote=activeLeagues.length>0&&hidden.length>0?
     `<div style="padding:5px 12px;font-size:10px;color:var(--dim)">${hidden.length} row${hidden.length!==1?'s':''} hidden by league filter</div>`:'';
 
