@@ -23,26 +23,33 @@ _Updated: 13 Jun 2026_
 _Updated: 13 Jun 2026_
 
 ### Refactor Redirect Cleanup
-**Status:** PR #10 open — CloudFront Function for /pokevault-refactor/* redirect + infra scaffolding.
+**Status:** PR #10 open — CloudFront Function for /pokevault
+-refactor/* redirect + infra scaffolding.
 **Owner:** YOU
 **Next action:** Review and merge https://github.com/mariellen/pokevault/pull/10 (requires CloudFront deploy after merge)
 _Updated: 13 Jun 2026_
+
+### Dynamax Master Flag
+**Status:** Implementation complete — Opus approved. PR #27 open, awaiting CI + merge.
+**Owner:** YOU
+**Next action:** Check CI is green on PR #27 then merge.
+_Updated: 20 Jun 2026_
 
 ---
 
 ## ⏳ WAITING FOR AN AGENT
 
-### Dynamax Master Flag
-**Status:** Implementation complete — awaiting Opus post-check
+### Bug Batch June 2026
+**Status:** Implementation complete — awaiting Opus post-check. Implemented Bug 1 (Lucky Master winner → Ⓜ) and Bug 2 (shiny non-winner → Ⓡ) per Opus guidance; v3.5.50. ⚠️ Opus review provided was TRUNCATED after Bug 2 — Bugs 3–7 have NO Opus guidance and are NOT implemented. Bug 1's plain-loser→Ⓡ98 case is gated on the (un-reviewed, Mariellen-sign-off) Bug 3 decision and left as a skipped test. See `reviews/bug-batch-june-2026-impl-summary.md`. Suite green (683 pass; 4 pre-existing csp.test.js fails are unrelated).
 **Owner:** PIPELINE
-**Next action:** Opus post-review of `reviews\dynamax-master-flag-impl-summary.md` + diff (analyse.js engine changes 1–5, RULES.md, +8 new tests, fixtures updated). All 711 tracked tests green; v3.5.51. Branch `feature/dynamax-master-flag` pushed (commit e63ca7a). `gh` CLI not installed this run — open the PR via: https://github.com/mariellen/pokevault/pull/new/feature/dynamax-master-flag
+**Next action:** Opus post-check the Bug 1/Bug 2 fixes, then supply the completed review for Bugs 3–7. PR: https://github.com/mariellen/pokevault/pull/18
 _Updated: 20 Jun 2026_
 
-### Feature Batch June 2026
-**Status:** Pipeline complete · Opus says: **APPROVE WITH NOTES.**
+### Pipeline File Attachment
+**Status:** Pre-review complete → see `reviews\pipeline-file-attachment-opus-pre.md`
 **Owner:** YOU
-**Next action:** Read `reviews\feature-batch-june-2026-opus-post.md` and decide: approve merge or send back to Claude Code
-_Updated: 20 Jun 2026 13:11_
+**Next action:** Review findings, then press Enter to dispatch Claude Code (or Ctrl+C to pause)
+_Updated: 14 Jun 2026 17:09_
 
 ### Playwright Expansion
 **Status:** Pipeline complete · Opus says: **APPROVE WITH NOTES.**
