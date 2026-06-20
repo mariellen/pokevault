@@ -100,8 +100,10 @@ same mechanism as regional/gender splits. No new keying logic needed.
     same-form not over-split)
   - `csv-filename.test.js` — 5 tests (persist, clear, overwrite, 120-char cap,
     textContent XSS-safety)
-- **Committed suite (what CI runs): 721 passed, 1 skipped, 0 failed.** (721 includes
-  main's `analyse.eevee_master` suite, picked up after rebasing onto current main.)
+- **Committed suite (what CI runs): 702 passed, 1 skipped, 0 failed across 28 suites.**
+  (Includes main's `analyse.eevee_master` suite, picked up after rebasing onto current
+  main, plus the 30 new tests in this PR. Measured with the untracked `csp.test.js`
+  excluded, matching what CI checks out.)
 - Locally the workspace also shows 4 failing tests in `tests/csp.test.js`, but that file
   is **untracked** — it is not on `main` and not in this commit, so **CI will not run it**.
   It is leftover WIP from the separate CSP-hardening thread and is unrelated to this PR
