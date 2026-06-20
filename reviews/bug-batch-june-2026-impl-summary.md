@@ -112,4 +112,4 @@ Version bumped `v3.5.48` → `v3.5.50` (title + logo span).
    Both Bug 2 tests pass; no regressions.
 
 ## PR URL
-_(to be filled after push)_
+https://github.com/mariellen/pokevault/pull/18

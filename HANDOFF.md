@@ -35,7 +35,7 @@ _Updated: 13 Jun 2026_
 ### Bug Batch June 2026
 **Status:** Implementation complete — awaiting Opus post-check. Implemented Bug 1 (Lucky Master winner → Ⓜ) and Bug 2 (shiny non-winner → Ⓡ) per Opus guidance; v3.5.50. ⚠️ Opus review provided was TRUNCATED after Bug 2 — Bugs 3–7 have NO Opus guidance and are NOT implemented. Bug 1's plain-loser→Ⓡ98 case is gated on the (un-reviewed, Mariellen-sign-off) Bug 3 decision and left as a skipped test. See `reviews/bug-batch-june-2026-impl-summary.md`. Suite green (683 pass; 4 pre-existing csp.test.js fails are unrelated).
 **Owner:** PIPELINE
-**Next action:** Opus post-check the Bug 1/Bug 2 fixes, then supply the completed review for Bugs 3–7. PR: _(to be filled after push)_
+**Next action:** Opus post-check the Bug 1/Bug 2 fixes, then supply the completed review for Bugs 3–7. PR: https://github.com/mariellen/pokevault/pull/18
 _Updated: 20 Jun 2026_
 
 ### Pipeline File Attachment
