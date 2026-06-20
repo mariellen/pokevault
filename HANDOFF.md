@@ -23,10 +23,17 @@ _Updated: 13 Jun 2026_
 _Updated: 13 Jun 2026_
 
 ### Refactor Redirect Cleanup
-**Status:** PR #10 open — CloudFront Function for /pokevault-refactor/* redirect + infra scaffolding.
+**Status:** PR #10 open — CloudFront Function for /pokevault
+-refactor/* redirect + infra scaffolding.
 **Owner:** YOU
 **Next action:** Review and merge https://github.com/mariellen/pokevault/pull/10 (requires CloudFront deploy after merge)
 _Updated: 13 Jun 2026_
+
+### Dynamax Master Flag
+**Status:** Implementation complete — Opus approved. PR #27 open, awaiting CI + merge.
+**Owner:** YOU
+**Next action:** Check CI is green on PR #27 then merge.
+_Updated: 20 Jun 2026_
 
 ---
 

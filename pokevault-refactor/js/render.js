@@ -22,6 +22,47 @@ const familySortState={};
 // ═══════════════════════════════════════════════
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
+// ═══════════════════════════════════════════════
+// BULK GO SEARCH (Feature Batch June 2026 — F1 🔍⭐ keepers, F2 🔍🔀 merge)
+// Build a GO-compatible `species&cpNNN,species&cpNNN` string for a set of members.
+// ═══════════════════════════════════════════════
+
+// GO search matches on a substring of the dex name. Spaces and most punctuation
+// break a comma-joined CP search, so reduce the species name to a safe token.
+// Hyphens are kept — GO accepts them (Ho-Oh → "ho-oh"). Spaces, dots, colons and
+// apostrophes are dropped ("Tapu Koko"→"tapukoko", "Mr. Mime"→"mrmime",
+// "Type: Null"→"typenull", "Farfetch'd"→"farfetchd"); é is folded to e (Flabébé).
+function goSpeciesToken(name){
+  return String(name||'').toLowerCase()
+    .replace(/[.\s:']/g,'')
+    .replace(/é/g,'e');
+}
+
+// Join members into `token&cpNNN,...`, de-duping identical name+cp pairs.
+function buildBulkCpSearch(members){
+  const seen=new Set();
+  const parts=[];
+  (members||[]).forEach(p=>{
+    const token=goSpeciesToken(p.name)+'&cp'+(p.cp||0);
+    if(seen.has(token)) return;
+    seen.add(token);
+    parts.push(token);
+  });
+  return parts.join(',');
+}
+
+// F1: gold + green stars = keep members with suggestStar (gold = also isFavorite,
+// green = not yet favorited). Both are suggestStar===true. Red stars
+// (isFavorite && !suggestStar) are intentionally excluded — they are not keepers.
+function familyStarKeepers(members){
+  return (members||[]).filter(p=>p.decision==='keep' && p.suggestStar);
+}
+
+// F2: merge-scan candidates — reuse the module-level mergeCandidateKeys Set (🔀 icon).
+function familyMergeCandidates(members){
+  return (members||[]).filter(p=>mergeCandidateKeys.has(p.stableKey));
+}
+
 function lrHTML(pct,num,dust,isLucky){
   if(!pct) return '<span class="lr-low">—</span>';
   const cls=pct>=90?'lr-90':pct>=70?'lr-70':'lr-low';
