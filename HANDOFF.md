@@ -35,7 +35,7 @@ _Updated: 13 Jun 2026_
 ### Dynamax Master Flag
 **Status:** Implementation complete — awaiting Opus post-check
 **Owner:** PIPELINE
-**Next action:** Opus post-review of `reviews\dynamax-master-flag-impl-summary.md` + diff (analyse.js engine changes 1–5, RULES.md, +8 new tests, fixtures updated). All 711 tracked tests green; v3.5.51. Branch `feature/dynamax-master-flag` — PR URL to be recorded once `gh`/push is available.
+**Next action:** Opus post-review of `reviews\dynamax-master-flag-impl-summary.md` + diff (analyse.js engine changes 1–5, RULES.md, +8 new tests, fixtures updated). All 711 tracked tests green; v3.5.51. Branch `feature/dynamax-master-flag` pushed (commit e63ca7a). `gh` CLI not installed this run — open the PR via: https://github.com/mariellen/pokevault/pull/new/feature/dynamax-master-flag
 _Updated: 20 Jun 2026_
 
 ### Feature Batch June 2026

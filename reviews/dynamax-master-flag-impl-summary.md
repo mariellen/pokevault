@@ -116,5 +116,6 @@ Tests:       1 skipped, 711 passed, 712 total
 
 ## PR
 
-Branch: `feature/dynamax-master-flag`. PR URL: _to be recorded once `gh`/push is available
-(see HANDOFF.md)._
+Branch: `feature/dynamax-master-flag` (commit `e63ca7a`, pushed to origin). The `gh` CLI is
+not installed in this environment, so the PR was not opened automatically. Open it via:
+**https://github.com/mariellen/pokevault/pull/new/feature/dynamax-master-flag**
