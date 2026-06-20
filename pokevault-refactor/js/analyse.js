@@ -31,6 +31,9 @@ function buildFamilyMap(rows) {
     'Aria','Pirouette',
     'Land','Sky',
     '10%','50%','Complete',
+    // F5 (June 2026): Urshifu — Single Strike (Fighting/Dark) and Rapid Strike
+    // (Fighting/Water) battle differently and must each keep their own slot.
+    'Single Strike','Rapid Strike',
   ]);
   // Species that are always standalone families regardless of Pokégenie evo data
   const STANDALONE_SPECIES = new Set(['Kleavor', 'Weezing|Galar']);

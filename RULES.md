@@ -309,6 +309,10 @@ that league's `rankPct` is ignored and no slot is assigned for that league.
   `NameⓇ{IV%}`. Dust exclusion threshold does **not** apply to these types.
 - Duplicate with no slot → `trade`, visibility star.
 
+### Urshifu (Single Strike / Rapid Strike)
+- The two battle forms are split into **separate families** via `FORM_SPLIT_FORMS` (see §8),
+  so each form keeps its own slot independently — added June 2026 (F5).
+
 ### Costumed
 - `isCostumed=true` (override) → `suggestStar=true` always.
 
@@ -479,10 +483,15 @@ detection (>40% threshold) so noisy data can't create spurious merges.
 Alola, Galar, Hisui, Paldea, Male, Female, Origin, Altered, Therian, Incarnate, Attack,
 Defense, Speed, Primal, Mega, Unbound, Rainy, Sunny, Snowy, Baile, Pa'u, Pom-Pom, Sensu,
 Small, Average, Large, Super, Combat, Blaze, Aqua, Plant, Sandy, Trash, Midnight, Dusk,
-Burn, Chill, Douse, Shock, Roaming, Hero, Aria, Pirouette, Land, Sky, 10%, 50%, Complete.
+Burn, Chill, Douse, Shock, Roaming, Hero, Aria, Pirouette, Land, Sky, 10%, 50%, Complete,
+**Single Strike, Rapid Strike** (Urshifu).
 
 > **`Normal` is NOT in this list** — it is normalised to `''` so species with and without an
 > explicit Normal form group together correctly.
+
+> **Single Strike / Rapid Strike** (Urshifu) added June 2026 (F5): the two battle forms
+> (Fighting/Dark vs Fighting/Water) play differently, so each gets its own family key
+> (`892|Single Strike`, `892|Rapid Strike`) and keeps its own slot independently.
 
 ### Standalone species (`STANDALONE_SPECIES`)
 `Kleavor` and `Weezing|Galar` — never merged into another family even when Pokégenie lists
@@ -591,6 +600,14 @@ become `_idx0` etc. Diagnostic logging added in `applyOverridesToPokemon()`; ful
 - **🔍 Me** copies the GO search string for this form only (with `!variant` exclusions).
 - **🔍 + Fam** copies all family species names comma-joined for Pokégenie
   (e.g. `Geodude,Graveler,Golem`).
+- **🔍⭐** (June 2026, F1) copies a GO-compatible `species&cpNNN,...` bulk search for ALL
+  recommended keepers in the family (gold + green stars = `decision==='keep' && suggestStar`).
+  Paste into GO → select all → bulk-star in Pokégenie. Hidden when the family has no keepers.
+- **🔍🔀** (June 2026, F2) same bulk `species&cpNNN,...` format for ALL merge-scan candidates
+  (`mergeCandidateKeys`, the 🔀 icon rows). Hidden when none.
+  - **Token rule** (`goSpeciesToken`, `render.js`): lowercase, keep hyphens (`Ho-Oh`→`ho-oh`),
+    strip spaces/dots/colons/apostrophes (`Tapu Koko`→`tapukoko`, `Mr. Mime`→`mrmime`,
+    `Farfetch'd`→`farfetchd`), fold `é`→`e` (`Flabébé`→`flabebe`). Identical name+cp pairs de-duped.
 
 ---
 

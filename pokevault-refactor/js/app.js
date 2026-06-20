@@ -79,6 +79,25 @@ function setLoadInProgress(active) {
   if(dz) dz.style.pointerEvents=active?'none':'';
 }
 
+// ═══════════════════════════════════════════════
+// CSV FILENAME LABEL (Feature Batch June 2026 — F3)
+// Single source of truth for the header "· filename" provenance label.
+// Persists to localStorage so it survives reloads / cloud auto-load. Uses
+// textContent (auto-escaped) — filenames can contain HTML metacharacters.
+// Call with a name to set+persist; call with null/'' to clear both.
+// ═══════════════════════════════════════════════
+function setCsvFilename(name){
+  const el=document.getElementById('csvFilename');
+  if(name){
+    const capped=String(name).slice(0,120);
+    try{ localStorage.setItem('pokevault_last_csv', capped); }catch(e){}
+    if(el){ el.textContent=' · '+capped; el.style.display='inline'; }
+  } else {
+    try{ localStorage.removeItem('pokevault_last_csv'); }catch(e){}
+    if(el){ el.textContent=''; el.style.display='none'; }
+  }
+}
+
 // Collection Tracker modal qualifier state
 let dexQualDmax    = false;
 let dexQualGmax    = false;
@@ -354,6 +373,11 @@ function renderFamily(fam,isOpen){
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const nameEsc=primaryName.replace(/"/g,'&quot;');
+  // F1/F2: bulk GO search strings — all keepers (🔍⭐) and all merge candidates (🔍🔀).
+  const _starKeepers=familyStarKeepers(members);
+  const _mergeCands=familyMergeCandidates(members);
+  const _starBulkEsc=buildBulkCpSearch(_starKeepers).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const _mergeBulkEsc=buildBulkCpSearch(_mergeCands).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
   const leagueDots=['L','G','U','M'].map(lg=>{
     const col=lg==='L'?'var(--little)':lg==='G'?'var(--great)':lg==='U'?'var(--ultra)':'var(--master)';
@@ -386,6 +410,8 @@ function renderFamily(fam,isOpen){
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''} <span style="color:var(--dim);font-size:11px">(${members.length})</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
+        ${_starKeepers.length?`<button class="copy-search-btn" data-copy="${_starBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'keepers',count:${_starKeepers.length}})" title="Copy GO search — all recommended keepers (CP) — paste into GO, select all, bulk-star">🔍⭐</button>`:''}
+        ${_mergeCands.length?`<button class="copy-search-btn" data-copy="${_mergeBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'merge',count:${_mergeCands.length}})" title="Copy GO search — all merge candidates (CP)">🔍🔀</button>`:''}
         ${goldCount?`<span class="fam-badge" style="color:var(--gold)">${goldCount}★</span>`:''}
         ${luckyCount?`<span class="fam-badge" style="color:var(--gold)">${luckyCount}🍀</span>`:''}
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
@@ -611,6 +637,11 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const goSearchEsc=goSearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const famSearchEsc=familySearchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const nameEsc=primaryName.replace(/"/g,'&quot;');
+  // F1/F2: bulk GO search strings — all keepers (🔍⭐) and all merge candidates (🔍🔀).
+  const _starKeepers=familyStarKeepers(members);
+  const _mergeCands=familyMergeCandidates(members);
+  const _starBulkEsc=buildBulkCpSearch(_starKeepers).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const _mergeBulkEsc=buildBulkCpSearch(_mergeCands).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
   const leagueDots=['L','G','U','M'].map(lg=>{
     const col=lg==='L'?'var(--little)':lg==='G'?'var(--great)':lg==='U'?'var(--ultra)':'var(--master)';
@@ -669,6 +700,8 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''}${collBadge} <span style="color:var(--dim);font-size:11px">(${members.length})${activeLeagues.length>0?' · '+visible.length+' shown':''}</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
+        ${_starKeepers.length?`<button class="copy-search-btn" data-copy="${_starBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'keepers',count:${_starKeepers.length}})" title="Copy GO search — all recommended keepers (CP) — paste into GO, select all, bulk-star">🔍⭐</button>`:''}
+        ${_mergeCands.length?`<button class="copy-search-btn" data-copy="${_mergeBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'merge',count:${_mergeCands.length}})" title="Copy GO search — all merge candidates (CP)">🔍🔀</button>`:''}
         ${goldCount?`<span class="fam-badge" style="color:var(--gold)">${goldCount}★</span>`:''}
         ${luckyCount?`<span class="fam-badge" style="color:var(--gold)">${luckyCount}🍀</span>`:''}
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
@@ -2133,8 +2166,9 @@ function processCloudRows(rows) {
           initialHash = '';
         }
         applyHashState();
-        const filenameEl=document.getElementById('csvFilename');
-        if(filenameEl){filenameEl.textContent='';filenameEl.style.display='none';}
+        // F3: cloud loads have no filename of their own — restore the last persisted
+        // CSV name as the collection's provenance (null → label stays hidden).
+        setCsvFilename(localStorage.getItem('pokevault_last_csv'));
         document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();trackSearchDebounced(searchTerm);document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
         document.getElementById('evoToggle').addEventListener('change',()=>applyFilters());
         loadOverrides();
@@ -2521,8 +2555,7 @@ function handleFile(file){
                 initialHash = '';
               }
               applyHashState();
-              const filenameEl=document.getElementById('csvFilename');
-              if(filenameEl){filenameEl.textContent=' · '+file.name;filenameEl.style.display='inline';}
+              setCsvFilename(file.name); // F3: persist + show the loaded CSV name
               loadOverrides();
               handleCloudSave(allPokemon);  // guards on auth internally
               document.getElementById('searchBox').addEventListener('input',ev=>{searchTerm=ev.target.value.toLowerCase();applyFilters();trackSearchDebounced(searchTerm);document.getElementById('searchClear')?.classList.toggle('visible',ev.target.value.length>0);});
@@ -2645,6 +2678,8 @@ window.addEventListener('load', async () => {
   // Falls back silently to the CSV import screen if cloud is empty or unavailable.
   if (allPokemon.length === 0) await autoLoadFromCloud();
   checkForIncompleteSave();
+  // F3: restore the last-loaded CSV name into the header (no-op if never set).
+  setCsvFilename(localStorage.getItem('pokevault_last_csv'));
 });
 
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});

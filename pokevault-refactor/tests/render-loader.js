@@ -24,7 +24,8 @@ const shim = `const overridesCache = {};\n`;
 
 const factory = new Function(
   shim + combined +
-  '\nreturn { buildRow, esc, buildNickname, applyNickOverride, clampNick };'
+  '\nreturn { buildRow, esc, buildNickname, applyNickOverride, clampNick,' +
+  ' goSpeciesToken, buildBulkCpSearch, familyStarKeepers, familyMergeCandidates, mergeCandidateKeys };'
 );
 
 module.exports = factory();
