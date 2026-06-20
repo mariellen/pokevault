@@ -178,10 +178,12 @@ describe('Dynamax — one keeper per evolution target', () => {
     expect(targets).toEqual(['Flareon', 'Jolteon', 'Vaporeon']);
   });
 
-  it('two Dynamax Eevees pointing at the SAME target share one pool (one slot, best IV)', () => {
+  it('two Dynamax Eevees pointing at the SAME target → best gets Ⓜ, the other kept as raid (Ⓡ)', () => {
+    // Per the dynamax-master-flag brief: only ONE Ⓜ per max-evo target (best IV), but
+    // every slot-less Dmax is kept as a raid candidate (Ⓡ) — both keep, neither traded.
     const rows = [
-      eeveeTo('Vaporeon', 500, 10, 10, 9, { idx: 1 }),    // 64.4% IV — better
-      eeveeTo('Vaporeon', 500, 7, 8, 8, { idx: 2 }),      // 51.1% IV — worse
+      eeveeTo('Vaporeon', 500, 10, 10, 9, { idx: 1 }),    // 64.4% IV — better → Ⓜ
+      eeveeTo('Vaporeon', 500, 7, 8, 8, { idx: 2 }),      // 51.1% IV — worse → Ⓡ raid
     ];
     const overrides = {
       [keyFor(NUM.Eevee, 10, 10, 9, 1)]: { is_dynamax: true },
@@ -189,9 +191,13 @@ describe('Dynamax — one keeper per evolution target', () => {
     };
     const { analyse: analyseOv } = loader.createWithOverrides(overrides);
     const eevees = analyseOv(toCSV(rows)).pokemon.filter(p => p.name === 'Eevee');
+    // Exactly one Ⓜ for the Vaporeon pool (the best IV); both slot-less Dmax are kept.
+    const masters = eevees.filter(p => p.wonDynamaxMaster);
+    expect(masters.length).toBe(1);
+    expect(Math.round(masters[0].ivAvg)).toBe(64);  // best-IV keeper carries Ⓜ
     const dmax = eevees.filter(p => p.slots.includes('dynamax'));
-    expect(dmax.length).toBe(1);                    // single shared Vaporeon pool
-    expect(Math.round(dmax[0].ivAvg)).toBe(64);     // best-IV keeper holds it
+    expect(dmax.length).toBe(2);                    // both kept as Dmax raid candidates
+    eevees.forEach(p => expect(p.decision).toBe('keep'));
   });
 
   it('a single-stage Dynamax species is unaffected (keys on its own name)', () => {
@@ -249,12 +255,13 @@ describe('Branching league separation still holds alongside Dynamax', () => {
     expect(slotsOf(jolt)).toContain('L');     // not displaced by the Leafeon
   });
 
-  it('a Dynamax keeper that also holds a league slot yields the slot to a slot-less sibling', () => {
-    // Best-IV Vaporeon-target Eevee (91% → wins a Master slot, a league slot); the Dmax
-    // slot for the Vaporeon pool must pass to the best Vaporeon-target Eevee WITHOUT one.
+  it('best-IV Dmax gets the Ⓜ flag; the slot-less sibling is kept as a raid candidate', () => {
+    // Per the dynamax-master-flag brief: Dmax are excluded from the regular Master pass,
+    // so the best-IV Vaporeon-target Eevee becomes the Ⓜ power-up candidate (wonDynamaxMaster)
+    // rather than winning a regular M slot. The lower-IV sibling is kept as a Dmax raid (Ⓡ).
     const rows = [
-      eeveeTo('Vaporeon', 1400, 14, 14, 13, { idx: 1 }),  // 91.1% → holds a league (M) slot, Dmax
-      eeveeTo('Vaporeon', 500, 10, 10, 9, { idx: 2 }),    // 64.4% → slot-less, Dmax
+      eeveeTo('Vaporeon', 1400, 14, 14, 13, { idx: 1 }),  // 91.1% → best Dmax → Ⓜ
+      eeveeTo('Vaporeon', 500, 10, 10, 9, { idx: 2 }),    // 64.4% → slot-less raid → Ⓡ
     ];
     const overrides = {
       [keyFor(NUM.Eevee, 14, 14, 13, 1)]: { is_dynamax: true },
@@ -262,11 +269,15 @@ describe('Branching league separation still holds alongside Dynamax', () => {
     };
     const { analyse: analyseOv } = loader.createWithOverrides(overrides);
     const eevees = analyseOv(toCSV(rows)).pokemon.filter(p => p.name === 'Eevee');
-    const slotted = eevees.find(p => p.cp === 1400);
-    const slotless = eevees.find(p => p.cp === 500);
-    expect(slotsOf(slotted).length).toBeGreaterThan(0);   // holds a league slot
-    expect(slotless.slots).toContain('dynamax');           // best-without-league-slot inherits it
-    expect(slotted.slots).not.toContain('dynamax');
+    const best = eevees.find(p => p.cp === 1400);
+    const sibling = eevees.find(p => p.cp === 500);
+    expect(best.wonDynamaxMaster).toBe(true);           // the Master power-up candidate
+    expect(best.wonMasterSlot).toBeFalsy();             // never a regular Master slot
+    expect(best.decision).toBe('keep');
+    expect(best.nickname).toContain('Ⓜ');
+    expect(sibling.wonDynamaxMaster).toBeFalsy();
+    expect(sibling.slots).toContain('dynamax');         // kept as a Dmax raid candidate
+    expect(sibling.decision).toBe('keep');
   });
 });
 
@@ -345,11 +356,14 @@ describe('Eevee/Dynamax invariants on export187 (smoke test)', () => {
   const exportPath = path.join(__dirname, 'export187.csv');
   const maybe = fs.existsSync(exportPath) ? it : it.skip;
 
-  maybe('no evolution target holds more than one dynamax/gigantamax keeper', () => {
+  maybe('no evolution target holds more than one gigantamax keeper', () => {
+    // NOTE: Dynamax intentionally allows MULTIPLE keepers per target since the
+    // dynamax-master-flag brief — the best gets Ⓜ (wonDynamaxMaster) and every other
+    // slot-less Dmax is kept as a raid candidate (Ⓡ). Gigantamax still keeps one per target.
     const { loadCSV } = require('./csvParser');
     const res = analyse(loadCSV(exportPath));
     const targetOf = p => p.evolvedNameU || p.evolvedNameG || p.name;
-    ['dynamax', 'gigantamax'].forEach(slot => {
+    ['gigantamax'].forEach(slot => {
       const seen = {};
       res.pokemon.filter(p => p.slots.includes(slot)).forEach(p => {
         // family + target uniquely identifies a max pool
@@ -360,6 +374,22 @@ describe('Eevee/Dynamax invariants on export187 (smoke test)', () => {
         .map(([k, g]) => slot + ' ' + k + ' -> ' + g.map(p => p.name + 'CP' + p.cp).join(','));
       expect(dupes).toEqual([]);
     });
+  });
+
+  maybe('the best Dynamax per evolution target carries the Ⓜ power-up flag', () => {
+    const { loadCSV } = require('./csvParser');
+    const res = analyse(loadCSV(exportPath));
+    const targetOf = p => p.evolvedNameU || p.evolvedNameG || p.name;
+    const seen = {};
+    res.pokemon.filter(p => p.isDynamax).forEach(p => {
+      const k = (p.familyKey || '') + '|' + targetOf(p);
+      (seen[k] = seen[k] || []).push(p);
+    });
+    // Exactly one wonDynamaxMaster per pool that has any Dynamax.
+    const bad = Object.entries(seen)
+      .filter(([, g]) => g.filter(p => p.wonDynamaxMaster).length !== 1)
+      .map(([k, g]) => k + ' -> ' + g.filter(p => p.wonDynamaxMaster).length + ' Ⓜ');
+    expect(bad).toEqual([]);
   });
 
   maybe('every confirmed non-shadow Master winner (non-nundo) shows Ⓜ', () => {

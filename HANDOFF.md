@@ -32,11 +32,17 @@ _Updated: 13 Jun 2026_
 
 ## ⏳ WAITING FOR AN AGENT
 
-### Feature Batch June 2026
-**Status:** Implementation complete — awaiting Opus post-check. F1/F2 (🔍⭐/🔍🔀 bulk search), F3 (CSV filename persistence) and F5 (Urshifu form split) implemented + 30 new tests. F4 (trainer name) deferred — needs Supabase schema approval. F6 (Dynamax Ⓜ) deferred — Opus pre-review truncated mid-guidance. See `reviews/feature-batch-june-2026-impl-summary.md`.
+### Dynamax Master Flag
+**Status:** Implementation complete — awaiting Opus post-check
 **Owner:** PIPELINE
-**Next action:** Open PR (branch pushed; gh CLI was gated this run) → https://github.com/mariellen/pokevault/pull/new/feature/feature-batch-june-2026 — then Opus post-check; coordinator to (a) approve F4 Supabase schema and (b) complete/re-run truncated F6 engine guidance.
+**Next action:** Opus post-review of `reviews\dynamax-master-flag-impl-summary.md` + diff (analyse.js engine changes 1–5, RULES.md, +8 new tests, fixtures updated). All 711 tracked tests green; v3.5.51. Branch `feature/dynamax-master-flag` — PR URL to be recorded once `gh`/push is available.
 _Updated: 20 Jun 2026_
+
+### Feature Batch June 2026
+**Status:** Pipeline complete · Opus says: **APPROVE WITH NOTES.**
+**Owner:** YOU
+**Next action:** Read `reviews\feature-batch-june-2026-opus-post.md` and decide: approve merge or send back to Claude Code
+_Updated: 20 Jun 2026 13:11_
 
 ### Playwright Expansion
 **Status:** Pipeline complete · Opus says: **APPROVE WITH NOTES.**

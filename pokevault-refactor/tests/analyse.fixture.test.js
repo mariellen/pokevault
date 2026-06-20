@@ -529,11 +529,13 @@ describe('Group 14 — Sawk multi-league deconfliction', () => {
 // Snorlax CP:100 (stableKey='143|||5|5|5|2026-02-01') has no league rank data.
 // Machamp CP:2450 (stableKey='68|||15|15|14|2025-01-01') holds Ultra slot normally.
 
+// rankSym = the no-league-slot rank symbol. The best Dynamax is the Master power-up
+// candidate (Ⓜ via wonDynamaxMaster); shiny/gigantamax no-slot still use Ⓡ.
 describe.each([
-  ['is_shiny',      '※', 'isShiny'],
-  ['is_dynamax',    'Ⓓ', 'isDynamax'],
-  ['is_gigantamax', 'Ⓧ', 'isGigantamax'],
-])('Group 15 — %s override = force keep', (flagKey, suffix, propName) => {
+  ['is_shiny',      '※', 'isShiny',      'Ⓡ'],
+  ['is_dynamax',    'Ⓓ', 'isDynamax',    'Ⓜ'],
+  ['is_gigantamax', 'Ⓧ', 'isGigantamax', 'Ⓡ'],
+])('Group 15 — %s override = force keep', (flagKey, suffix, propName, rankSym) => {
   let ovResult;
   const ovFind = (name, cp) => ovResult.pokemon.find(p => p.name === name && p.cp === cp);
 
@@ -560,9 +562,9 @@ describe.each([
     expect(p.suggestStar).toBe(true);
   });
 
-  it(`Snorlax CP:100 (${flagKey}, no league rank) → nick contains Ⓡ and ${suffix}`, () => {
+  it(`Snorlax CP:100 (${flagKey}, no league rank) → nick contains ${rankSym} and ${suffix}`, () => {
     const p = ovFind('Snorlax', 100);
-    expect(p.nickname).toContain('Ⓡ');
+    expect(p.nickname).toContain(rankSym);
     expect(p.nickname).toContain(suffix);
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
@@ -1181,8 +1183,9 @@ describe('Group 26 — Nick Symbol Overhaul', () => {
 // Dmax/Gmax: best-IV per species → keep slot; all dupes → trade + visibility star.
 // Legendary (non-Dmax/Gmax, no league slot): best-IV → 'best_overall' → keep; dupes → trade + visibility.
 
-// 27a: Two Dmax Entei — best keeps, dupe trades with visibility star
-describe('Group 27a — Dmax Entei: best-IV keeps, dupe gets visibility star', () => {
+// 27a: Two Dmax Entei — best is the Master power-up candidate (Ⓜ); the slot-less dupe
+// is kept as a raid candidate (Ⓡ) per the dynamax-master-flag brief (all Dmax kept).
+describe('Group 27a — Dmax Entei: best-IV gets Ⓜ, dupe kept as raid candidate (Ⓡ)', () => {
   let g27aResult;
   const g27aFind = (name, cp) => g27aResult.pokemon.find(p => p.name === name && p.cp === cp);
 
@@ -1195,34 +1198,37 @@ describe('Group 27a — Dmax Entei: best-IV keeps, dupe gets visibility star', (
     g27aResult = loader.createWithOverrides(overrides).analyse(csv);
   });
 
-  it('Entei CP:2900 (best Dmax, 88.9%) → decision=keep, slots includes dynamax', () => {
+  it('Entei CP:2900 (best Dmax, 88.9%) → decision=keep, wonDynamaxMaster, slots includes dynamax', () => {
     const p = g27aFind('Entei', 2900);
     expect(p).toBeDefined();
     expect(p.isDynamax).toBe(true);
     expect(p.decision).toBe('keep');
+    expect(p.wonDynamaxMaster).toBe(true);
     expect(p.slots).toContain('dynamax');
   });
 
-  it('Entei CP:2900 (best Dmax) → nickname is EnteiⓇ89Ⓓ', () => {
+  it('Entei CP:2900 (best Dmax) → nickname is EnteiⓂ89Ⓓ (Master power-up candidate)', () => {
     const p = g27aFind('Entei', 2900);
-    expect(p.nickname).toBe('EnteiⓇ89Ⓓ');
+    expect(p.nickname).toBe('EnteiⓂ89Ⓓ');
   });
 
-  it('Entei CP:2800 (dupe Dmax, 75.6%) → decision=trade', () => {
+  it('Entei CP:2800 (dupe Dmax, 75.6%) → decision=keep (raid candidate)', () => {
     const p = g27aFind('Entei', 2800);
     expect(p).toBeDefined();
     expect(p.isDynamax).toBe(true);
-    expect(p.decision).toBe('trade');
+    expect(p.decision).toBe('keep');
+    expect(p.wonDynamaxMaster).toBeFalsy();
   });
 
-  it('Entei CP:2800 (dupe Dmax) → starType is visibility', () => {
+  it('Entei CP:2800 (dupe Dmax) → nickname is EnteiⓇ76Ⓓ (raid candidate)', () => {
     const p = g27aFind('Entei', 2800);
-    expect(p.starType).toBe('visibility');
+    expect(p.nickname).toBe('EnteiⓇ76Ⓓ');
   });
 
-  it('Entei CP:2800 (visibility star dupe) → decision is trade, not keep', () => {
+  it('Entei CP:2800 (dupe Dmax) → kept, not a tradeable visibility star', () => {
     const p = g27aFind('Entei', 2800);
-    expect(p.decision).not.toBe('keep');
+    expect(p.decision).toBe('keep');
+    expect(p.starType).not.toBe('visibility');
   });
 });
 
@@ -1298,8 +1304,9 @@ describe('Group 27c — Raikou Legendary: best wins Master slot (Ⓜ93), dupe ge
   });
 });
 
-// 27d: Dmax+shiny Entei CP:2901 — only Dmax in run, keeps with nick containing Ⓡ, Ⓓ, ※
-describe('Group 27d — Dmax+shiny Entei: keeps with Ⓡ, Ⓓ, ※ in nick', () => {
+// 27d: Dmax+shiny Entei CP:2901 — only Dmax in run, so it is the best Dmax and gets the
+// Master power-up flag (Ⓜ) plus the Ⓓ/※ markers.
+describe('Group 27d — Dmax+shiny Entei: keeps with Ⓜ, Ⓓ, ※ in nick', () => {
   let g27dResult;
   const g27dFind = (name, cp) => g27dResult.pokemon.find(p => p.name === name && p.cp === cp);
 
@@ -1320,9 +1327,9 @@ describe('Group 27d — Dmax+shiny Entei: keeps with Ⓡ, Ⓓ, ※ in nick', () 
     expect(p.slots).toContain('dynamax');
   });
 
-  it('Entei CP:2901 (Dmax+shiny) → nickname contains Ⓡ, Ⓓ, and ※', () => {
+  it('Entei CP:2901 (Dmax+shiny, best Dmax) → nickname contains Ⓜ, Ⓓ, and ※', () => {
     const p = g27dFind('Entei', 2901);
-    expect(p.nickname).toContain('Ⓡ');
+    expect(p.nickname).toContain('Ⓜ');
     expect(p.nickname).toContain('Ⓓ');
     expect(p.nickname).toContain('※');
     expect(p.nickname.length).toBeLessThanOrEqual(12);
@@ -1502,8 +1509,9 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
     g27eResult = loader.createWithOverrides(overrides).analyse(csv);
   });
 
-  it('Entei CP:3200 (Dmax hundo, 15/15/15) → decision=keep, slots includes M', () => {
-    // Legendaries now enter M competition; 15/15/15 Entei wins Master slot (not Dmax slot).
+  it('Entei CP:3200 (Dmax hundo, 15/15/15) → decision=keep, wonDynamaxMaster, slots includes dynamax (not regular M)', () => {
+    // Dynamax is excluded from the regular Master pass; the best Dmax gets the Ⓜ power-up
+    // flag via wonDynamaxMaster instead of winning a regular M slot.
     const p = g27eFind('Entei', 3200);
     expect(p).toBeDefined();
     expect(p.isDynamax).toBe(true);
@@ -1511,11 +1519,13 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
     expect(p.defIV).toBe(15);
     expect(p.staIV).toBe(15);
     expect(p.decision).toBe('keep');
-    expect(p.slots).toContain('M');
+    expect(p.wonDynamaxMaster).toBe(true);
+    expect(p.wonMasterSlot).toBeFalsy();
+    expect(p.slots).toContain('dynamax');
   });
 
   it('Entei CP:3200 (Dmax hundo) → nickname is EnteiⓂ100ⒹⒽ', () => {
-    // rankPctM=ivAvg=100 >= 90 → dynamax handler picks Ⓜ as best league proxy
+    // wonDynamaxMaster → Ⓜ + IV%(100→PERFECT); Ⓓ (dynamax) + Ⓗ (hundo) suffixes.
     const p = g27eFind('Entei', 3200);
     expect(p.nickname).toBe('EnteiⓂ100ⒹⒽ');
   });

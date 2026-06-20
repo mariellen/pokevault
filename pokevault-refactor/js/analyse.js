@@ -378,9 +378,14 @@ function buildNickname(p, slot, convention) {
     nickSuf = sufNoStar + SHINY_SFX + (p.isPurified ? '*' : '');
     return fitName(p.name, mid, nickSuf, 12);
   } else if (slot==='dynamax') {
-    const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
-    if (best) { const pv=Math.round(p['rankPct'+best]||0); mid=LC[best]+(pv===100?PERFECT:String(pv)); }
-    else { mid=LC.R+String(iv); }
+    if (p.wonDynamaxMaster) {
+      // Best-overall Dynamax → NameⓂ{IV%}Ⓓ — power up to Master level.
+      mid = LC.M + (iv===100?PERFECT:String(iv));
+    } else {
+      const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
+      if (best) { const pv=Math.round(p['rankPct'+best]||0); mid=LC[best]+(pv===100?PERFECT:String(pv)); }
+      else { mid=LC.R+String(iv); }
+    }
     return fitName(base, mid, nickSuf, 12); // nickSuf has Ⓓ from suf
   } else if (slot==='gigantamax') {
     const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
@@ -679,7 +684,7 @@ function analyse(rows) {
       suggestStarExpensive:false, suggestStarCheaper:false,
       isExpensiveWinner:false, isAffordableWinner:false, isCheaperAlternative:false,
       targetEvo:'', hidden:false, evoIndicator:'', canEvolve:false, neverEvolved:false, isHundo:false, dustToL40:0, belowCapNote:'',
-      isDynamax:false, isGigantamax:false, isCostumed:false, vivillonPattern:'', specialForm:'', manualDecision:'', notes:'', stableKey:'',
+      isDynamax:false, isGigantamax:false, wonDynamaxMaster:false, isCostumed:false, vivillonPattern:'', specialForm:'', manualDecision:'', notes:'', stableKey:'',
       overBudget100:false, cheaperAvailable:false,
       evolutionUnknown: typeof FAMILY_OVERRIDES !== 'undefined' && FAMILY_OVERRIDES.unknownEvo ? FAMILY_OVERRIDES.unknownEvo.has(r['Name']) : false,
       genderUnknownLocked,
@@ -749,7 +754,10 @@ function analyse(rows) {
         // Split by gender for dimorphic species; split shadow/purified/lucky into own sub-groups
         // so each variant type gets an independent slot (shadow Great + regular Great can coexist)
         const isDimorphic = GENDER_DIMORPHIC.has(stageName)||GENDER_DIMORPHIC.has(p.name);
-        const variantKey = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
+        // Dynamax forms an independent sub-group (like shadow/purified/lucky) so it competes
+        // only against other Dynamax for capped slots and never displaces a regular winner.
+        // Precedence: shadow > purified > lucky > dynamax (a Lucky-Dmax stays in |lucky).
+        const variantKey = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : p.isDynamax ? '|dynamax' : '';
         const groupKey = (isDimorphic && p.gender) ? stageName+'|'+p.gender+variantKey : stageName+variantKey;
         if (!byEvoStage[groupKey]) byEvoStage[groupKey]=[];
         byEvoStage[groupKey].push(p);
@@ -787,6 +795,11 @@ function analyse(rows) {
             // the purify-assigned slot is a recommendation (keep-to-purify), not a won battle slot.
             if (p.hasBattleSlot) return false;
             if (!p.isPurifySlot && p.slots.some(s => RULES.leagues.includes(s) || s.endsWith('_affordable'))) return false;
+
+            // Dynamax never competes in the regular Master pass — the best Dmax gets the Ⓜ
+            // power-up flag via wonDynamaxMaster (kept orthogonal to wonMasterSlot). It still
+            // competes among Dmax for capped GL/UL/LL slots via the |dynamax sub-group.
+            if (lg === 'M' && p.isDynamax) return false;
 
             // Master league: only the final evolution (must BE stageName, not just evolve to it)
             // Exception 1: hundo pre-evos always allowed — will be evolved, and 15/15/15 beats any evolved form
@@ -1108,7 +1121,7 @@ function analyse(rows) {
       const wonInLoop = members.filter(p => p.wonMasterSlot && !p.isShadow);
       const mlFloor = RULES.keepThreshold; // confirmed keeper threshold
       const extraCandidates = members.filter(p =>
-        !p.isShadow && !p.wonMasterSlot &&
+        !p.isShadow && !p.isDynamax && !p.wonMasterSlot &&
         (p.rankPctM || p.ivAvg || 0) >= mlFloor &&
         isFinalStage(p) &&
         // not already committed to a capped league it should keep instead
@@ -1179,10 +1192,17 @@ function analyse(rows) {
     Object.values(dmaxCandidates).forEach(cands => {
       cands.sort((a, b) => (b.ivAvg||0) - (a.ivAvg||0) || (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
       const best = cands[0]; if (!best) return;
-      const target = best.slots.some(s => RULES.leagues.includes(s))
-        ? cands.find(p => !p.slots.some(s => RULES.leagues.includes(s)))
-        : best;
-      if (target && !target.slots.includes('dynamax')) target.slots.push('dynamax');
+      // Best-overall Dynamax per max-evo target → Master power-up candidate (Ⓜ).
+      // Fires even if this (or another) Dmax also holds a capped league slot — the
+      // wonDynamaxMaster branch in the decision block routes ahead of hasLeagueSlot.
+      best.wonDynamaxMaster = true;
+      // Every Dynamax without a capped league slot is kept as a raid candidate (NameⓇ{IV%}Ⓓ)
+      // via the 'dynamax' slot. The best-overall renders Ⓜ regardless (routed earlier).
+      cands.forEach(p => {
+        if (!p.slots.some(s => RULES.leagues.includes(s)) && !p.slots.includes('dynamax')) {
+          p.slots.push('dynamax');
+        }
+      });
     });
     // Gigantamax: same best-without-league-slot logic
     const gmaxCandidates = {};
@@ -1253,6 +1273,11 @@ function analyse(rows) {
       if (p.slots.includes('nundo')) {
         p.decision='keep'; p.reason='Nundo — 0/0/0';
         p.nickname=buildNickname(p,'nundo');
+      } else if (p.wonDynamaxMaster) {
+        // Best-overall Dynamax — always Ⓜ, even if it also won a capped Dmax league slot.
+        // Placed above hasLeagueSlot so a capped-slot Dmax still renders NameⓂ{IV%}Ⓓ.
+        p.decision='keep'; p.reason='Best Dynamax — power up to Master';
+        p.nickname=buildNickname(p,'dynamax');
       } else if (hasLeagueSlot) {
         const lgSlots=p.slots.filter(s=>RULES.leagues.includes(s)||s.endsWith('_affordable')).map(s=>s.replace('_affordable',''));
         const lgNames=lgSlots.map(s=>RULES.leagueNames[s]);
@@ -1367,7 +1392,8 @@ function analyse(rows) {
             p.slots.includes('purified') ||
             p.slots.includes('dynamax') ||
             p.slots.includes('gigantamax') ||
-            p.slots.includes('best_overall')
+            p.slots.includes('best_overall') ||
+            p.wonDynamaxMaster
           )) ||
           isProtectedBest ||
           (p.isLucky) ||
@@ -1442,7 +1468,7 @@ function analyse(rows) {
           :lg==='G'?(p.evolvedNameG||p.name)
           :lg==='U'?(p.evolvedNameU||p.name)
           :(p.evolvedNameU||p.evolvedNameG||p.name);
-        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : p.isDynamax ? '|dynamax' : '';
         slotWinners[lg+'|'+evo+vk] = (slotWinners[lg+'|'+evo+vk]||0) + 1;
       });
     });
@@ -1503,7 +1529,7 @@ function analyse(rows) {
         releasedSlotPokemon.add(p);
 
         // Decrement winner count for this stage
-        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : p.isDynamax ? '|dynamax' : '';
         const wk = s+'|'+evoTarget+vk;
         slotWinners[wk] = Math.max(0, (slotWinners[wk]||1) - 1);
 
@@ -1516,7 +1542,7 @@ function analyse(rows) {
           .filter(m => m !== p)
           .filter(m => {
             // Must match the same variant (shadow/regular/lucky/purified) as the releasing Pokémon
-            const m_vk = m.isShadow ? '|shadow' : m.isPurified ? '|purified' : m.isLucky ? '|lucky' : '';
+            const m_vk = m.isShadow ? '|shadow' : m.isPurified ? '|purified' : m.isLucky ? '|lucky' : m.isDynamax ? '|dynamax' : '';
             if (m_vk !== vk) return false;
             // One slot per Pokémon: nextBest candidate must not already hold a battle slot
             if (m.hasBattleSlot) return false;
@@ -1583,7 +1609,7 @@ function analyse(rows) {
           :lg==='G'?(p.evolvedNameG||p.name)
           :lg==='U'?(p.evolvedNameU||p.name)
           :(p.evolvedNameU||p.evolvedNameG||p.name);
-        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : p.isDynamax ? '|dynamax' : '';
         const key = lg+'|'+evo+vk;
         if (!byEvo[key]) byEvo[key] = [];
         byEvo[key].push(p);

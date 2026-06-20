@@ -50,12 +50,14 @@ Defined in `config.js`.
 | `ⓛ` | U+24DB | Little League (≤500 CP) |
 | `Ⓖ` | U+24C6 | Great League (≤1500 CP) |
 | `Ⓤ` | U+24CA | Ultra League (≤2500 CP) |
-| `Ⓜ` | U+24C2 | Master League (no cap) — **confirmed Master slot WINNER only** |
-| `Ⓡ` | U+24C7 | Best overall, **no confirmed league slot** — used for Lucky (no league), best Dmax/Gmax/Legendary with no league slot, best Shadow with no slot, and Master *non-winners* / demoted Master keepers |
+| `Ⓜ` | U+24C2 | Master League (no cap) — **confirmed Master slot WINNER** (`wonMasterSlot`) OR the **best-overall Dynamax** per max-evo target (`wonDynamaxMaster`) |
+| `Ⓡ` | U+24C7 | Best overall, **no confirmed league slot** — used for Lucky (no league), best Gmax/Legendary with no league slot, slot-less Dynamax raid candidates, best Shadow with no slot, and Master *non-winners* / demoted Master keepers |
 
 > **`Ⓜ` vs `Ⓡ` is contextual, not a global rename.** The single non-shadow Master
-> *winner* per family gets `Ⓜ`. Demoted Master keepers and all other no-league-slot
-> "raid/best-overall" candidates keep `Ⓡ`. Do **not** sweep-replace one with the other.
+> *winner* per family gets `Ⓜ` (via `wonMasterSlot`); the best Dynamax per max-evo target
+> also gets `Ⓜ` (via the separate `wonDynamaxMaster` flag — different mechanism, same symbol).
+> Demoted Master keepers, slot-less Dynamax, and all other no-league-slot "raid/best-overall"
+> candidates keep `Ⓡ`. Do **not** sweep-replace one with the other.
 
 ### Nick Special Symbols
 | Symbol | Constant | Meaning |
@@ -120,20 +122,21 @@ implemented in the decision/nick block of `analyse.js`.)
 | # | Condition | Decision | Reason string |
 |---|-----------|----------|---------------|
 | 1 | `nundo` slot (0/0/0) | `keep` | `Nundo — 0/0/0` |
-| 2 | League slot, confirmed (rank ≥ 90% **or** affordable-only backup) | `keep` | `Best <leagues>` / `Affordable backup for <league>` |
-| 3 | League slot, best available but **below 90%** | `review` | `Best available for <leagues> (below 90% threshold)` |
-| 4 | `lucky` slot | `keep` | `Lucky — always keep` |
-| 5 | `shiny` / `shiny_lower` slot | `keep` | `Shiny — always favourite` |
-| 6 | `dynamax` slot | `keep` | `Best Dynamax — keep` |
-| 7 | `gigantamax` slot | `keep` | `Best Gigantamax — keep` |
-| 8 | `best_overall` slot | `keep` | `Best Legendary — keep` (legendary) / `Best in family — keep` (non-legendary) |
-| 9 | `shadow` slot | `keep` | `Best shadow — keep for raids/Master League` |
-| 10 | `purified` slot | `keep` | `Best purified` |
-| 11 | Qualifies in any league (≥90%) but not best in family | `review` | `≥90% but not best in family — review` |
-| 12 | `collection` slot | `keep` | `Collection — keeping N for full set` |
-| 13 | `isLucky` fallthrough (no slot above) | `keep` | `Lucky — always keep (Master/Raid candidate)` |
-| 14 | Hundo (15/15/15) fallthrough | `keep` | `Hundo (15/15/15) — always keep` (sets `suggestStar=true`) |
-| 15 | Everything else | `trade` | `IV X% — not best in any slot` |
+| 2 | `wonDynamaxMaster` (best Dmax per max-evo target) | `keep` | `Best Dynamax — power up to Master` (nick `NameⓂ{IV%}Ⓓ`; sits **above** league slot so a capped-slot Dmax still renders `Ⓜ`) |
+| 3 | League slot, confirmed (rank ≥ 90% **or** affordable-only backup) | `keep` | `Best <leagues>` / `Affordable backup for <league>` |
+| 4 | League slot, best available but **below 90%** | `review` | `Best available for <leagues> (below 90% threshold)` |
+| 5 | `lucky` slot | `keep` | `Lucky — always keep` |
+| 6 | `shiny` / `shiny_lower` slot | `keep` | `Shiny — always favourite` |
+| 7 | `dynamax` slot (slot-less Dmax raid candidate) | `keep` | `Best Dynamax — keep` (nick `NameⓇ{IV%}Ⓓ`) |
+| 8 | `gigantamax` slot | `keep` | `Best Gigantamax — keep` |
+| 9 | `best_overall` slot | `keep` | `Best Legendary — keep` (legendary) / `Best in family — keep` (non-legendary) |
+| 10 | `shadow` slot | `keep` | `Best shadow — keep for raids/Master League` |
+| 11 | `purified` slot | `keep` | `Best purified` |
+| 12 | Qualifies in any league (≥90%) but not best in family | `review` | `≥90% but not best in family — review` |
+| 13 | `collection` slot | `keep` | `Collection — keeping N for full set` |
+| 14 | `isLucky` fallthrough (no slot above) | `keep` | `Lucky — always keep (Master/Raid candidate)` |
+| 15 | Hundo (15/15/15) fallthrough | `keep` | `Hundo (15/15/15) — always keep` (sets `suggestStar=true`) |
+| 16 | Everything else | `trade` | `IV X% — not best in any slot` |
 
 **Collection edge case:** at rule 15, if the species is in `COLLECTION_SETS` and has no
 `specialForm`/`vivillonPattern` set, the decision is upgraded to `review` with
@@ -241,8 +244,8 @@ self-flag path only, not on the blue/expensive path).
 | `purified` | Best-IV purified per family |
 | `lucky` | Every Lucky gets one |
 | `nundo` | Every 0/0/0 |
-| `dynamax` | Best-IV Dynamax per max-evo target, **only when no league slot**; if best holds a league slot, the best slot-less candidate inherits it |
-| `gigantamax` | Same logic as `dynamax` |
+| `dynamax` | Assigned to **every** Dynamax without a capped league slot, kept as a raid candidate (`NameⓇ{IV%}Ⓓ`). The best-IV Dynamax per max-evo target additionally gets `wonDynamaxMaster` → `NameⓂ{IV%}Ⓓ` (Master power-up candidate), even if it also holds a capped slot. Dynamax compete only among themselves for capped slots (independent `\|dynamax` sub-group) and are excluded from the regular Master pass. |
+| `gigantamax` | Best-IV Gigantamax per max-evo target, **only when no league slot**; if best holds a league slot, the best slot-less candidate inherits it. (Gigantamax is unchanged — no `Ⓜ` flag pending Gmax-parity confirmation.) |
 | `best_overall` | Best-IV per species with no confirmed league slot — **all species** (legendary and non-legendary; non-legendaries must qualify ≥90% in some league and have no confirmed family keeper unless `masterDemoted`). Nick: `NameⓇ{IV%}` |
 | `collection` / `collection_keep` | Top N by IV% for `COLLECTION_SETS` species |
 
@@ -294,14 +297,32 @@ that league's `rankPct` is ignored and no slot is assigned for that league.
 - Nick suffix `*` (the genuine final character). Pays half dust to power up (effective-dust
   not yet applied in slot sorting for this path).
 
-### Dynamax / Gigantamax
-- Set via Supabase override (`is_dynamax` / `is_gigantamax`); not from CSV. Mutually
-  exclusive in-game.
-- Best-IV per max-evo target gets the slot **when it has no league slot**; if the best holds
-  a league slot, the best slot-less candidate inherits it (branching families like Eevee key
-  by final evo target so Dmax →Vaporeon and →Flareon each keep one).
-- Suffix `Ⓓ`/`Ⓧ` always shown, even on a league nick and even when traded.
-- Non-best duplicate with no slot → `trade`, visibility star.
+### Dynamax (June 2026 — `dynamax-master-flag`)
+- Set via Supabase override (`is_dynamax`); not from CSV. Mutually exclusive with Gigantamax in-game.
+- **All Dynamax are kept** (none traded). Per max-evo target:
+  - **Best Dynamax by IV** → `wonDynamaxMaster` → `NameⓂ{IV%}Ⓓ` — the one to power up to
+    Master level. Fires **even if** it (or another Dmax) also wins a capped league slot.
+  - **Other Dynamax that win a capped league slot** → `NameⒼ/Ⓤ/ⓛ{rank}Ⓓ`.
+  - **Other Dynamax with no slot** → `NameⓇ{IV%}Ⓓ` — kept as a raid candidate.
+- **Dynamax do NOT compete with regular Pokémon for capped league slots.** They form an
+  independent `|dynamax` sub-group (like shadow/purified/lucky; precedence
+  shadow > purified > lucky > dynamax) and compete only among themselves for GL/UL/LL.
+- **Dynamax are excluded from the regular Master pass** — they never set `wonMasterSlot`
+  (kept orthogonal). The `wonDynamaxMaster` flag is separate and does not enter the
+  non-shadow Master single-keeper reconciliation, the ML-placeholder pass, or `best_overall`.
+- Branching families (Eevee) key by final evo target, so Dmax →Vaporeon and →Flareon each
+  surface their own `Ⓜ`.
+- Suffix `Ⓓ` always shown, even on a league/`Ⓜ` nick.
+- Decision routing: the `wonDynamaxMaster` branch sits **above** `hasLeagueSlot` so the best
+  Dmax always renders `Ⓜ`, never the capped-league symbol.
+
+### Gigantamax
+- Set via Supabase override (`is_gigantamax`); not from CSV.
+- **Unchanged** (no `Ⓜ` flag pending Gmax-parity confirmation from Mariellen). Best-IV per
+  max-evo target gets the slot **when it has no league slot**; if the best holds a league
+  slot, the best slot-less candidate inherits it. Gigantamax still competes with regulars.
+- Suffix `Ⓧ` always shown, even on a league nick and even when traded.
+- Non-best duplicate Gmax with no slot → `trade`, visibility star.
 
 ### Legendary / Mythical / Ultra Beast
 - Skip Master in regular league evaluation (handled by `best_overall`).
@@ -343,7 +364,7 @@ Built by `buildNickname(p, slot)` in `analyse.js`. Max length 12 (GO cap), enfor
 | `L` / `G` / `U` | `ⓛ`/`Ⓖ`/`Ⓤ` + rank% (or `100`) | `base` = evo target name when it differs from current form |
 | `M` | **`Ⓜ`** + rank% **if winner**, else **`Ⓡ`** + rank% | `holdsMaster = wonMasterSlot \|\| (isPurifySlot && purifyLeague==='M')`; `base` = highest evo target |
 | `shiny` / `shiny_lower` | Best qualifying league symbol + rank%, else `Ⓡ` + IV% | suffix forced to end `…※[*]` |
-| `dynamax` | Best qualifying league symbol + rank%, else `Ⓡ` + IV% | `Ⓓ` in suffix |
+| `dynamax` | **`Ⓜ` + IV%** when `wonDynamaxMaster` (best Dmax → Master power-up); otherwise best qualifying league symbol + rank%, else `Ⓡ` + IV% | `Ⓓ` in suffix |
 | `gigantamax` | Best qualifying league symbol + rank%, else `Ⓡ` + IV% | `Ⓧ` in suffix |
 | `lucky` | `Ⓡ` + Master/IV% | also used for `best_overall`, shadow no-slot, and pure-hundo no-slot |
 | `trade` | IV% + `t` | e.g. `Glaceon56t` |
@@ -663,9 +684,18 @@ survives every earlier nick reassignment.
 
 Decision badge classes: `dec-keep`, `dec-trade`, `dec-review`, `dec-protected`.
 
-### Dynamax / Gigantamax keep rules
-- Best league slot → keep with league nick + `Ⓓ`/`Ⓧ`.
-- Best overall IV% (no league slot) → keep with `NameⓇ{IV%}Ⓓ/Ⓧ`, green star.
+### Dynamax keep rules (June 2026 — `dynamax-master-flag`)
+- **Best Dynamax by IV** per max-evo target → keep, `NameⓂ{IV%}Ⓓ` (Master power-up
+  candidate, `wonDynamaxMaster`), green/gold star — even if it also holds a capped slot.
+- **Dynamax that wins a capped slot** (among other Dmax) → keep, `NameⒼ/Ⓤ/ⓛ{rank}Ⓓ`.
+- **Slot-less Dynamax** → keep with `NameⓇ{IV%}Ⓓ` (raid candidate), green/gold star.
+- **All Dynamax are kept** — none trade, so no Dmax visibility star.
+- Dynamax compete only among themselves for capped slots and are excluded from the regular
+  Master pass (`wonMasterSlot` is never set on a Dmax).
+
+### Gigantamax keep rules (unchanged)
+- Best league slot → keep with league nick + `Ⓧ`.
+- Best overall IV% (no league slot) → keep with `NameⓇ{IV%}Ⓧ`, green star.
 - Duplicate (not best, no slot) → trade, **visibility star** (rank 5) — surfaces
   above red but below none; does not affect keep counts or Pokédex counters.
 - `Ⓓ`/`Ⓧ` always appears in the nick regardless of keep/trade.
