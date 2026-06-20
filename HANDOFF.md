@@ -35,7 +35,7 @@ _Updated: 13 Jun 2026_
 ### Feature Batch June 2026
 **Status:** Implementation complete — awaiting Opus post-check. F1/F2 (🔍⭐/🔍🔀 bulk search), F3 (CSV filename persistence) and F5 (Urshifu form split) implemented + 30 new tests. F4 (trainer name) deferred — needs Supabase schema approval. F6 (Dynamax Ⓜ) deferred — Opus pre-review truncated mid-guidance. See `reviews/feature-batch-june-2026-impl-summary.md`.
 **Owner:** PIPELINE
-**Next action:** Opus post-check; coordinator to (a) approve F4 Supabase schema and (b) complete/re-run truncated F6 engine guidance. PR: _(opening — URL to follow)_
+**Next action:** Open PR (branch pushed; gh CLI was gated this run) → https://github.com/mariellen/pokevault/pull/new/feature/feature-batch-june-2026 — then Opus post-check; coordinator to (a) approve F4 Supabase schema and (b) complete/re-run truncated F6 engine guidance.
 _Updated: 20 Jun 2026_
 
 ### Playwright Expansion

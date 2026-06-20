@@ -130,6 +130,16 @@ same mechanism as regional/gender splits. No new keying logic needed.
 
 ---
 
+## PR
+Branch `feature/feature-batch-june-2026` is pushed (rebased onto current `main`, single
+clean commit). **Open the PR here:**
+https://github.com/mariellen/pokevault/pull/new/feature/feature-batch-june-2026
+
+> The `gh` CLI was permission-gated in this autonomous run, so the PR could not be opened
+> programmatically — one click on the URL above creates it (base `main`).
+
+---
+
 ## Open questions (for coordinator)
 
 ### F4 — Trainer name (BLOCKED on schema approval)
