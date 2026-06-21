@@ -208,4 +208,65 @@ describe('Dynamax Master flag stays orthogonal to the regular Master slot', () =
     expect(p.wonMasterSlot).toBeFalsy();
     expect(p.slots).not.toContain('M');
   });
+
+  it('a high-IV Dmax does NOT enter the regular Master pool or demote the non-Dmax Master winner', () => {
+    // A regular final-stage Electabuzz wins Master via wonMasterSlot (Ⓜ via wonMasterSlot).
+    // A higher-IV Dmax sibling must NOT steal the M slot, must NOT demote the regular winner,
+    // and the regular must still render Ⓜ. The Dmax uses its own wonDynamaxMaster flag.
+    const rows = [
+      elecbuzz(1500, 96.0, 15, 14, 14, { idx: 1 }),   // regular — best non-Dmax IV → Master winner
+      elecbuzz(1400, 99.0, 15, 15, 14, { idx: 2 }),   // Dmax — higher IV but excluded from regular Master
+    ];
+    const overrides = {
+      [keyFor(NUM.Electabuzz, 15, 15, 14, 2)]: { is_dynamax: true },
+    };
+    const mons = loader.createWithOverrides(overrides).analyse(toCSV(rows))
+      .pokemon.filter(p => p.name === 'Electabuzz');
+    const regular = find(mons, 1500);
+    const dmax = find(mons, 1400);
+    expect(regular.isDynamax).toBeFalsy();
+    expect(dmax.isDynamax).toBe(true);
+    // Regular still wins Master despite the Dmax having a higher IV.
+    expect(regular.wonMasterSlot).toBe(true);
+    expect(regular.slots).toContain('M');
+    expect(regular.decision).toBe('keep');
+    expect(regular.nickname).toContain('Ⓜ');
+    // Dmax keeps its own orthogonal flag and never sets wonMasterSlot / M slot.
+    expect(dmax.wonDynamaxMaster).toBe(true);
+    expect(dmax.wonMasterSlot).toBeFalsy();
+    expect(dmax.slots).not.toContain('M');
+    expect(dmax.nickname).toContain('Ⓜ');   // via wonDynamaxMaster, with Ⓓ
+    expect(dmax.nickname).toContain('Ⓓ');
+  });
+});
+
+// ─── Group F — every Dynamax is kept; none are ever traded ─────────────────────
+describe('Dynamax are always kept — never traded', () => {
+  it('a family of 4 Dmax → all decision=keep, no trade, none with a trade visibility star', () => {
+    const rows = [
+      elecbuzz(1326, 96.0, 15, 15, 13, { idx: 1 }),              // best → Ⓜ
+      elecbuzz(1310, 89.0, 14, 13, 13, { idx: 2, ru: 95.0 }),    // wins Ultra among Dmax
+      elecbuzz(1303, 87.0, 13, 13, 13, { idx: 3 }),              // no slot → Ⓡ raid
+      elecbuzz(1290, 71.0, 10, 10, 12, { idx: 4 }),              // low IV, no slot → Ⓡ raid
+    ];
+    const overrides = {
+      [keyFor(NUM.Electabuzz, 15, 15, 13, 1)]: { is_dynamax: true },
+      [keyFor(NUM.Electabuzz, 14, 13, 13, 2)]: { is_dynamax: true },
+      [keyFor(NUM.Electabuzz, 13, 13, 13, 3)]: { is_dynamax: true },
+      [keyFor(NUM.Electabuzz, 10, 10, 12, 4)]: { is_dynamax: true },
+    };
+    const mons = loader.createWithOverrides(overrides).analyse(toCSV(rows))
+      .pokemon.filter(p => p.name === 'Electabuzz');
+    expect(mons.length).toBe(4);
+    mons.forEach(p => {
+      expect(p.isDynamax).toBe(true);
+      expect(p.decision).toBe('keep');
+      expect(p.decision).not.toBe('trade');
+    });
+    // Every slot-less Dmax holds the 'dynamax' raid slot (Ⓡ) except the Ⓜ winner / capped-slot one.
+    const raid = find(mons, 1290);
+    expect(raid.slots).toContain('dynamax');
+    expect(raid.nickname).toContain('Ⓡ');
+    expect(raid.nickname).toContain('Ⓓ');
+  });
 });
