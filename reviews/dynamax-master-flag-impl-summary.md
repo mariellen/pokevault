@@ -57,8 +57,9 @@ Bumped `index.html` v3.5.50 → **v3.5.51**.
 ## Files modified
 
 - `pokevault-refactor/js/analyse.js` — engine changes 1–5.
-- `pokevault-refactor/tests/analyse.dynamax_master.test.js` — **new** (8 tests, the Opus
-  required cases).
+- `pokevault-refactor/tests/analyse.dynamax_master.test.js` — **new** (10 tests, the Opus
+  required cases). Originally 8; this verification run added 2 to close gaps in the Opus
+  required list (see "Test coverage follow-up" below).
 - `pokevault-refactor/tests/analyse.fixture.test.js` — updated Group 15 (Dmax no-slot → `Ⓜ`),
   Group 27a (best → `Ⓜ`, dupe kept as `Ⓡ` raid not traded), Group 27d (best Dmax+shiny → `Ⓜ`),
   Group 27e (hundo Dmax → `wonDynamaxMaster`/dynamax slot, not regular `M`).
@@ -69,20 +70,46 @@ Bumped `index.html` v3.5.50 → **v3.5.51**.
 
 ## Test results
 
-`npx jest --env=node --testPathIgnorePatterns=csp.test.js`:
+Full suite, `npx jest --env=node` (run 21 Jun 2026, this verification pass):
+
+```
+Test Suites: 1 failed, 29 passed, 30 total   ← the 1 failure is the untracked csp.test.js
+Tests:       4 failed, 1 skipped, 732 passed, 737 total
+```
+
+Excluding the untracked, unrelated `csp.test.js` suite (the CI-committed set):
 
 ```
 Test Suites: 29 passed, 29 total
-Tests:       1 skipped, 711 passed, 712 total
+Tests:       1 skipped, 713 passed, 714 total
 ```
 
-- The 8 new `analyse.dynamax_master.test.js` tests cover: the Electabuzz golden case
+- The 10 `analyse.dynamax_master.test.js` tests cover: the Electabuzz golden case
   (`ElectabuⓂ96Ⓓ` / `ElectabuⓊ95Ⓓ` / `ElectabuⓇ87Ⓓ`), best-Dmax-also-wins-capped-slot
   stays `Ⓜ`, Dmax not displacing a regular Ultra winner, Eevee branching (one `Ⓜ` per evo
-  target), and `wonDynamaxMaster` ⟂ `wonMasterSlot`.
+  target), `wonDynamaxMaster` ⟂ `wonMasterSlot`, a Dmax not entering the regular Master pool
+  alongside a non-Dmax Master keeper, and a 4-Dmax family all kept (none traded).
 - The 1 skip is the `export187.csv` smoke test, gated on the (gitignored) personal export.
-- `csp.test.js` is an untracked, pre-existing-failing suite excluded from CI (per the
-  repo's committed-test-count note) and is unrelated to this change.
+- `csp.test.js` is an untracked, pre-existing-failing suite (4 failures, all asserting
+  CSP-hardening markers in `index.html` from a *separate* in-flight thread) excluded from CI
+  per the repo's committed-test-count note. It is unrelated to this change — verified by
+  running it in isolation (4 fail / 19 pass) and confirming the only tracked file this branch
+  touches besides the engine is the Dynamax test file.
+
+## Test coverage follow-up (21 Jun 2026 verification pass)
+
+The Opus pre-review listed 8 required tests. The original commit (e63ca7a) shipped 8 tests but
+two of Opus's required cases were only partially covered. This pass added them, TDD-style
+(asserted against the already-committed engine, which passed):
+
+- **`dmax_excluded_from_regular_master` (Opus #6, full form)** — a regular final-stage
+  Electabuzz (96% IV) coexisting with a *higher-IV* Dmax sibling (99% IV). Asserts the regular
+  still wins Master (`wonMasterSlot`, `M` slot, renders `Ⓜ`), the Dmax does **not** demote it,
+  the Dmax never sets `wonMasterSlot`, and the Dmax still renders `Ⓜ` via `wonDynamaxMaster`
+  (with `Ⓓ`). The prior Group E only checked a lone Dmax never sets `wonMasterSlot`.
+- **`dmax_all_kept_none_traded` (Opus #8)** — a family of 4 Dmax. Asserts every member is
+  `decision==='keep'` (never `trade`), and the extra slot-less Dmax holds the `dynamax` raid
+  slot with `NameⓇ{IV%}Ⓓ`.
 
 ## Deviations from Opus guidance
 

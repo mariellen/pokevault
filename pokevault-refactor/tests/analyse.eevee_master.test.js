@@ -356,24 +356,23 @@ describe('Eevee/Dynamax invariants on export187 (smoke test)', () => {
   const exportPath = path.join(__dirname, 'export187.csv');
   const maybe = fs.existsSync(exportPath) ? it : it.skip;
 
-  maybe('no evolution target holds more than one gigantamax keeper', () => {
-    // NOTE: Dynamax intentionally allows MULTIPLE keepers per target since the
-    // dynamax-master-flag brief — the best gets Ⓜ (wonDynamaxMaster) and every other
-    // slot-less Dmax is kept as a raid candidate (Ⓡ). Gigantamax still keeps one per target.
+  maybe('the best Gigantamax per evolution target carries the Ⓜ power-up flag', () => {
+    // dmax-gmax-league-rules-refinement (v3.5.54): Gigantamax now has full Master parity
+    // with Dynamax — the best Gmax per max-evo target gets wonGigantamaxMaster (Ⓜ), and
+    // every slot-less Gmax is kept as a raid candidate (Ⓡ). So MULTIPLE gigantamax keepers
+    // per target are expected (matching Dynamax), with exactly one Ⓜ per pool.
     const { loadCSV } = require('./csvParser');
     const res = analyse(loadCSV(exportPath));
     const targetOf = p => p.evolvedNameU || p.evolvedNameG || p.name;
-    ['gigantamax'].forEach(slot => {
-      const seen = {};
-      res.pokemon.filter(p => p.slots.includes(slot)).forEach(p => {
-        // family + target uniquely identifies a max pool
-        const k = (p.familyKey || '') + '|' + targetOf(p);
-        (seen[k] = seen[k] || []).push(p);
-      });
-      const dupes = Object.entries(seen).filter(([, g]) => g.length > 1)
-        .map(([k, g]) => slot + ' ' + k + ' -> ' + g.map(p => p.name + 'CP' + p.cp).join(','));
-      expect(dupes).toEqual([]);
+    const seen = {};
+    res.pokemon.filter(p => p.isGigantamax).forEach(p => {
+      const k = (p.familyKey || '') + '|' + targetOf(p);
+      (seen[k] = seen[k] || []).push(p);
     });
+    const bad = Object.entries(seen)
+      .filter(([, g]) => g.filter(p => p.wonGigantamaxMaster).length !== 1)
+      .map(([k, g]) => k + ' -> ' + g.filter(p => p.wonGigantamaxMaster).length + ' Ⓜ');
+    expect(bad).toEqual([]);
   });
 
   maybe('the best Dynamax per evolution target carries the Ⓜ power-up flag', () => {

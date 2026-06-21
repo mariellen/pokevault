@@ -44,8 +44,31 @@ _Updated: 13 Jun 2026_
 
 ## ⏳ WAITING FOR AN AGENT
 
+<<<<<<< HEAD
 ### Bug Batch June 2026 — Bugs 3–7
 **Status:** Bugs 1 & 2 implemented (v3.5.50). Bugs 3–7 have NO Opus guidance and are NOT implemented. Opus review was truncated after Bug 2. See `reviews/bug-batch-june-2026-impl-summary.md`.
+=======
+### Dmax/Gmax League Rules Refinement (#30, v3.5.54)
+**Status:** Implementation complete — awaiting Opus post-check. Removed the spurious `|dynamax`
+capped sub-group (PR #27 over-keep bug) so Dmax/Gmax now compete in the **main capped pool**
+with a type-priority tiebreak (Shiny Gmax > Gmax > Shiny Dmax > Dmax > Shiny Normal > Normal);
+added full Gigantamax Master parity (`wonGigantamaxMaster`), categorical Normal-Master
+suppression when a family has any Gmax (hundo → grey star `NameⓇ{IV%}Ⓗ`; non-hundo → cull/review),
+and Lucky-non-winner handling (`NameⓇ{IV%}`, no star, never traded). New `analyse.gmax_master.test.js`
+(20 tests). Full suite green: **752 passed / 1 skipped**, only the unrelated untracked
+`csp.test.js` fails (pre-existing, not in this branch). 3 documented deviations from Opus
+(non-winner nick → `Ⓡ{IV%}`; no `masterDemoted` on Gmax suppression; raid Dmax/Gmax get no star)
++ 2 open questions — see `reviews/dmax-gmax-league-rules-refinement-impl-summary.md`.
+**Owner:** PIPELINE
+**Next action:** Opus post-check, then open PR (gh CLI not installed — create at
+https://github.com/mariellen/pokevault/pull/new/feature/dmax-gmax-league-rules-refinement ).
+Branch pushed (commit 6ec3d62). Resolve open question on `|lucky` pooling
+(lone-Lucky-vs-higher-type) — see impl-summary §5.
+_Updated: 21 Jun 2026_
+
+### Dynamax Master Flag
+**Status:** Implementation complete — awaiting Opus post-check. Engine + RULES.md already shipped in commit e63ca7a (v3.5.51); this pass verified behaviour against the Electabuzz golden case and closed two gaps in Opus's required-test list (added `dmax_excluded_from_regular_master` full form + `dmax_all_kept_none_traded`, 8→10 tests in analyse.dynamax_master.test.js). Full suite green: 713 passed / 1 skipped excluding the unrelated untracked csp.test.js.
+>>>>>>> 6ec3d62 (feat(analyse): Dmax/Gmax capped-pool competition + Gmax Master parity (v3.5.54))
 **Owner:** PIPELINE
 **Next action:** Opus post-check from Bug 3 onwards. PR: https://github.com/mariellen/pokevault/pull/18
 _Updated: 21 Jun 2026_
