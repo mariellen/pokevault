@@ -2,6 +2,9 @@
 
 **Brief:** dmax-gmax-league-rules-refinement · **Route:** DIRECT · **Target:** v3.5.54
 **GitHub:** #30 · **Status:** Implementation complete — awaiting Opus post-check
+**Branch:** `feature/dmax-gmax-league-rules-refinement` (commit `6ec3d62`, pushed)
+**PR:** create at https://github.com/mariellen/pokevault/pull/new/feature/dmax-gmax-league-rules-refinement
+(gh CLI not installed in this environment)
 
 ---
 

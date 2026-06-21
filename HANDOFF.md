@@ -60,9 +60,10 @@ and Lucky-non-winner handling (`NameⓇ{IV%}`, no star, never traded). New `anal
 (non-winner nick → `Ⓡ{IV%}`; no `masterDemoted` on Gmax suppression; raid Dmax/Gmax get no star)
 + 2 open questions — see `reviews/dmax-gmax-league-rules-refinement-impl-summary.md`.
 **Owner:** PIPELINE
-**Next action:** Opus post-check, then open PR for `feature/dmax-gmax-league-rules-refinement`
-(PR URL pending push — gh CLI not installed). Resolve open question on `|lucky` pooling
-(lone-Lucky-vs-higher-type).
+**Next action:** Opus post-check, then open PR (gh CLI not installed — create at
+https://github.com/mariellen/pokevault/pull/new/feature/dmax-gmax-league-rules-refinement ).
+Branch pushed (commit 6ec3d62). Resolve open question on `|lucky` pooling
+(lone-Lucky-vs-higher-type) — see impl-summary §5.
 _Updated: 21 Jun 2026_
 
 ### Dynamax Master Flag
