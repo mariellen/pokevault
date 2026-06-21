@@ -1,5 +1,5 @@
 # PokéVault Handoff
-_Last updated: 13 Jun 2026_
+_Last updated: 21 Jun 2026_
 
 > **How to use this file**
 > Open this whenever you come back to PokéVault.
@@ -9,6 +9,18 @@ _Last updated: 13 Jun 2026_
 ---
 
 ## 🔴 NEEDS YOU NOW
+
+### Dmax/Gmax Rules (Issue #30)
+**Status:** Ruleset fully defined (see Issue #30). Brief file needed at `briefs/dmax-gmax-league-rules-refinement.md` before pipeline dispatch.
+**Owner:** YOU
+**Next action:** Create brief locally, then dispatch via pipeline (OPUS-FIRST). Version target: v3.5.54.
+_Updated: 21 Jun 2026_
+
+### Dynamax Master Flag
+**Status:** Implementation complete — Opus approved. PR #27 open, awaiting CI + merge.
+**Owner:** YOU
+**Next action:** Check CI is green on PR #27 then merge.
+_Updated: 21 Jun 2026_
 
 ### GA4 Event Tracking
 **Status:** PR #12 open — adds auth.js sign_in/sign_out tracking + 10-test tracking suite. GA4 helpers already shipped in PR #11. Minor conflict expected on version (both ga4 and sort bump to v3.5.47 from same base).
@@ -23,27 +35,20 @@ _Updated: 13 Jun 2026_
 _Updated: 13 Jun 2026_
 
 ### Refactor Redirect Cleanup
-**Status:** PR #10 open — CloudFront Function for /pokevault
--refactor/* redirect + infra scaffolding.
+**Status:** PR #10 open — CloudFront Function for /pokevault-refactor/* redirect + infra scaffolding.
 **Owner:** YOU
 **Next action:** Review and merge https://github.com/mariellen/pokevault/pull/10 (requires CloudFront deploy after merge)
 _Updated: 13 Jun 2026_
-
-### Dynamax Master Flag
-**Status:** Implementation complete — Opus approved. PR #27 open, awaiting CI + merge.
-**Owner:** YOU
-**Next action:** Check CI is green on PR #27 then merge.
-_Updated: 20 Jun 2026_
 
 ---
 
 ## ⏳ WAITING FOR AN AGENT
 
-### Bug Batch June 2026
-**Status:** Implementation complete — awaiting Opus post-check. Implemented Bug 1 (Lucky Master winner → Ⓜ) and Bug 2 (shiny non-winner → Ⓡ) per Opus guidance; v3.5.50. ⚠️ Opus review provided was TRUNCATED after Bug 2 — Bugs 3–7 have NO Opus guidance and are NOT implemented. Bug 1's plain-loser→Ⓡ98 case is gated on the (un-reviewed, Mariellen-sign-off) Bug 3 decision and left as a skipped test. See `reviews/bug-batch-june-2026-impl-summary.md`. Suite green (683 pass; 4 pre-existing csp.test.js fails are unrelated).
+### Bug Batch June 2026 — Bugs 3–7
+**Status:** Bugs 1 & 2 implemented (v3.5.50). Bugs 3–7 have NO Opus guidance and are NOT implemented. Opus review was truncated after Bug 2. See `reviews/bug-batch-june-2026-impl-summary.md`.
 **Owner:** PIPELINE
-**Next action:** Opus post-check the Bug 1/Bug 2 fixes, then supply the completed review for Bugs 3–7. PR: https://github.com/mariellen/pokevault/pull/18
-_Updated: 20 Jun 2026_
+**Next action:** Opus post-check from Bug 3 onwards. PR: https://github.com/mariellen/pokevault/pull/18
+_Updated: 21 Jun 2026_
 
 ### Pipeline File Attachment
 **Status:** Pre-review complete → see `reviews\pipeline-file-attachment-opus-pre.md`
@@ -67,6 +72,8 @@ _Updated: 12 Jun 2026 20:19_
 
 ## ✅ RECENTLY COMPLETED
 
+- Bug 1 (Lucky Master winner → Ⓜ) + Bug 2 (shiny non-winner → Ⓡ) — v3.5.50
+- Dmax/Gmax ruleset fully defined — Issue #30 (capped pool unification + Gmax Master + Lucky/Normal culling)
 - Nick Override (v3.5.46) — merged as PR #11 · inline nick editing, applyNickOverride, rerenderNickCell
 - CI/CD pipeline via GitHub Actions — merged, branch protection active (v3.5.44)
 - Opus Review #6 security findings — all resolved
