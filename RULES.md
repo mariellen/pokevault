@@ -209,6 +209,12 @@ higher raw rank** (final deterministic tiebreak only).
   number before slot competition. 99.6% and 99.9% both round to 100 and are **tied**.
 - **Already-evolved wins the tie.** At equal rounded rank, an already-evolved Pokémon beats
   a pre-evolution that still needs evolving (evolution cost is implicit). Checked *before* dust.
+- **Type-priority tiebreak (v3.5.54).** At equal rounded rank, after the already-evolved
+  check and *before* dust, the comparator applies a type ladder — higher wins:
+  **Shiny Gmax (6) > Gmax (5) > Shiny Dmax (4) > Dmax (3) > Shiny Normal (2) > Normal (1)**.
+  Dmax/Gmax battle in normal form in PvP, so they share the capped pool with normals; this
+  ladder only fires on an *exact rounded-rank tie*. **Lucky is not in the ladder** — it stays
+  in its own `|lucky` sub-group and wins ties via the half-dust tiebreak below.
 - **Dust tiebreak when rounded ranks are equal.** Lower effective dust wins (affordable-first).
 - **Missing/null dust = 0.** A Pokémon already at/above the cap may export null dust; treat
   as `dust = 0` (already there, no investment) — the most affordable outcome, always wins
@@ -244,8 +250,8 @@ self-flag path only, not on the blue/expensive path).
 | `purified` | Best-IV purified per family |
 | `lucky` | Every Lucky gets one |
 | `nundo` | Every 0/0/0 |
-| `dynamax` | Assigned to **every** Dynamax without a capped league slot, kept as a raid candidate (`NameⓇ{IV%}Ⓓ`). The best-IV Dynamax per max-evo target additionally gets `wonDynamaxMaster` → `NameⓂ{IV%}Ⓓ` (Master power-up candidate), even if it also holds a capped slot. Dynamax compete only among themselves for capped slots (independent `\|dynamax` sub-group) and are excluded from the regular Master pass. |
-| `gigantamax` | Best-IV Gigantamax per max-evo target, **only when no league slot**; if best holds a league slot, the best slot-less candidate inherits it. (Gigantamax is unchanged — no `Ⓜ` flag pending Gmax-parity confirmation.) |
+| `dynamax` | Assigned to **every** Dynamax without a capped league slot, kept as a raid candidate (`NameⓇ{IV%}Ⓓ`, IV-based — **no star**). The best-IV Dynamax per max-evo target additionally gets `wonDynamaxMaster` → `NameⓂ{IV%}Ⓓ` (Master power-up candidate, starred), even if it also holds a capped slot. Dynamax **compete with normals in the same capped pool** (best rounded rank wins; type-priority breaks exact ties — see §3 tiebreak) and are excluded from the regular Master pass. |
+| `gigantamax` | Full parity with `dynamax` (v3.5.54). Assigned to **every** Gigantamax without a capped league slot (`NameⓇ{IV%}Ⓧ`, IV-based — **no star**). The best-IV Gigantamax per max-evo target gets `wonGigantamaxMaster` → `NameⓂ{IV%}Ⓧ` (Master power-up candidate, starred), even if it also holds a capped slot. Gmax compete with normals in the capped pool and are excluded from the regular Master pass. |
 | `best_overall` | Best-IV per species with no confirmed league slot — **all species** (legendary and non-legendary; non-legendaries must qualify ≥90% in some league and have no confirmed family keeper unless `masterDemoted`). Nick: `NameⓇ{IV%}` |
 | `collection` / `collection_keep` | Top N by IV% for `COLLECTION_SETS` species |
 
@@ -297,32 +303,60 @@ that league's `rankPct` is ignored and no slot is assigned for that league.
 - Nick suffix `*` (the genuine final character). Pays half dust to power up (effective-dust
   not yet applied in slot sorting for this path).
 
-### Dynamax (June 2026 — `dynamax-master-flag`)
+### Dynamax (June 2026 — refined v3.5.54 `dmax-gmax-league-rules-refinement`)
 - Set via Supabase override (`is_dynamax`); not from CSV. Mutually exclusive with Gigantamax in-game.
-- **All Dynamax are kept** (none traded). Per max-evo target:
-  - **Best Dynamax by IV** → `wonDynamaxMaster` → `NameⓂ{IV%}Ⓓ` — the one to power up to
-    Master level. Fires **even if** it (or another Dmax) also wins a capped league slot.
+- **All Dynamax are kept** (none traded). Game mechanic: Dmax battle in **normal form** in
+  PvP (Max moves unavailable), and have their **own** Max Battle pool — so:
+  - **Best Dynamax by IV per max-evo target** → `wonDynamaxMaster` → `NameⓂ{IV%}Ⓓ` — the one
+    to power up to Master level (starred). Fires **even if** it also wins a capped league slot.
   - **Other Dynamax that win a capped league slot** → `NameⒼ/Ⓤ/ⓛ{rank}Ⓓ`.
-  - **Other Dynamax with no slot** → `NameⓇ{IV%}Ⓓ` — kept as a raid candidate.
-- **Dynamax do NOT compete with regular Pokémon for capped league slots.** They form an
-  independent `|dynamax` sub-group (like shadow/purified/lucky; precedence
-  shadow > purified > lucky > dynamax) and compete only among themselves for GL/UL/LL.
+  - **Other Dynamax with no slot** → `NameⓇ{IV%}Ⓓ` (IV-based) — kept as a raid candidate,
+    **no star**.
+- **Dynamax COMPETE with regular Pokémon for capped league slots** (v3.5.54 — reverses the
+  PR #27 `|dynamax` sub-group). Best rounded rank wins; an exact rounded-rank tie is broken
+  by the type-priority ladder (Dmax (3) > Normal (1) — see §3). A Dmax that loses on rank
+  gets no capped slot and falls to `NameⓇ{IV%}Ⓓ`.
 - **Dynamax are excluded from the regular Master pass** — they never set `wonMasterSlot`
-  (kept orthogonal). The `wonDynamaxMaster` flag is separate and does not enter the
-  non-shadow Master single-keeper reconciliation, the ML-placeholder pass, or `best_overall`.
+  (kept orthogonal). `wonDynamaxMaster` does not enter the non-shadow Master reconciliation
+  or `best_overall`; it *does* count as a Master keeper for the ML-placeholder guard.
 - Branching families (Eevee) key by final evo target, so Dmax →Vaporeon and →Flareon each
   surface their own `Ⓜ`.
-- Suffix `Ⓓ` always shown, even on a league/`Ⓜ` nick.
-- Decision routing: the `wonDynamaxMaster` branch sits **above** `hasLeagueSlot` so the best
-  Dmax always renders `Ⓜ`, never the capped-league symbol.
+- Suffix `Ⓓ` always shown. Decision routing: the `wonDynamaxMaster` branch sits **above**
+  `hasLeagueSlot` so the best Dmax always renders `Ⓜ`, never the capped-league symbol.
 
-### Gigantamax
+### Gigantamax (full parity with Dynamax — v3.5.54)
 - Set via Supabase override (`is_gigantamax`); not from CSV.
-- **Unchanged** (no `Ⓜ` flag pending Gmax-parity confirmation from Mariellen). Best-IV per
-  max-evo target gets the slot **when it has no league slot**; if the best holds a league
-  slot, the best slot-less candidate inherits it. Gigantamax still competes with regulars.
-- Suffix `Ⓧ` always shown, even on a league nick and even when traded.
-- Non-best duplicate Gmax with no slot → `trade`, visibility star.
+- Gmax is a **universal soldier**: it battles in normal form in PvP **and** has its own Max
+  Battle pool (distinct from Dmax). Behaviour now mirrors Dynamax exactly:
+  - **Best Gigantamax by IV per max-evo target** → `wonGigantamaxMaster` → `NameⓂ{IV%}Ⓧ`
+    (Master power-up candidate, starred), even if it also wins a capped slot.
+  - **Other Gmax that win a capped league slot** → `NameⒼ/Ⓤ/ⓛ{rank}Ⓧ`.
+  - **Other Gmax with no slot** → `NameⓇ{IV%}Ⓧ` (IV-based) — kept as a raid candidate,
+    **no star**. (Gmax are never traded — replaces the old trade + visibility-star behaviour.)
+- Gmax **compete with normals** in the capped pool (type-priority: Gmax (5) > Dmax (3) >
+  Normal (1)) and are **excluded from the regular Master pass**. `wonGigantamaxMaster` counts
+  as a Master keeper for the ML-placeholder guard.
+- Suffix `Ⓧ` always shown.
+
+### Master League — three independent slots & Gmax suppression (v3.5.54)
+Gmax, Dmax, and Normal serve non-substitutable Master roles (different Max Battle pools):
+- **Best Gmax** (`wonGigantamaxMaster`) → `NameⓂ{IV%}Ⓧ` — PvP + Gmax Max Battles.
+- **Best Dmax** (`wonDynamaxMaster`) → `NameⓂ{IV%}Ⓓ` — PvP + Dmax Max Battles.
+- **Best Normal** (existing single-keeper logic) → `NameⓂ{IV%}` — **only if no Gmax in the family.**
+- **Normal Master suppression (categorical, not IV-based):** if **any** Gmax exists in the
+  family, the Normal Master winner is suppressed (`gmaxSuppressedNormal`) — Gmax owns the
+  family's Master PvP slot:
+  - **hundo** Normal → never traded; loses `Ⓜ` + `suggestStar` → `NameⓇ{IV%}Ⓗ`, **grey star**
+    (`gmaxSuppressedHundo`).
+  - **non-hundo** Normal → loses `Ⓜ` + star; routes through existing cull/review rules
+    (kept out of `best_overall`, so a same-species capped winner's presence sends it to cull).
+
+### Lucky non-winner (v3.5.54)
+- A Lucky stays in its own `|lucky` capped sub-group. If multiple Luckies contend for one
+  league slot, only the best wins; a **losing** Lucky (had a ≥`keepThreshold` capped claim but
+  no slot) → `luckyNonWinner` → `NameⓇ{IV%}`, **no star**, **decision stays `keep`** (Lucky is
+  never traded). Winners, pure raid/master Luckies (no capped claim), and Max/Master-flagged
+  Luckies keep the `lucky` slot unchanged.
 
 ### Legendary / Mythical / Ultra Beast
 - Skip Master in regular league evaluation (handled by `best_overall`).
@@ -400,6 +434,11 @@ Star type is set by `p.starType` in `analyse.js` and rendered by `render.js`.
 
 ### Decision tree (first match wins)
 ```
+0a. GREY  ★  gmaxSuppressedHundo — a hundo Normal kept while the family Gmax owns the PvP
+             slot (v3.5.54). Beats GOLD, so a favourited suppressed hundo is grey not gold.
+             → "Master covered by Gmax — hundo kept, no power-up"
+0b. NONE  ·  luckyNonWinner — a Lucky that lost its capped contention (v3.5.54). Explicit,
+             so a favourited losing Lucky earns NO gold star.
 1. GOLD   ★  suggestStar && isFavorite && (!isShiny || hasRealSlot)
              OR suggestStarExpensive && isFavorite
              → "Starred correctly ✓"

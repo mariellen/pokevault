@@ -218,6 +218,19 @@ function buildNickname(p, slot, convention) {
 
   if (isNundo) return fitName(base, NUNDO, '', 12);
 
+  // Change 6 (dmax-gmax-league-rules-refinement): suppressed-keeper short-circuits.
+  // These render on the Pokémon's OWN name (not an evo target) — they are kept-in-place,
+  // not power-up recommendations. Placed before all slot logic so they win unconditionally.
+  // gmaxSuppressedHundo: Normal hundo kept while the family Gmax owns the PvP slot → NameⓇ{IV%}Ⓗ.
+  if (p.gmaxSuppressedHundo) {
+    const sfx = HUNDO_SFX + (p.isShiny ? SHINY_SFX : '') + (p.isPurified ? '*' : '');
+    return fitName(p.name, LC.R + (iv === 100 ? PERFECT : String(iv)), sfx, 12);
+  }
+  // luckyNonWinner: Lucky that lost its capped contention → NameⓇ{IV%} (kept, no star).
+  if (p.luckyNonWinner) {
+    return fitName(p.name, LC.R + String(iv), (p.isShiny ? SHINY_SFX : ''), 12);
+  }
+
   // Special marker suffixes applied regardless of convention (shiny ※, dynamax Ⓓ, gigantamax Ⓧ)
   let specialSuf = '';
   if (p.isDynamax) specialSuf += 'Ⓓ';
@@ -378,19 +391,16 @@ function buildNickname(p, slot, convention) {
     nickSuf = sufNoStar + SHINY_SFX + (p.isPurified ? '*' : '');
     return fitName(p.name, mid, nickSuf, 12);
   } else if (slot==='dynamax') {
-    if (p.wonDynamaxMaster) {
-      // Best-overall Dynamax → NameⓂ{IV%}Ⓓ — power up to Master level.
-      mid = LC.M + (iv===100?PERFECT:String(iv));
-    } else {
-      const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
-      if (best) { const pv=Math.round(p['rankPct'+best]||0); mid=LC[best]+(pv===100?PERFECT:String(pv)); }
-      else { mid=LC.R+String(iv); }
-    }
+    // Change 6: the 'dynamax' slot is only held by a Dmax that did NOT win a capped league slot
+    // (a capped-slot Dmax routes through the L/G/U handler instead). A non-winning Dmax is a
+    // Max-Battle/raid candidate → NameⓇ{IV%}Ⓓ (IV-based, NOT a league letter — brief: NameR89D).
+    // The best Dmax per evo target → NameⓂ{IV%}Ⓓ (power up to Master).
+    mid = p.wonDynamaxMaster ? LC.M + (iv===100?PERFECT:String(iv)) : LC.R + String(iv);
     return fitName(base, mid, nickSuf, 12); // nickSuf has Ⓓ from suf
   } else if (slot==='gigantamax') {
-    const best=['G','U','L','M'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
-    if (best) { const pv=Math.round(p['rankPct'+best]||0); mid=LC[best]+(pv===100?PERFECT:String(pv)); }
-    else { mid=LC.R+String(iv); }
+    // Change 6: Gigantamax parity with Dynamax. Best Gmax per evo target → NameⓂ{IV%}Ⓧ;
+    // a non-winning Gmax → NameⓇ{IV%}Ⓧ (Max-Battle/raid candidate — brief: NameR82X).
+    mid = p.wonGigantamaxMaster ? LC.M + (iv===100?PERFECT:String(iv)) : LC.R + String(iv);
     return fitName(base, mid, nickSuf, 12); // nickSuf has Ⓧ from suf
   } else if (slot==='lucky') {
     // Pure hundo with no league slot (not actually lucky): Ⓗ plus any other suffixes
@@ -684,7 +694,8 @@ function analyse(rows) {
       suggestStarExpensive:false, suggestStarCheaper:false,
       isExpensiveWinner:false, isAffordableWinner:false, isCheaperAlternative:false,
       targetEvo:'', hidden:false, evoIndicator:'', canEvolve:false, neverEvolved:false, isHundo:false, dustToL40:0, belowCapNote:'',
-      isDynamax:false, isGigantamax:false, wonDynamaxMaster:false, isCostumed:false, vivillonPattern:'', specialForm:'', manualDecision:'', notes:'', stableKey:'',
+      isDynamax:false, isGigantamax:false, wonDynamaxMaster:false, wonGigantamaxMaster:false,
+      gmaxSuppressedNormal:false, gmaxSuppressedHundo:false, luckyNonWinner:false, isCostumed:false, vivillonPattern:'', specialForm:'', manualDecision:'', notes:'', stableKey:'',
       overBudget100:false, cheaperAvailable:false,
       evolutionUnknown: typeof FAMILY_OVERRIDES !== 'undefined' && FAMILY_OVERRIDES.unknownEvo ? FAMILY_OVERRIDES.unknownEvo.has(r['Name']) : false,
       genderUnknownLocked,
@@ -757,7 +768,7 @@ function analyse(rows) {
         // Dynamax forms an independent sub-group (like shadow/purified/lucky) so it competes
         // only against other Dynamax for capped slots and never displaces a regular winner.
         // Precedence: shadow > purified > lucky > dynamax (a Lucky-Dmax stays in |lucky).
-        const variantKey = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : p.isDynamax ? '|dynamax' : '';
+        const variantKey = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';  // Change 1: Dmax/Gmax compete in the MAIN capped pool (no private sub-group)
         const groupKey = (isDimorphic && p.gender) ? stageName+'|'+p.gender+variantKey : stageName+variantKey;
         if (!byEvoStage[groupKey]) byEvoStage[groupKey]=[];
         byEvoStage[groupKey].push(p);
@@ -799,7 +810,10 @@ function analyse(rows) {
             // Dynamax never competes in the regular Master pass — the best Dmax gets the Ⓜ
             // power-up flag via wonDynamaxMaster (kept orthogonal to wonMasterSlot). It still
             // competes among Dmax for capped GL/UL/LL slots via the |dynamax sub-group.
-            if (lg === 'M' && p.isDynamax) return false;
+            // Change 4: Dynamax AND Gigantamax are excluded from the regular Master pass.
+            // Each gets its own orthogonal Master flag (wonDynamaxMaster / wonGigantamaxMaster)
+            // because Dmax and Gmax serve different Max Battle pools (non-substitutable roles).
+            if (lg === 'M' && (p.isDynamax || p.isGigantamax)) return false;
 
             // Master league: only the final evolution (must BE stageName, not just evolve to it)
             // Exception 1: hundo pre-evos always allowed — will be evolved, and 15/15/15 beats any evolved form
@@ -924,6 +938,18 @@ function analyse(rows) {
           return 3;
         };
 
+        // Change 2: type-priority tiebreak (dmax-gmax-league-rules-refinement). Dmax/Gmax
+        // battle in NORMAL form in PvP, so they share the capped pool with normals — best
+        // ROUNDED rank wins, and an EXACT rounded-rank tie is broken by type priority:
+        //   Shiny Gmax(6) > Gmax(5) > Shiny Dmax(4) > Dmax(3) > Shiny Normal(2) > Normal(1)
+        // Lucky is NOT in the ladder — it stays in its own |lucky sub-group and wins ties
+        // via the existing half-dust tiebreak below.
+        const typePriority = p => {
+          if (p.isGigantamax) return p.isShiny ? 6 : 5;
+          if (p.isDynamax)    return p.isShiny ? 4 : 3;
+          return p.isShiny ? 2 : 1;
+        };
+
         eligible.sort((a, b) => {
           const ra = a[rankField]||0, rb = b[rankField]||0;
           const roundedA = Math.round(ra), roundedB = Math.round(rb);
@@ -933,15 +959,20 @@ function analyse(rows) {
           // decides on rank alone; otherwise we fall through to the dust tiebreak below.
           if (roundedA !== roundedB) return roundedB - roundedA;
           // Tied on rounded rank → prefer already-evolved (p.name === stageName) over a pre-evo
-          // (evolution cost is implicit), then cheapest effective dust wins the tie.
+          // (evolution cost is implicit).
           const aIsEvolved = (a.name === stageName) ? 0 : 1;
           const bIsEvolved = (b.name === stageName) ? 0 : 1;
           if (aIsEvolved !== bIsEvolved) return aIsEvolved - bIsEvolved;
+          // Change 2: type-priority tiebreak — only fires when rounded ranks are already tied.
+          const tpa = typePriority(a), tpb = typePriority(b);
+          if (tpa !== tpb) return tpb - tpa;   // higher priority wins
+          // Then cheapest effective dust wins the tie (Lucky pays half — its tier-7 edge).
           const da = effectiveDust(a), db = effectiveDust(b);
           if (da !== db) return da - db;
-          // Fully tied on rounded rank, evolved-state and dust → higher raw rank as a final,
-          // deterministic tiebreak (does NOT override the dust comparison above).
-          return rb - ra;
+          // Fully tied on rounded rank, evolved-state, type and dust → higher raw rank, then a
+          // stable terminal tiebreak on scan index (Amendment B — do not rely on sort stability).
+          if (Math.abs(rb - ra) > 1e-9) return rb - ra;
+          return (Number(a.idx)||0) - (Number(b.idx)||0);
         });
 
         // Option C+D: affordable-first two-pass. ML always single pass (Option D — exempt by design).
@@ -1128,7 +1159,7 @@ function analyse(rows) {
       const wonInLoop = members.filter(p => p.wonMasterSlot && !p.isShadow);
       const mlFloor = RULES.keepThreshold; // confirmed keeper threshold
       const extraCandidates = members.filter(p =>
-        !p.isShadow && !p.isDynamax && !p.wonMasterSlot &&
+        !p.isShadow && !p.isDynamax && !p.isGigantamax && !p.wonMasterSlot &&
         (p.rankPctM || p.ivAvg || 0) >= mlFloor &&
         isFinalStage(p) &&
         // not already committed to a capped league it should keep instead
@@ -1181,7 +1212,27 @@ function analyse(rows) {
     if(shadows.length) shadows[0].slots.push('shadow');
     const purified=members.filter(p=>p.isPurified).sort((a,b)=>b.ivAvg-a.ivAvg);
     if(purified.length) purified[0].slots.push('purified');
-    members.filter(p=>p.isLucky).forEach(p=>p.slots.push('lucky'));
+    // Change 8: Lucky non-winner suppression (dmax-gmax-league-rules-refinement).
+    // A Lucky that competed for a capped slot (had a ≥keepThreshold capped claim) and lost
+    // (e.g. multiple Luckies for one league slot) is NOT given the 'lucky' keep-slot — it falls
+    // to NameⓇ{IV%} with no star. A Lucky can NEVER be traded, so its decision stays 'keep'.
+    // Winners, pure raid/master Luckies (no capped claim), and Max/Master-flagged Luckies keep
+    // the 'lucky' slot unchanged.
+    members.filter(p => p.isLucky).forEach(p => {
+      const wonRealSlot = p.slots.some(s => RULES.leagues.includes(s));
+      const wonMaxOrSpecial =
+        p.wonDynamaxMaster || p.wonGigantamaxMaster ||
+        p.slots.includes('dynamax') || p.slots.includes('gigantamax') ||
+        p.wonMasterSlot;
+      const everHadCappedClaim =
+        RULES.leagues.some(lg => lg !== 'M' && (p['rankPct' + lg] || 0) >= RULES.keepThreshold);
+      if (wonRealSlot || wonMaxOrSpecial || !everHadCappedClaim) {
+        p.slots.push('lucky');           // winner / pure raid / Max-Master Lucky: unchanged
+      } else {
+        p.luckyNonWinner = true;         // lost capped contention → NameⓇ{IV%}, no star
+        p.decision = 'keep';             // Lucky is never traded
+      }
+    });
     members.filter(p=>p.isNundo).forEach(p=>p.slots.push('nundo'));
     // Dynamax: best-IV per evolution target gets 'dynamax' slot, unless it already holds a
     // league slot. Best-without-league-slot: if best-IV holds a league slot, the best remaining
@@ -1214,21 +1265,58 @@ function analyse(rows) {
         }
       });
     });
-    // Gigantamax: same best-without-league-slot logic
+    // Change 3: Gigantamax — full Master parity with Dynamax (dmax-gmax-league-rules-refinement).
+    // Gmax and Dmax enter DIFFERENT Max Battle pools, so wonGigantamaxMaster is a SEPARATE flag,
+    // keyed by the same maxTargetKey closure — NOT unified with the dmaxCandidates pass.
+    // The best Gmax per evo target → wonGigantamaxMaster (Ⓜ power-up, routed above hasLeagueSlot);
+    // every slot-less Gmax is kept as a raid candidate (NameⓇ{IV%}Ⓧ) via the 'gigantamax' slot.
+    // A Gmax can be both a raid candidate AND a Master winner simultaneously.
     const gmaxCandidates = {};
     members.filter(p => p.isGigantamax).forEach(p => {
       const k = maxTargetKey(p);
-      if (!gmaxCandidates[k]) gmaxCandidates[k] = [];
-      gmaxCandidates[k].push(p);
+      (gmaxCandidates[k] = gmaxCandidates[k] || []).push(p);
     });
     Object.values(gmaxCandidates).forEach(cands => {
       cands.sort((a, b) => (b.ivAvg||0) - (a.ivAvg||0) || (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
       const best = cands[0]; if (!best) return;
-      const target = best.slots.some(s => RULES.leagues.includes(s))
-        ? cands.find(p => !p.slots.some(s => RULES.leagues.includes(s)))
-        : best;
-      if (target && !target.slots.includes('gigantamax')) target.slots.push('gigantamax');
+      best.wonGigantamaxMaster = true;
+      cands.forEach(p => {
+        if (!p.slots.some(s => RULES.leagues.includes(s)) && !p.slots.includes('gigantamax')) {
+          p.slots.push('gigantamax');
+        }
+      });
     });
+
+    // Change 7: categorical Normal-Master suppression when the family has any Gmax.
+    // Gmax is a universal soldier (PvP + Gmax Max Battles) so it OWNS the family's Master
+    // PvP slot regardless of IV — the Normal Master winner is redundant and suppressed.
+    //   • hundo Normal → kept (never traded), but loses Ⓜ + suggestStar → NameⓇ{IV%}Ⓗ, grey star
+    //   • non-hundo Normal → loses Ⓜ + slot; routes through existing cull/review rules (may be culled)
+    // ORDERING: runs AFTER wonGigantamaxMaster is set (Change 3, immediately above) and BEFORE
+    // the best_overall pass + the hundo-always-keep block (~"Hundos always keep"). Note we do
+    // NOT set masterDemoted here — unlike the normal-vs-normal demotion, a Gmax-suppressed
+    // non-hundo Normal is intended to fall to the family's normal cull rules (brief: Charizard
+    // CP701 96% → culled), so it must stay excluded from best_overall (see filter below).
+    const familyHasGmax = members.some(m => m.isGigantamax);
+    if (familyHasGmax) {
+      members.forEach(p => {
+        if (p.isShadow || p.isDynamax || p.isGigantamax) return; // shadow/dmax/gmax untouched
+        if (!p.wonMasterSlot) return;                            // only the Normal Master winner
+        const isHundo = p.atkIV === 15 && p.defIV === 15 && p.staIV === 15;
+        p.slots = p.slots.filter(s => s !== 'M' && s !== 'M_tentative');
+        p.wonMasterSlot = false;
+        p.hasBattleSlot = false;
+        p.slotConfirmed = p.slots.some(s => RULES.leagues.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold);
+        p.gmaxSuppressedNormal = true;
+        p.gmaxSuppressedHundo = isHundo;
+        if (isHundo) {
+          p.decision = 'keep';                                   // hundos are never traded
+          if (!p.slots.includes('hundo')) p.slots.push('hundo');
+          // suggestStar deliberately NOT set — Gmax covers the PvP slot; grey star via the ladder.
+        }
+      });
+    }
+
     // All species: best-IV per species without a confirmed league slot → 'best_overall' slot
     // Non-legendaries: must have a qualifying rank (≥90%) in some league AND the species must have
     // no confirmed keeper already in the family (prevents same-species losers from piling up).
@@ -1241,6 +1329,10 @@ function analyse(rows) {
       const bestOverallBySpecies = {};
       members.filter(p => {
         if (p.isDynamax || p.isGigantamax) return false;
+        // Change 7: a Gmax-suppressed Normal must not be re-kept here — it has lost its Master
+        // PvP role to the family's Gmax and must lose suggestStar (hundo → grey via ladder;
+        // non-hundo → existing cull/review rules).
+        if (p.gmaxSuppressedNormal || p.gmaxSuppressedHundo) return false;
         if (p.slots.some(s => RULES.leagues.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)) return false;
         if (!isLegendary && !RULES.leagues.some(l => (p[`rankPct${l}`]||0) >= RULES.keepThreshold)) return false;
         if (speciesWithConfirmedKeeper.has(p.name) && !p.masterDemoted) return false;
@@ -1289,11 +1381,21 @@ function analyse(rows) {
       if (p.slots.includes('nundo')) {
         p.decision='keep'; p.reason='Nundo — 0/0/0';
         p.nickname=buildNickname(p,'nundo');
+      } else if (p.luckyNonWinner) {
+        // Change 8: a Lucky that lost its capped contention — kept (Lucky never traded) as
+        // NameⓇ{IV%} with no star. buildNickname short-circuits luckyNonWinner → NameⓇ{IV%}.
+        p.decision='keep'; p.reason='Lucky — lost capped slot, kept (Master/Raid candidate)';
+        p.nickname=buildNickname(p,'review');
       } else if (p.wonDynamaxMaster) {
         // Best-overall Dynamax — always Ⓜ, even if it also won a capped Dmax league slot.
         // Placed above hasLeagueSlot so a capped-slot Dmax still renders NameⓂ{IV%}Ⓓ.
         p.decision='keep'; p.reason='Best Dynamax — power up to Master';
         p.nickname=buildNickname(p,'dynamax');
+      } else if (p.wonGigantamaxMaster) {
+        // Change 5: Best-overall Gigantamax — always Ⓜ (mirrors wonDynamaxMaster), even if it
+        // also won a capped slot. Placed above hasLeagueSlot so it renders NameⓂ{IV%}Ⓧ.
+        p.decision='keep'; p.reason='Best Gigantamax — power up to Master';
+        p.nickname=buildNickname(p,'gigantamax');
       } else if (hasLeagueSlot) {
         const lgSlots=p.slots.filter(s=>RULES.leagues.includes(s)||s.endsWith('_affordable')).map(s=>s.replace('_affordable',''));
         const lgNames=lgSlots.map(s=>RULES.leagueNames[s]);
@@ -1406,13 +1508,15 @@ function analyse(rows) {
             p.slots.includes('nundo') ||
             p.slots.includes('shadow') ||
             p.slots.includes('purified') ||
-            p.slots.includes('dynamax') ||
-            p.slots.includes('gigantamax') ||
+            // Change 6/9: a Dmax/Gmax holding ONLY the raid slot (not the Master power-up
+            // candidate, not a capped winner) gets NO star — per brief "non-winning Dmax/Gmax
+            // → keep, no star". The won*Master power-up candidates are starred below.
             p.slots.includes('best_overall') ||
-            p.wonDynamaxMaster
+            p.wonDynamaxMaster ||
+            p.wonGigantamaxMaster
           )) ||
           isProtectedBest ||
-          (p.isLucky) ||
+          (p.isLucky && !p.luckyNonWinner) ||  // Change 8: a losing Lucky earns no star
           (p.isCostumed)
         )
       );
@@ -1431,7 +1535,9 @@ function analyse(rows) {
       if (p.atkIV === 15 && p.defIV === 15 && p.staIV === 15) {
         p.decision = 'keep';
         if (!p.slots.includes('hundo')) p.slots.push('hundo');
-        p.suggestStar = true;
+        // Change 7: a Gmax-suppressed hundo loses suggestStar (Gmax covers the PvP slot) —
+        // it gets a grey star via the ladder below instead.
+        if (!p.gmaxSuppressedHundo) p.suggestStar = true;
       }
 
       // starType: used by render.js and tests.
@@ -1439,7 +1545,12 @@ function analyse(rows) {
       // the star reason is shiny-only (no real PvP/lucky/nundo slot alongside it).
       const hasRealSlot = p.slots.some(s => RULES.leagues.includes(s))
         || p.slots.includes('lucky') || p.slots.includes('nundo');
-      if (p.suggestStar && p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'gold';
+      // Change 9: Gmax-suppression / Lucky-non-winner take precedence over the normal ladder.
+      // gmaxSuppressedHundo → grey (Gmax owns PvP, hundo still kept). luckyNonWinner → none
+      // (explicit, so a favourited losing Lucky does NOT earn a gold star).
+      if (p.gmaxSuppressedHundo) p.starType = 'grey';
+      else if (p.luckyNonWinner) p.starType = 'none';
+      else if (p.suggestStar && p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'gold';
       else if (p.suggestStar && !p.isFavorite && !p.suggestStarCheaper && (!p.isShiny || hasRealSlot)) p.starType = 'green';
       else if (p.suggestStarExpensive && p.isFavorite) p.starType = 'gold';
       else if (p.suggestStarExpensive && !p.isFavorite) p.starType = 'blue';
@@ -1484,7 +1595,7 @@ function analyse(rows) {
           :lg==='G'?(p.evolvedNameG||p.name)
           :lg==='U'?(p.evolvedNameU||p.name)
           :(p.evolvedNameU||p.evolvedNameG||p.name);
-        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : p.isDynamax ? '|dynamax' : '';
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
         slotWinners[lg+'|'+evo+vk] = (slotWinners[lg+'|'+evo+vk]||0) + 1;
       });
     });
@@ -1545,7 +1656,7 @@ function analyse(rows) {
         releasedSlotPokemon.add(p);
 
         // Decrement winner count for this stage
-        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : p.isDynamax ? '|dynamax' : '';
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
         const wk = s+'|'+evoTarget+vk;
         slotWinners[wk] = Math.max(0, (slotWinners[wk]||1) - 1);
 
@@ -1558,7 +1669,7 @@ function analyse(rows) {
           .filter(m => m !== p)
           .filter(m => {
             // Must match the same variant (shadow/regular/lucky/purified) as the releasing Pokémon
-            const m_vk = m.isShadow ? '|shadow' : m.isPurified ? '|purified' : m.isLucky ? '|lucky' : m.isDynamax ? '|dynamax' : '';
+            const m_vk = m.isShadow ? '|shadow' : m.isPurified ? '|purified' : m.isLucky ? '|lucky' : '';
             if (m_vk !== vk) return false;
             // One slot per Pokémon: nextBest candidate must not already hold a battle slot
             if (m.hasBattleSlot) return false;
@@ -1625,7 +1736,7 @@ function analyse(rows) {
           :lg==='G'?(p.evolvedNameG||p.name)
           :lg==='U'?(p.evolvedNameU||p.name)
           :(p.evolvedNameU||p.evolvedNameG||p.name);
-        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : p.isDynamax ? '|dynamax' : '';
+        const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
         const key = lg+'|'+evo+vk;
         if (!byEvo[key]) byEvo[key] = [];
         byEvo[key].push(p);
@@ -1756,7 +1867,11 @@ function analyse(rows) {
     // a Master League candidate to star before culling everything else.
     // Legendaries/Mythicals/UBs skip ML entirely (handled by best_overall) — no placeholder.
     if (!isLegendary) {
-      const hasConfirmedMlKeeper = members.some(m => m.slots.includes('M') && m.slotConfirmed);
+      // A Dmax/Gmax Master power-up candidate (wonDynamaxMaster / wonGigantamaxMaster) covers
+      // the family's Master role even though it holds no literal 'M' slot — so no ML placeholder
+      // is needed (and a Gmax-suppressed Normal must not be re-promoted into one).
+      const hasConfirmedMlKeeper = members.some(m =>
+        (m.slots.includes('M') && m.slotConfirmed) || m.wonDynamaxMaster || m.wonGigantamaxMaster);
       const candidates = members.filter(m =>
         !m.slots.some(s => RULES.leagues.includes(s) || s.endsWith('_affordable')) &&
         m.decision !== 'keep' && m.decision !== 'protected'

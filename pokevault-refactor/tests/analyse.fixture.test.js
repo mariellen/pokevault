@@ -529,12 +529,13 @@ describe('Group 14 — Sawk multi-league deconfliction', () => {
 // Snorlax CP:100 (stableKey='143|||5|5|5|2026-02-01') has no league rank data.
 // Machamp CP:2450 (stableKey='68|||15|15|14|2025-01-01') holds Ultra slot normally.
 
-// rankSym = the no-league-slot rank symbol. The best Dynamax is the Master power-up
-// candidate (Ⓜ via wonDynamaxMaster); shiny/gigantamax no-slot still use Ⓡ.
+// rankSym = the no-league-slot rank symbol. The best Dynamax AND the best Gigantamax are
+// each the Master power-up candidate (Ⓜ via wonDynamaxMaster / wonGigantamaxMaster — Gmax
+// parity, dmax-gmax-league-rules-refinement v3.5.54); shiny no-slot still uses Ⓡ.
 describe.each([
   ['is_shiny',      '※', 'isShiny',      'Ⓡ'],
   ['is_dynamax',    'Ⓓ', 'isDynamax',    'Ⓜ'],
-  ['is_gigantamax', 'Ⓧ', 'isGigantamax', 'Ⓡ'],
+  ['is_gigantamax', 'Ⓧ', 'isGigantamax', 'Ⓜ'],
 ])('Group 15 — %s override = force keep', (flagKey, suffix, propName, rankSym) => {
   let ovResult;
   const ovFind = (name, cp) => ovResult.pokemon.find(p => p.name === name && p.cp === cp);
@@ -741,12 +742,17 @@ describe('Group 18 — Dynamax/Gigantamax/Shiny holding-format redirect', () => 
     expect(nick.length).toBeLessThanOrEqual(12);
   });
 
-  it('isDynamax with qualifying league + slot=review → uses league symbol not Ⓡ', () => {
-    // rankPctU=95 >= 90 → should produce NameⓊ95Ⓓ
+  it('isDynamax holding only the raid slot → NameⓇ{IV%}Ⓓ (IV-based, not a league symbol)', () => {
+    // dmax-gmax-league-rules-refinement (v3.5.54): a Dmax that holds ONLY the 'dynamax' raid
+    // slot did NOT win its capped contention, so it renders as an IV-based Max-Battle/raid
+    // candidate (NameⓇ{IV%}Ⓓ) — NOT the league symbol. A capped-slot Dmax routes via the
+    // L/G/U handler; the best Dmax per evo target renders Ⓜ via wonDynamaxMaster.
     const p = makeP({ isDynamax: true, rankPctU: 95, slots: ['dynamax'] });
     const nick = buildNickname(p, 'review');
-    expect(nick).toContain('Ⓤ');
+    expect(nick).toContain('Ⓡ');
     expect(nick).toContain('Ⓓ');
+    expect(nick).not.toContain('Ⓤ');
+    expect(nick).toContain('82'); // IV-based (ivAvg 82), not the UL rank 95
     expect(nick.length).toBeLessThanOrEqual(12);
   });
 
@@ -1232,8 +1238,10 @@ describe('Group 27a — Dmax Entei: best-IV gets Ⓜ, dupe kept as raid candidat
   });
 });
 
-// 27b: Gmax Snorlax — best (with Ultra rank ≥90) keeps with Ⓧ in nick, dupe trades with visibility
-describe('Group 27b — Gmax Snorlax: best-IV keeps (Ⓧ in nick), dupe gets visibility star', () => {
+// 27b: Gmax Snorlax — full parity with Dynamax (dmax-gmax-league-rules-refinement v3.5.54).
+// Best Gmax per evo target → Master power-up candidate (Ⓜ via wonGigantamaxMaster); every
+// slot-less Gmax is kept as a raid candidate (Ⓡ), NEVER traded (mirrors Group 27a).
+describe('Group 27b — Gmax Snorlax: best-IV gets Ⓜ, dupe kept as raid candidate (Ⓡ)', () => {
   let g27bResult;
   const g27bFind = (name, cp) => g27bResult.pokemon.find(p => p.name === name && p.cp === cp);
 
@@ -1246,33 +1254,38 @@ describe('Group 27b — Gmax Snorlax: best-IV keeps (Ⓧ in nick), dupe gets vis
     g27bResult = loader.createWithOverrides(overrides).analyse(csv);
   });
 
-  it('Snorlax CP:2448 (best Gmax, 97.8%) → decision=keep', () => {
+  it('Snorlax CP:2448 (best Gmax, 97.8%) → decision=keep, wonGigantamaxMaster', () => {
+    // This Gmax also wins an Ultra slot on rank, so it holds 'U' (not the raid 'gigantamax'
+    // slot) — but wonGigantamaxMaster still routes its nick to Ⓜ above the capped slot.
     const p = g27bFind('Snorlax', 2448);
     expect(p).toBeDefined();
     expect(p.isGigantamax).toBe(true);
     expect(p.decision).toBe('keep');
+    expect(p.wonGigantamaxMaster).toBe(true);
   });
 
-  it('Snorlax CP:2448 (best Gmax) → nickname contains Ⓧ and is SnorlaxⓊ96Ⓧ', () => {
-    // Lucky Snorlax wins Master slot; CP:2448 (non-lucky) demoted → holds Gmax slot instead.
-    // Gmax nick picks best capped league ≥90% (Ultra 96%), so SnorlaxⓊ96Ⓧ.
+  it('Snorlax CP:2448 (best Gmax) → nickname is SnorlaxⓂ98Ⓧ (Master power-up candidate)', () => {
+    // Gmax parity with Dynamax: the best Gmax per evo target renders Ⓜ + {IV%} + Ⓧ.
     const p = g27bFind('Snorlax', 2448);
     expect(p.nickname).toContain('Ⓧ');
-    expect(p.nickname).toBe('SnorlaxⓊ96Ⓧ');
+    expect(p.nickname).toBe('SnorlaxⓂ98Ⓧ');
     expect(p.nickname.length).toBeLessThanOrEqual(12);
   });
 
-  it('Snorlax CP:200 (no Gmax slot, Lucky winner holds Master) → decision=trade', () => {
-    // CP:2448 holds Gmax slot (no M slot after demotion); CP:200 has no slot.
+  it('Snorlax CP:200 (dupe Gmax, 71.1%) → decision=keep (raid candidate), not wonGigantamaxMaster', () => {
+    // Parity with Dmax: every slot-less Gmax is kept as a raid candidate, never traded.
     const p = g27bFind('Snorlax', 200);
     expect(p).toBeDefined();
     expect(p.isGigantamax).toBe(true);
-    expect(p.decision).toBe('trade');
+    expect(p.decision).toBe('keep');
+    expect(p.wonGigantamaxMaster).toBeFalsy();
+    expect(p.slots).toContain('gigantamax');
   });
 
-  it('Snorlax CP:200 (no slot) → starType is visibility', () => {
+  it('Snorlax CP:200 (dupe Gmax) → nickname is SnorlaxⓇ71Ⓧ (raid candidate), no visibility star', () => {
     const p = g27bFind('Snorlax', 200);
-    expect(p.starType).toBe('visibility');
+    expect(p.nickname).toBe('SnorlaxⓇ71Ⓧ');
+    expect(p.starType).not.toBe('visibility');
   });
 });
 
