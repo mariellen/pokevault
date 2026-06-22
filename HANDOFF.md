@@ -44,10 +44,25 @@ _Updated: 13 Jun 2026_
 
 ## ⏳ WAITING FOR AN AGENT
 
-<<<<<<< HEAD
+### Gmax Master Flag Debug (#35, v3.5.55)
+**Status:** Diagnosed + closed. The reported symptom (a capped-slot-winning Gmax showing the
+capped nick `PersiU100Ⓧ` instead of `NameⓂ{IV%}Ⓧ`) is the **deployed v3.5.53 behaviour** —
+`origin/main` has NO `wonGigantamaxMaster`. The fix already exists on this branch (v3.5.54,
+commit `ed96ba9`: adds the flag + routes it above `hasLeagueSlot`). Verified against the brief's
+real Meowth/Persian example via the engine: best Gmax → `PersianⓂ98Ⓧ` keep; lower Gmax →
+`PersianⓇ82Ⓧ` keep. **No engine change needed.** Added the missing regression: first TWO-stage
+gmax test (`gmax_master_overrides_capped_slot` in `analyse.gmax_master.test.js`; all prior gmax
+tests used single-stage Electabuzz). Bumped v3.5.54 → v3.5.55. Suite green: 754 passed / 2
+skipped (untracked `csp.test.js` is the separate CSP thread). Pushed commit `3f41fe1`.
+**Owner:** YOU
+**Next action:** #35 is fixed by merging the open Dmax/Gmax PR (this same branch,
+`feature/dmax-gmax-league-rules-refinement`) to deploy it. See
+`reviews/gmax-master-flag-debug-impl-summary.md`.
+_Updated: 22 Jun 2026_
+
 ### Bug Batch June 2026 — Bugs 3–7
 **Status:** Bugs 1 & 2 implemented (v3.5.50). Bugs 3–7 have NO Opus guidance and are NOT implemented. Opus review was truncated after Bug 2. See `reviews/bug-batch-june-2026-impl-summary.md`.
-=======
+
 ### Dmax/Gmax League Rules Refinement (#30, v3.5.54)
 **Status:** Implementation complete — awaiting Opus post-check. Removed the spurious `|dynamax`
 capped sub-group (PR #27 over-keep bug) so Dmax/Gmax now compete in the **main capped pool**
@@ -68,7 +83,6 @@ _Updated: 21 Jun 2026_
 
 ### Dynamax Master Flag
 **Status:** Implementation complete — awaiting Opus post-check. Engine + RULES.md already shipped in commit e63ca7a (v3.5.51); this pass verified behaviour against the Electabuzz golden case and closed two gaps in Opus's required-test list (added `dmax_excluded_from_regular_master` full form + `dmax_all_kept_none_traded`, 8→10 tests in analyse.dynamax_master.test.js). Full suite green: 713 passed / 1 skipped excluding the unrelated untracked csp.test.js.
->>>>>>> 6ec3d62 (feat(analyse): Dmax/Gmax capped-pool competition + Gmax Master parity (v3.5.54))
 **Owner:** PIPELINE
 **Next action:** Opus post-check from Bug 3 onwards. PR: https://github.com/mariellen/pokevault/pull/18
 _Updated: 21 Jun 2026_
