@@ -476,3 +476,70 @@ describe('Real example — Electabuzz Dmax non-winners', () => {
     expect(loser.nickname).toContain('Ⓓ');
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// gmax_master_overrides_capped_slot (GitHub #35) — direct equivalent of the Dmax
+// "best Dmax that also wins a capped slot stays Ⓜ" group, but exercised on a
+// TWO-STAGE species (Meowth → Persian). Every other gmax test above uses
+// single-stage Electabuzz (Name (U)=self); this closes the two-stage coverage
+// gap and reproduces Mariellen's real Meowth/Persian example from the brief:
+//   • CP423 Gmax (98% IV, 100% UL rank) → wonGigantamaxMaster, NameⓂ98Ⓧ (NOT the
+//     capped PersiU100Ⓧ nick — the Master power-up must route ABOVE hasLeagueSlot)
+//   • CP410 Gmax (82% IV, 97% UL rank) → kept raid candidate, NameⓇ82Ⓧ, no star
+// Regression guard for the deployed-v3.5.53 behaviour where a capped-slot-winning
+// Gmax routed through hasLeagueSlot and showed the capped league nick.
+// ───────────────────────────────────────────────────────────────────────────
+describe('gmax_master_overrides_capped_slot (#35) — two-stage Meowth→Persian', () => {
+  const MEOWTH = 52; // Meowth → Persian (Name (U)='Persian')
+  const meowKey = (a, d, s, idx) => [String(MEOWTH), '', '', a, d, s, '_idx' + idx].join('|');
+  // Meowth row: Name (U)='Persian' so evolvedNameU='Persian' (two-stage, unlike Electabuzz).
+  const meow = (o) => row({
+    Index: String(o.idx), Name: 'Meowth', 'Pokemon Number': String(MEOWTH),
+    CP: String(o.cp), 'Atk IV': String(o.a), 'Def IV': String(o.d), 'Sta IV': String(o.s),
+    'IV Avg': ivAvg(o.a, o.d, o.s).toFixed(1), 'Level Min': '20', Dust: '5000',
+    'Rank % (U)': o.ru != null ? String(o.ru) : '', 'Dust Cost (U)': o.ru != null ? '10000' : '', 'Name (U)': 'Persian',
+  });
+  const runMeow = (specs) => {
+    const m = {};
+    specs.forEach(o => { if (o.gmax) m[meowKey(o.a, o.d, o.s, o.idx)] = { is_gigantamax: true }; });
+    return loader.createWithOverrides(m)
+      .analyse(toCSV(specs.map(meow))).pokemon.filter(p => p.name === 'Meowth');
+  };
+  const meowByIdx = (mons, specs, idx) => mons.find(p => p.cp === specs.find(s => s.idx === idx).cp);
+
+  it('the best Gmax wins a capped slot AND still routes wonGigantamaxMaster → NameⓂ{IV%}Ⓧ', () => {
+    const specs = [
+      { idx: 1, cp: 423, a: 14, d: 15, s: 15, ru: 100.0, gmax: true }, // 98% IV, wins UL on rank
+      { idx: 2, cp: 410, a: 14, d: 11, s: 12, ru: 97.0, gmax: true },  // 82% IV, loses → raid candidate
+    ];
+    const mons = runMeow(specs);
+    const best = meowByIdx(mons, specs, 1);
+    const loser = meowByIdx(mons, specs, 2);
+
+    // evolvedNameU must resolve to Persian (two-stage) and feed maxTargetKey
+    expect(best.evolvedNameU).toBe('Persian');
+    expect(loser.evolvedNameU).toBe('Persian');
+
+    // exactly one Master power-up candidate for the evo target
+    expect(mons.filter(p => p.wonGigantamaxMaster).length).toBe(1);
+
+    // best Gmax: Master override beats the capped slot it also won
+    expect(best.wonGigantamaxMaster).toBe(true);
+    expect(best.slots).toContain('U');                       // it DID win the capped slot
+    expect(best.decision).toBe('keep');
+    expect(best.nickname).toContain('Ⓜ');                   // routed above hasLeagueSlot
+    expect(best.nickname).toContain('Ⓧ');
+    expect(best.nickname).not.toContain('Ⓤ');               // NOT the capped league nick
+    expect(best.nickname).toContain(String(ivPct(14, 15, 15))); // IV-based 98, not UL rank 100
+
+    // lower-IV Gmax: kept raid candidate, no Master, no star, NOT traded
+    expect(loser.wonGigantamaxMaster).toBeFalsy();
+    expect(loser.decision).toBe('keep');
+    expect(loser.slots).toContain('gigantamax');
+    expect(loser.slots).not.toContain('U');
+    expect(loser.nickname).toContain('Ⓡ');
+    expect(loser.nickname).toContain('Ⓧ');
+    expect(loser.nickname).toContain(String(ivPct(14, 11, 12))); // Ⓡ82, IV-based
+    expect(loser.suggestStar).toBe(false);
+  });
+});
