@@ -19,7 +19,7 @@ Suite GREEN: 732 passed / 36 skipped / 1 todo. 11 new assertions (A1–A11). Cau
 pre-existing tracked regression (`lycanroc_fixture.csv` Group E). See
 `reviews/evolved-form-in-nick-v3-impl-summary.md`.
 **Owner:** YOU
-**Next action:** Review and merge PR — _PR_URL_PLACEHOLDER_
+**Next action:** Review and merge https://github.com/mariellen/pokevault/pull/40
 _Updated: 23 Jun 2026_
 
 ### Dmax/Gmax Rules (Issue #30)

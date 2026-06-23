@@ -94,7 +94,7 @@ surface a FORMSET review flag.
 
 ## PR URL
 
-(pending — added on PR creation)
+https://github.com/mariellen/pokevault/pull/40
 
 ## Deviations
 
