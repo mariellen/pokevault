@@ -385,6 +385,7 @@ const VALID_EVOLUTIONS = {
   'Zorua|Hisui':['Zoroark|Hisui'],
   'Qwilfish|Hisui':['Overqwil'],
   'Sneasel|Hisui':['Sneasler'],
+  'Basculin|Hisui':['Basculegion'], // White-Striped Hisui Basculin → Basculegion (gender form set by Pokégenie)
   // Alolan lines
   'Rattata|Alola':['Raticate|Alola'],
   'Sandshrew|Alola':['Sandslash|Alola'],

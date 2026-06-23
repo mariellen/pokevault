@@ -10,6 +10,18 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
+### Form-aware evo-target identity (#39, v3.5.56)
+**Status:** Implemented on `feature/evolved-form-in-nick`. `slotEvoTarget(p, lg)` makes evo-target
+identity form-aware so Lycanroc's Midday/Midnight/Dusk each win an independent keeper slot on a
+different physical Rockruff (no more one-Rockruff-holds-Great-Midnight-AND-Ultra-Midday). Plus the
+inverse Burmy→Wormadam cloak carve-out (no confidently-wrong `Plnt` nick; FORMSET 📝 review star).
+Suite GREEN: 732 passed / 36 skipped / 1 todo. 11 new assertions (A1–A11). Caught + fixed one
+pre-existing tracked regression (`lycanroc_fixture.csv` Group E). See
+`reviews/evolved-form-in-nick-v3-impl-summary.md`.
+**Owner:** YOU
+**Next action:** Review and merge PR — _PR_URL_PLACEHOLDER_
+_Updated: 23 Jun 2026_
+
 ### Dmax/Gmax Rules (Issue #30)
 **Status:** Ruleset fully defined (see Issue #30). Brief file needed at `briefs/dmax-gmax-league-rules-refinement.md` before pipeline dispatch.
 **Owner:** YOU

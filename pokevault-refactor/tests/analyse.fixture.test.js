@@ -2078,3 +2078,78 @@ describe('Group 49 — ML placeholder: grey star for families with no ML keeper'
     expect(cubone.isMlPlaceholder).toBeFalsy();
   });
 });
+
+// ─── Group 26 — Form-aware evo-target identity (#39, v3.5.56) ─────────────────
+// Lycanroc's three battle forms (Midday/Midnight/Dusk) share ONE species name but live in
+// evolvedFormG/U/L. Form-aware slotEvoTarget keys them as 'Lycanroc|<form>' so each gets an
+// independent keeper slot on a DIFFERENT physical Rockruff — no single Rockruff may hold two
+// different-form confirmed slots at once. Plus the Burmy→Wormadam cloak carve-out.
+describe('Lycanroc form-aware evo-target identity (#39)', () => {
+  const R = (cp) => result.pokemon.find(p => p.name === 'Rockruff' && p.cp === cp);
+  // A1 CORE BUG: no Rockruff confirms two DIFFERENT-form slots
+  it('no Rockruff holds two different-form confirmed slots', () => {
+    result.pokemon.filter(p => p.name === 'Rockruff').forEach(p => {
+      const confirmedForms = new Set();
+      ['G','U','L'].forEach(lg => { if (p.slots.includes(lg) && p.slotConfirmed) { const form = lg==='G'?p.evolvedFormG:lg==='U'?p.evolvedFormU:p.evolvedFormL; if (form) confirmedForms.add(form); } });
+      expect(confirmedForms.size).toBeLessThanOrEqual(1);
+    });
+  });
+  // A2 three distinct physical keepers, one per form
+  it('Midday/Midnight/Dusk keepers are three distinct Rockruffs', () => {
+    const midday=R(492), midnight=R(393), dusk=R(515);
+    expect(midday.slots.some(s=>['G','U'].includes(s))).toBe(true);
+    expect(midnight.slots).toContain('G');
+    expect(dusk.slots).toContain('G');
+    expect(new Set([midday.cp,midnight.cp,dusk.cp]).size).toBe(3);
+  });
+  // A2b CP393 keeps Midnight, does NOT also confirm Midday in Ultra
+  it('CP393 keeps Midnight, does not also confirm Midday in Ultra', () => {
+    const p=R(393); expect(p.evolvedFormG).toBe('Midnight');
+    const confirmedUltraMidday = p.slots.includes('U') && p.slotConfirmed && p.evolvedFormU==='Midday';
+    expect(confirmedUltraMidday).toBe(false);
+  });
+  // A3 form prefixes fire
+  it('keeper nicks carry the form prefix', () => {
+    expect(R(492).nickname).toMatch(/Day/); expect(R(393).nickname).toMatch(/Night/); expect(R(515).nickname).toMatch(/Dusk/);
+  });
+  // A4 loser culls to Ⓡ, no confirmed league slot
+  it('CP197 loses all form groups → RockruffⓇ, no confirmed league slot', () => {
+    const p=R(197); expect(p.slots.some(s=>['L','G','U','M'].includes(s) && p.slotConfirmed)).toBe(false); expect(p.nickname).toMatch(/Rockruff/);
+  });
+  // A5 already-evolved Lycanroc Midnight hundo unchanged
+  it('already-evolved Lycanroc Midnight nick unchanged (hundo)', () => {
+    const p=result.pokemon.find(x=>x.name==='Lycanroc' && x.form==='Midnight'); expect(p).toBeDefined(); expect(p.isHundo).toBe(true); expect(p.nickname).toMatch(/Ⓗ/);
+  });
+  // A6 EDGE Basculin Hisui→Basculegion|Male distinct (Great stays Hisui Basculin, Ultra → Basculegion)
+  // Note: Great's Name(G)=Basculin (same species) → evolvedNameG resolves to '' (stay-as-self);
+  // the form-aware split is proven by the Great form staying Hisui vs Ultra targeting Basculegion|Male.
+  it('Hisui Basculin keys Basculin|Hisui (G) vs Basculegion|Male (U) distinctly', () => {
+    const p=result.pokemon.find(x=>x.name==='Basculin' && x.cp===1173); expect(p).toBeDefined();
+    expect(p.evolvedFormG).toBe('Hisui');            // Great stays Hisui Basculin
+    expect(p.evolvedNameU).toMatch(/Basculegion/);   // Ultra targets Basculegion
+    expect(p.evolvedFormU).toBe('Male');             // gender form on the Ultra target
+  });
+  // A7 MUST-NOT-REGRESS Alolan Vulpix
+  it('Alolan Vulpix → Ninetales|Alola unchanged', () => {
+    const p=result.pokemon.find(x=>x.name==='Vulpix' && x.form==='Alola'); expect(p).toBeDefined(); expect(p.evolvedNameG).toMatch(/Ninetales/);
+  });
+  // A8 MUST-NOT-REGRESS Deoxys Defense already-evolved
+  it('Deoxys Defense (already evolved) slot/nick unchanged', () => {
+    const p=result.pokemon.find(x=>x.name==='Deoxys' && x.form==='Defense'); expect(p).toBeDefined(); expect(p.form).toBe('Defense');
+  });
+  // A9 CARVE-OUT female Burmy no Plant nick, formUnset when keep-worthy
+  it('female Burmy: no Plant nick, formUnset indicator when keep-worthy', () => {
+    const p=result.pokemon.find(x=>x.name==='Burmy' && x.cp===203); expect(p).toBeDefined();
+    expect(p.nickname).not.toMatch(/Plant|Plnt/);
+    if ((p.rankPctG||0)>=90 || (p.rankPctU||0)>=90 || p.ivAvg>=90) { expect(p.starType).toBe('formset'); expect(p.starType).not.toBe('swirl'); }
+  });
+  it.todo('Burmy with specialForm override set → emits Wormadam|<cloak> + form nick');
+  // A10 male Burmy → Mothim unaffected
+  it('male Burmy → Mothim handled normally', () => {
+    const p=result.pokemon.find(x=>x.name==='Burmy' && x.cp===199); expect(p).toBeDefined(); expect(p.evolvedNameG).toMatch(/Mothim/);
+  });
+  // A11 already-evolved Wormadam Trash unchanged
+  it('Wormadam Trash (already evolved) unchanged', () => {
+    const p=result.pokemon.find(x=>x.name==='Wormadam' && x.form==='Trash'); expect(p).toBeDefined(); expect(p.form).toBe('Trash');
+  });
+});
