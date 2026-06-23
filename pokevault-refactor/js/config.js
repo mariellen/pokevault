@@ -99,6 +99,16 @@ const GENDER_DIMORPHIC = new Set([
 // When gender is missing/unknown, evo targets are cleared to prevent incorrect slot assignment.
 const GENDER_LOCKED_EVO = new Set(['Combee', 'Kirlia', 'Snorunt', 'Burmy']);
 
+// ── Form-set-required evolutions ──────────────────────────
+// Evolution TARGETS whose visual form is catch-locked and UNKNOWABLE before evolving.
+// A female Burmy's cloak (Plant/Sandy/Trash) is fixed at catch but Pokégenie DEFAULTS the
+// export to 'Plant' — a confidently-wrong value. So we must NOT emit a cloak form for the
+// Wormadam target until the user records the real cloak via the override panel (specialForm).
+// This is the OPPOSITE of Rockruff (Midday/Midnight/Dusk = a real user-chosen divergence).
+// Male Burmy → Mothim (no cloak) is excluded automatically: the gate is on the evolved
+// TARGET species (Wormadam), never on the base species name 'Burmy'.
+const FORM_SET_REQUIRED_EVOS = new Set(['Wormadam']);
+
 // ── Special family overrides ──────────────────────────────
 // Pokémon that need custom family grouping behaviour
 const FAMILY_OVERRIDES = {
@@ -139,8 +149,10 @@ const FORM_NICK_PREFIXES = {
   'Attack':'Atk', 'Defense':'Def', 'Speed':'Spd',
   // Groudon / Kyogre
   'Primal':'Prml',
-  // Wormadam
-  'Sandy':'Sandy', 'Trash':'Trash',
+  // Wormadam — 'Plant' added (v3.5.56) for symmetry with Sandy/Trash so a USER-SET
+  // Plant cloak nicks correctly. The Burmy→Wormadam carve-out (FORM_SET_REQUIRED_EVOS)
+  // prevents this prefix from emitting on a cloak that hasn't been recorded yet.
+  'Sandy':'Sandy', 'Trash':'Trash', 'Plant':'Plnt',
   // Furfrou trims (via Set Forms modal)
   'Dandy':'Dand', 'Matron':'Matr', 'La Reine':'Rein', 'Kabuki':'Kbki',
   'Pharaoh':'Phar', 'Star':'Star', 'Diamond':'Diam', 'Heart':'Hart', 'Natural':'Natl',

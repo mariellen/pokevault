@@ -235,6 +235,7 @@ body.moves-visible th.col-moves{display:table-cell;}
 .star-cyan{color:#00e5cc;font-size:18px;font-weight:900;}
 .star-visibility{color:#c084fc;font-size:18px;font-weight:900;}
 .star-grey{color:var(--muted);font-size:18px;font-weight:400;}
+.star-formset{color:#f5a623;font-size:16px;font-weight:900;} /* amber 'needs your input' — Wormadam cloak not set (#39) */
 .star-none{color:var(--dim);font-size:14px;}
 .evo-ind{font-size:11px;font-weight:700;margin-right:2px;}
 .evo-gold{color:var(--gold);}

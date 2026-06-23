@@ -25,7 +25,8 @@ function buildFamilyMap(rows) {
     'Small','Average','Large','Super',
     'Combat','Blaze','Aqua',
     'Plant','Sandy','Trash',
-    'Midnight','Dusk',
+    'Midnight','Dusk','Midday', // Lycanroc battle forms — 'Midday' added (v3.5.56) for symmetry
+
     'Burn','Chill','Douse','Shock',
     'Roaming','Hero',
     'Aria','Pirouette',
@@ -185,6 +186,14 @@ function buildNickname(p, slot, convention) {
   else if (slot==='M' || slot==='dynamax' || slot==='gigantamax') {
     base=p.evolvedNameU||p.evolvedNameG||p.name;
     evolvedFormForSlot=p.evolvedFormU||p.evolvedFormG||'';
+  }
+  // Burmy→Wormadam carve-out (#39): the evo-target cloak is catch-locked and unknowable
+  // pre-evolution (Pokégenie defaults to 'Plant'). Suppress the evo-target form prefix so we
+  // never emit a confidently-wrong 'Plnt' nick. Once the user records the cloak (specialForm),
+  // the normal own-form prefix path below applies it like a set Furfrou trim.
+  if (typeof FORM_SET_REQUIRED_EVOS !== 'undefined'
+      && FORM_SET_REQUIRED_EVOS.has(base.split('|')[0]) && !p.specialForm) {
+    evolvedFormForSlot = '';
   }
   // VALID_EVOLUTIONS returns form-qualified keys (e.g. 'Ninetales|Alola') — strip the suffix
   // so fitName works on the plain species name.
@@ -585,6 +594,39 @@ function simulatePurify(p) {
 }
 
 // ═══════════════════════════════════════════════
+// FORM-AWARE EVO-TARGET IDENTITY  (v3.5.56, #39)
+// ═══════════════════════════════════════════════
+// Returns the IDENTITY of the thing a Pokémon evolves into for a given league —
+// form-aware, so multi-FORM evolutions resolve exactly like multi-SPECIES ones.
+//   • Lycanroc's three battle forms (Midday/Midnight/Dusk) share ONE species name but
+//     live in evolvedFormG/U/L → keyed as 'Lycanroc|Midnight' etc. so slot-grouping and
+//     cross-league conflict checks treat them as distinct targets (a Rockruff can no longer
+//     hold Great-as-Midnight AND Ultra-as-Midday at once).
+//   • Regional forms are ALREADY pipe-qualified in evolvedNameG (e.g. 'Arcanine|Hisui').
+//     The double-pipe guard returns them untouched so we never produce 'Arcanine|Hisui|Hisui'.
+//   • Burmy→Wormadam carve-out: a female Burmy's cloak is catch-locked and unknowable
+//     pre-evolution (Pokégenie defaults to 'Plant'). We emit a plain 'Wormadam' (never a
+//     cloak) until the user records the real cloak via specialForm. Male Burmy → Mothim is
+//     excluded automatically because the gate is on the evolved TARGET, not the name 'Burmy'.
+const slotEvoTarget = (p, lg) => {
+  const name = lg==='L' ? (p.evolvedNameL||p.name)
+             : lg==='G' ? (p.evolvedNameG||p.name)
+             : lg==='U' ? (p.evolvedNameU||p.name)
+             : (p.evolvedNameU||p.evolvedNameG||p.name);          // M
+  if (name.includes('|')) return name;   // regional already form-qualified — never double-pipe
+  const FSR = (typeof FORM_SET_REQUIRED_EVOS !== 'undefined') ? FORM_SET_REQUIRED_EVOS : null;
+  if (FSR && FSR.has(name)) {
+    // Cloak is unknowable until recorded. Once specialForm is set, qualify normally.
+    return p.specialForm ? name + '|' + p.specialForm : name;
+  }
+  const form = lg==='L' ? (p.evolvedFormL||'')
+             : lg==='G' ? (p.evolvedFormG||'')
+             : lg==='U' ? (p.evolvedFormU||'')
+             : (p.evolvedFormU||p.evolvedFormG||'');               // M
+  return form ? name + '|' + form : name;
+};
+
+// ═══════════════════════════════════════════════
 // MAIN ANALYSIS
 // ═══════════════════════════════════════════════
 function analyse(rows) {
@@ -758,13 +800,12 @@ function analyse(rows) {
         if (lg==='G' && p.standaloneEvoG) return;
         if (lg==='U' && p.standaloneEvoU) return;
 
-        const stageName = lg==='L'?(p.evolvedNameL||p.name)
-          :lg==='G'?(p.evolvedNameG||p.name)
-          :lg==='U'?(p.evolvedNameU||p.name)
-          :(p.evolvedNameU||p.evolvedNameG||p.name);
+        // Form-aware evo-target identity (#39): 'Lycanroc|Midnight' ≠ 'Lycanroc|Midday' so the
+        // three battle forms each get an independent slot group, just like multi-species evos.
+        const stageName = slotEvoTarget(p, lg);
         // Split by gender for dimorphic species; split shadow/purified/lucky into own sub-groups
         // so each variant type gets an independent slot (shadow Great + regular Great can coexist)
-        const isDimorphic = GENDER_DIMORPHIC.has(stageName)||GENDER_DIMORPHIC.has(p.name);
+        const isDimorphic = GENDER_DIMORPHIC.has(stageName.split('|')[0])||GENDER_DIMORPHIC.has(p.name);
         // Dynamax forms an independent sub-group (like shadow/purified/lucky) so it competes
         // only against other Dynamax for capped slots and never displaces a regular winner.
         // Precedence: shadow > purified > lucky > dynamax (a Lucky-Dmax stays in |lucky).
@@ -777,6 +818,10 @@ function analyse(rows) {
       Object.entries(byEvoStage).forEach(([groupKey,group])=>{
         // Strip gender/variant suffix to get the actual species name for comparisons
         const stageName = groupKey.split('|')[0];
+        // Form-aware target shared by every member of this group (e.g. 'Lycanroc|Midnight').
+        // Use this wherever a comparison means "the thing this slot evolves into" (cross-form
+        // conflict checks); keep `stageName` (species only) for name-equality membership tests.
+        const stageTarget = slotEvoTarget(group[0], lg);
         // Master league: only final evolution
         // NOTE: Legendaries now DO enter the M competition (previously skipped here and
         // handled only by best_overall). The non-shadow Master winner is chosen below via
@@ -831,7 +876,16 @@ function analyse(rows) {
                 const maxPreEvoIV = Math.max(...group.filter(m => m.name !== stageName).map(m => m.ivAvg || 0));
                 return (p.ivAvg || 0) >= maxPreEvoIV;
               }
-              const maxIV = Math.max(...group.map(m => m.ivAvg || 0));
+              // Form-aware grouping (#39) splits the M pass into per-form subgroups. For the
+              // "no final evo present" pre-evo race, compare IV across all SAME-VARIANT family
+              // pre-evos (every evolved form, but still only this variant: normal/shadow/lucky/
+              // purified compete independently) so only the family's single best pre-evo takes
+              // Master. Prevents a strong capped-league pre-evo (e.g. 99% Great-as-Rockruff) from
+              // being pulled into Master merely for topping its own small evolved-form subgroup.
+              const variantOf = m => m.isShadow ? '|shadow' : m.isPurified ? '|purified' : m.isLucky ? '|lucky' : '';
+              const maxIV = Math.max(...members
+                .filter(m => m.name !== stageName && variantOf(m) === variantOf(p))
+                .map(m => m.ivAvg || 0));
               return (p.ivAvg || 0) >= maxIV;
             }
 
@@ -848,10 +902,7 @@ function analyse(rows) {
             // Already consumed for evolution in a higher-priority league — can't also battle as itself here.
             // e.g. Skwovet wins UL-as-Greedent (targetEvo='Greedent'), so it can't also hold a GL-as-Skwovet slot.
             // ML falls back to p.name but targetEvo is always undefined when ML runs (first in M→U→G→L order).
-            const thisLgEvo = lg==='L'?(p.evolvedNameL||p.name)
-              :lg==='G'?(p.evolvedNameG||p.name)
-              :lg==='U'?(p.evolvedNameU||p.name)
-              :p.name;
+            const thisLgEvo = slotEvoTarget(p, lg); // form-aware (#39)
             if (p.targetEvo && p.targetEvo !== p.name && thisLgEvo === p.name) return false;
 
             // Exclude if already holding a confirmed higher-priority slot for a DIFFERENT evo target.
@@ -862,10 +913,7 @@ function analyse(rows) {
               const hasConflictingConfirmedSlot = p.slots.some(existingSlot => {
                 const esPri = priority.indexOf(existingSlot);
                 if (esPri < 0 || esPri >= lgPri) return false;
-                const esEvo = existingSlot==='L'?(p.evolvedNameL||p.name)
-                  :existingSlot==='G'?(p.evolvedNameG||p.name)
-                  :existingSlot==='U'?(p.evolvedNameU||p.name)
-                  :(p.evolvedNameU||p.evolvedNameG||p.name); // Master: same formula as slotEvo('M')
+                const esEvo = slotEvoTarget(p, existingSlot); // form-aware (#39)
                 if (esEvo === thisLgEvo) return false; // same evo target — no conflict
                 return (p['rankPct'+existingSlot]||0) >= RULES.keepThreshold;
               });
@@ -999,10 +1047,8 @@ function analyse(rows) {
                              lg==='M' ? ['U','G','L'] : [];
         const shouldProtect = lowerLeagues.some(ll => {
           if (!RULES.leagues.includes(ll)) return false;
-          const lowerEvo = ll==='L'?(best.evolvedNameL||best.name)
-            :ll==='G'?(best.evolvedNameG||best.name)
-            :(best.evolvedNameU||best.name);
-          const thisEvo = stageName;
+          const lowerEvo = slotEvoTarget(best, ll); // form-aware (#39)
+          const thisEvo = stageTarget;              // form-aware target of this group
           if (lowerEvo === thisEvo) return false; // same evo, no conflict
           // Pre-evo battles as itself in lower league (evolvedNameG blank → lowerEvo = its own name).
           // GL-as-Skwovet and UL-as-Greedent are separate commitments — surface both, let user choose.
@@ -1017,9 +1063,8 @@ function analyse(rows) {
           // Try next best that doesn't have the same protection issue
           const alternative = eligiblePool.slice(1).find(p => {
             const altShouldProtect = lowerLeagues.some(ll => {
-              const lowerEvo = ll==='L'?(p.evolvedNameL||p.name)
-                :ll==='G'?(p.evolvedNameG||p.name):(p.evolvedNameU||p.name);
-              if (lowerEvo === stageName) return false;
+              const lowerEvo = slotEvoTarget(p, ll); // form-aware (#39)
+              if (lowerEvo === stageTarget) return false;
               if (lowerEvo === p.name) return false; // same rule as above
               const lr = Math.round(p['rankPct'+ll]||0);
               const tr = Math.round(p[rankField]||0);
@@ -1350,6 +1395,16 @@ function analyse(rows) {
 
     // Set decisions and nicknames
     members.forEach(p=>{
+      // Burmy→Wormadam cloak carve-out (#39): flag when the evo target requires a recorded
+      // cloak, none is set, and the Pokémon is otherwise keep-worthy (max league rank ≥ 90 —
+      // the same gate as the swirl/unknown-evo indicator). Sub-90 Burmy trades as normal.
+      {
+        const FSR = typeof FORM_SET_REQUIRED_EVOS !== 'undefined' ? FORM_SET_REQUIRED_EVOS : null;
+        const targetsFormSet = FSR && [p.evolvedNameG, p.evolvedNameU, p.evolvedNameL]
+          .some(n => n && FSR.has(n.split('|')[0]));
+        const maxRank = Math.max(p.rankPctG||0, p.rankPctU||0, p.rankPctL||0, p.rankPctM||0);
+        p.formUnset = !!(targetsFormSet && !p.specialForm && maxRank >= 90);
+      }
       // Fix dustCostBest to use the dust for the assigned league slot
       const leagueSlot = p.slots.find(s=>['L','G','U','M'].includes(s));
       if (leagueSlot === 'L' && p.dustL > 0) p.dustCostBest = p.dustL;
@@ -1396,6 +1451,14 @@ function analyse(rows) {
         // also won a capped slot. Placed above hasLeagueSlot so it renders NameⓂ{IV%}Ⓧ.
         p.decision='keep'; p.reason='Best Gigantamax — power up to Master';
         p.nickname=buildNickname(p,'gigantamax');
+      } else if (p.formUnset) {
+        // Burmy→Wormadam cloak carve-out (#39): the cloak is unknowable pre-evolution, so even
+        // a slot-winning Burmy is surfaced for review (record the cloak before evolving) rather
+        // than nicked with the confidently-wrong Pokégenie 'Plant' default. Holding nick on the
+        // base name — no evo-target form prefix (suppressed in buildNickname).
+        p.decision='review';
+        p.reason='Wormadam cloak not set — record in override panel before evolving';
+        p.nickname=buildNickname(p,'review');
       } else if (hasLeagueSlot) {
         const lgSlots=p.slots.filter(s=>RULES.leagues.includes(s)||s.endsWith('_affordable')).map(s=>s.replace('_affordable',''));
         const lgNames=lgSlots.map(s=>RULES.leagueNames[s]);
@@ -1550,6 +1613,7 @@ function analyse(rows) {
       // (explicit, so a favourited losing Lucky does NOT earn a gold star).
       if (p.gmaxSuppressedHundo) p.starType = 'grey';
       else if (p.luckyNonWinner) p.starType = 'none';
+      else if (p.formUnset) p.starType = 'formset'; // #39 Burmy cloak carve-out — overrides gold/red
       else if (p.suggestStar && p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'gold';
       else if (p.suggestStar && !p.isFavorite && !p.suggestStarCheaper && (!p.isShiny || hasRealSlot)) p.starType = 'green';
       else if (p.suggestStarExpensive && p.isFavorite) p.starType = 'gold';
@@ -1591,10 +1655,7 @@ function analyse(rows) {
     members.forEach(p => {
       RULES.leagues.forEach(lg => {
         if (!p.slots.includes(lg)) return;
-        const evo = lg==='L'?(p.evolvedNameL||p.name)
-          :lg==='G'?(p.evolvedNameG||p.name)
-          :lg==='U'?(p.evolvedNameU||p.name)
-          :(p.evolvedNameU||p.evolvedNameG||p.name);
+        const evo = slotEvoTarget(p, lg); // form-aware (#39)
         const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
         slotWinners[lg+'|'+evo+vk] = (slotWinners[lg+'|'+evo+vk]||0) + 1;
       });
@@ -1606,13 +1667,7 @@ function analyse(rows) {
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
       if (leagueSlots.length < 2) return;
 
-      const slotEvo = (s, ref) => {
-        const r = ref || p;
-        if (s==='L') return r.evolvedNameL || r.name;
-        if (s==='G') return r.evolvedNameG || r.name;
-        if (s==='U') return r.evolvedNameU || r.name;
-        return r.evolvedNameU || r.evolvedNameG || r.name;
-      };
+      const slotEvo = (s, ref) => slotEvoTarget(ref || p, s); // form-aware (#39)
 
       const priority = ['M','U','G','L'];
 
@@ -1675,10 +1730,7 @@ function analyse(rows) {
             if (m.hasBattleSlot) return false;
             if (!m.isPurifySlot && m.slots.some(sl => RULES.leagues.includes(sl) || sl.endsWith('_affordable'))) return false;
             // Candidate's evo target for this league must match the released slot's evo target
-            const candidateEvo = s==='L'?(m.evolvedNameL||m.name)
-              :s==='G'?(m.evolvedNameG||m.name)
-              :s==='U'?(m.evolvedNameU||m.name)
-              :(m.evolvedNameU||m.evolvedNameG||m.name);
+            const candidateEvo = slotEvoTarget(m, s); // form-aware (#39)
             return candidateEvo === evoTarget;
           })
           .filter(m => {
@@ -1706,10 +1758,7 @@ function analyse(rows) {
             return !m.slots.some(sl => {
               const slPri = slPriority.indexOf(sl);
               if (slPri < 0 || slPri >= myPri) return false;
-              const slEvo = sl==='L'?(m.evolvedNameL||m.name)
-                :sl==='G'?(m.evolvedNameG||m.name)
-                :sl==='U'?(m.evolvedNameU||m.name)
-                :(m.evolvedNameU||m.evolvedNameG||m.name);
+              const slEvo = slotEvoTarget(m, sl); // form-aware (#39)
               return slEvo === evoTarget && (m['rankPct'+sl]||0) >= RULES.keepThreshold;
             });
           });
@@ -1732,10 +1781,7 @@ function analyse(rows) {
       const rf = 'rankPct'+lg;
       const byEvo = {};
       members.filter(p => p.slots.includes(lg)).forEach(p => {
-        const evo = lg==='L'?(p.evolvedNameL||p.name)
-          :lg==='G'?(p.evolvedNameG||p.name)
-          :lg==='U'?(p.evolvedNameU||p.name)
-          :(p.evolvedNameU||p.evolvedNameG||p.name);
+        const evo = slotEvoTarget(p, lg); // form-aware (#39)
         const vk = p.isShadow ? '|shadow' : p.isPurified ? '|purified' : p.isLucky ? '|lucky' : '';
         const key = lg+'|'+evo+vk;
         if (!byEvo[key]) byEvo[key] = [];
@@ -1772,6 +1818,7 @@ function analyse(rows) {
     // decision was already set to trade/review when they had no slot. Re-pass
     // promotes them to keep with correct nick and suggestStar.
     members.forEach(p => {
+      if (p.formUnset) return; // #39: keep the cloak-carve-out review state — never re-promote
       const leagueSlots = p.slots.filter(s => RULES.leagues.includes(s));
       if (!leagueSlots.length) return;
       if (!p.slotConfirmed) return; // below 90% — leave as review

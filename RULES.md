@@ -1,7 +1,7 @@
 # PokéVault — Business Rules & Design Reference
 
-> Last updated: 2026-06-13
-> Version: v3.5.49
+> Last updated: 2026-06-23
+> Version: v3.5.56
 > Source of truth: analyse.js (refactor is canonical — HTML is retired)
 
 This is the single canonical reference for PokéVault's analysis engine. Where any
@@ -421,6 +421,39 @@ Pokémon (`evolvedFormG ≠ evolvedFormU` or `evolvedFormG ≠ evolvedFormL`):
 Regional form evo names (`Ninetales|Alola`, `Arcanine|Hisui`) use the species name before
 the pipe as the nick base — family grouping already separates regional from normal lines.
 
+### Form-aware evo-target identity (v3.5.56, #39)
+Slot grouping and cross-league conflict checks resolve the evo TARGET via `slotEvoTarget(p, lg)`
+in `analyse.js` — **form-aware**, so a multi-FORM evolution behaves exactly like a multi-SPECIES
+one. The target identity is `name + '|' + form` (e.g. `Lycanroc|Midnight`):
+- **Battle forms (Rockruff → Lycanroc).** The form lives in `evolvedFormG/U/L`, not the name.
+  `Lycanroc|Midnight` ≠ `Lycanroc|Midday` ≠ `Lycanroc|Dusk`, so each form wins an **independent
+  keeper slot on a different physical Rockruff** (Midnight→`NightⒼ97`, Midday→`DayⓊ97`,
+  Dusk→`DuskⒼ95`). One Rockruff can no longer hold Great-as-Midnight **and** Ultra-as-Midday at
+  once. Every post-assignment dedup/deconflict pass uses `slotEvoTarget` too (not name-only).
+- **Regional forms (already pipe-qualified).** `evolvedNameG` already carries the pipe
+  (`Arcanine|Hisui`). A double-pipe guard returns it untouched — never `Arcanine|Hisui|Hisui`.
+- **Mixed name + regional + gender (Hisui Basculin).** Great stays `Basculin|Hisui` (Name(G)=self),
+  Ultra targets `Basculegion|Male` — keyed distinctly, correct split.
+- **Master pass.** Grouping is form-aware, but the "no final evo present" pre-evo race compares IV
+  across all SAME-VARIANT family pre-evos (every form) so only the family's single best pre-evo
+  takes Master — a strong capped-league pre-evo (99% Great-as-Rockruff) is never pulled into Master
+  for merely topping its own small evolved-form subgroup.
+
+### Burmy → Wormadam cloak carve-out (v3.5.56, #39)
+The OPPOSITE of Rockruff: a female Burmy's Wormadam cloak (Plant/Sandy/Trash) is catch-locked and
+**unknowable** pre-evolution, and Pokégenie DEFAULTS the export to `Plant` (a confidently-wrong
+value). `FORM_SET_REQUIRED_EVOS` (`config.js`, currently `{Wormadam}`) gates this:
+- `slotEvoTarget` returns plain `Wormadam` (never `Wormadam|<cloak>`) until the user records the
+  real cloak via the override panel (`specialForm`); once set it emits `Wormadam|<specialForm>`.
+- `buildNickname` suppresses the evo-target form prefix, so an unset female Burmy never nicks `Plnt`.
+  (`Plant`→`Plnt` IS in `FORM_NICK_PREFIXES` so a USER-SET Plant cloak nicks correctly.)
+- Male Burmy → Mothim is excluded automatically — the gate is on the evolved TARGET (`Wormadam`),
+  never on the base name `Burmy`.
+- A keep-worthy unset female Burmy (max league rank ≥ 90, no `specialForm`) sets `p.formUnset=true`
+  → decision `review`, reason "Wormadam cloak not set — record in override panel before evolving",
+  and a distinct **FORMSET 📝** star (`star-formset`, amber). Already-evolved Wormadam (real fixed
+  form in the base Form column) is unaffected.
+
 ### Alt nicks
 When a Pokémon qualifies (≥90%) for both Great **and** Ultra with different evo targets, an
 alternate nick for the non-primary league is computed and shown in smaller UI text
@@ -439,6 +472,9 @@ Star type is set by `p.starType` in `analyse.js` and rendered by `render.js`.
              → "Master covered by Gmax — hundo kept, no power-up"
 0b. NONE  ·  luckyNonWinner — a Lucky that lost its capped contention (v3.5.54). Explicit,
              so a favourited losing Lucky earns NO gold star.
+0c. FORMSET 📝 formUnset — Burmy→Wormadam cloak not recorded (v3.5.56, #39). Placed high so it
+             overrides GOLD/RED for a favourited keep-worthy Burmy. See the carve-out above.
+             → "Form not set — record the Wormadam cloak in the override panel before evolving"
 1. GOLD   ★  suggestStar && isFavorite && (!isShiny || hasRealSlot)
              OR suggestStarExpensive && isFavorite
              → "Starred correctly ✓"
