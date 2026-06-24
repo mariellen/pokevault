@@ -10,6 +10,21 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
+### Evolved-form Supabase persistence (#41, v3.5.57)
+**Status:** Implemented on `feature/evolved-form-supabase-persistence`. Persists `evolved_form_g/u/l`
+so the #39 form-aware nick (Lycanroc Day/Night/Dusk, Burmy cloak) survives a cloud round-trip.
+**Migration already run** by you in the Supabase SQL editor (`ALTER TABLE pokemon_collection ADD
+COLUMN … evolved_form_g/u/l`). Code: save payload + `COLLECTION_DB_FIELDS` + a new pure
+`cloudRowToCsvRow` helper (extracted from app.js) that **restores `Form (G/U/L)` from
+`evolved_form_*`** — the real bug was app.js hardcoding those to `''` on every cloud load, which
+the brief missed. Brief also had the table name wrong (`pokemon` → `pokemon_collection`) and
+mislocated Step 3; see deviations in the impl summary. Suite green: 770 passed / 2 skipped / 1 todo
+(+4 new #41 tests). v3.5.56 → v3.5.57.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/42 . Migration is already
+applied, so it's safe to deploy on merge. See `reviews/evolved-form-supabase-persistence-impl-summary.md`.
+_Updated: 24 Jun 2026_
+
 ### Form-aware evo-target identity (#39, v3.5.56)
 **Status:** Implemented on `feature/evolved-form-in-nick`. `slotEvoTarget(p, lg)` makes evo-target
 identity form-aware so Lycanroc's Midday/Midnight/Dusk each win an independent keeper slot on a
