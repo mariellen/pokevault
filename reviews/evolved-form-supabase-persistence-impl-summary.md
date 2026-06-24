@@ -31,7 +31,7 @@ Root cause is two-sided: the form was **never saved** (brief got this right) **a
 
 ## 4. PR URL
 
-`feature/evolved-form-supabase-persistence` → main. <!-- PR_URL -->
+`feature/evolved-form-supabase-persistence` → main: https://github.com/mariellen/pokevault/pull/42
 
 ## 5. Deviations from the brief
 

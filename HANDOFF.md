@@ -21,8 +21,8 @@ the brief missed. Brief also had the table name wrong (`pokemon` → `pokemon_co
 mislocated Step 3; see deviations in the impl summary. Suite green: 770 passed / 2 skipped / 1 todo
 (+4 new #41 tests). v3.5.56 → v3.5.57.
 **Owner:** YOU
-**Next action:** Review + merge the PR (<!-- PR_URL -->). Migration is already applied, so it's safe
-to deploy on merge. See `reviews/evolved-form-supabase-persistence-impl-summary.md`.
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/42 . Migration is already
+applied, so it's safe to deploy on merge. See `reviews/evolved-form-supabase-persistence-impl-summary.md`.
 _Updated: 24 Jun 2026_
 
 ### Form-aware evo-target identity (#39, v3.5.56)
