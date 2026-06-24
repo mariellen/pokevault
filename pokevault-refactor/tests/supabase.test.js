@@ -152,3 +152,69 @@ describe('saveCollectionToCloud — batched write + session tracking', () => {
   });
 
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #41 — evolved_form_g/u/l persistence round-trip
+// The form-aware nick (#39) is derived from evolvedFormG/U/L, which on a CSV import
+// come from Pokégenie's Form (G/U/L) columns. Cloud save must persist them, and cloud
+// load must restore them via the synthetic CSV row (cloudRowToCsvRow), or the nick
+// silently degrades to the plain species name after a refresh.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('#41 — evolved_form persistence', () => {
+  const { cloudRowToCsvRow } = require('../js/supabase.js');
+  const { analyse } = require('./loader');
+
+  // A Rockruff CP492 row exactly as it would be persisted: Great→Lycanroc/Midday.
+  const rockruffDbRow = (over = {}) => ({
+    pokemon_index: '744||♀', name: 'Rockruff', form: '', pokemon_num: '744',
+    cp: 492, atk_iv: 3, def_iv: 15, sta_iv: 14, iv_avg: 71.1, level: 20, gender: '♀',
+    rank_pct_g: 96.83, rank_pct_u: 97.34, rank_pct_l: 91.89,
+    evolved_name_g: 'Lycanroc', evolved_name_u: 'Lycanroc', evolved_name_l: 'Rockruff',
+    evolved_form_g: 'Midday', evolved_form_u: 'Midday', evolved_form_l: '',
+    ...over,
+  });
+
+  it('SAVE: evolved_form_g/u/l are written to the upsert payload', async () => {
+    const batches = [];
+    const mockFetch = async (method, path, body) => {
+      if (method === 'POST' && path === 'sync_sessions') return [{ id: 'sess-1' }];
+      if (method === 'POST') { batches.push(body); return {}; }
+      return {};
+    };
+    const { saveCollectionToCloud } = supabaseLoader.createEnv({ supabaseFetch: mockFetch });
+    await saveCollectionToCloud([{
+      stableKey: '744||♀', name: 'Rockruff', form: '', pokeNum: '744', cp: 492,
+      atkIV: 3, defIV: 15, staIV: 14, ivAvg: 71.1, level: 20,
+      evolvedNameG: 'Lycanroc', evolvedFormG: 'Midday', evolvedFormU: 'Midnight', evolvedFormL: '',
+    }]);
+    const saved = batches[0][0];
+    expect(saved.evolved_form_g).toBe('Midday');
+    expect(saved.evolved_form_u).toBe('Midnight');
+    expect(saved.evolved_form_l).toBe('');
+  });
+
+  it('LOAD MAP: cloudRowToCsvRow restores Form (G/U/L) from evolved_form_* (was hardcoded "")', () => {
+    const csv = cloudRowToCsvRow(rockruffDbRow(), 0);
+    expect(csv['Form (G)']).toBe('Midday');
+    expect(csv['Form (U)']).toBe('Midday');
+    expect(csv['Form (L)']).toBe('');
+    expect(csv['Name (G)']).toBe('Lycanroc'); // existing behaviour unchanged
+  });
+
+  it('LOAD MAP: a form-less Pokémon yields empty Form columns (no regression)', () => {
+    const csv = cloudRowToCsvRow({ name: 'Pikachu', pokemon_num: '25' }, 0);
+    expect(csv['Form (G)']).toBe('');
+    expect(csv['Form (U)']).toBe('');
+    expect(csv['Form (L)']).toBe('');
+  });
+
+  it('ROUND-TRIP: DB row → cloudRowToCsvRow → analyse restores evolvedFormG (#39 nick survives)', () => {
+    const csvRow = cloudRowToCsvRow(rockruffDbRow(), 0);
+    const out = analyse([csvRow]);
+    const rock = out.pokemon.find(p => p.name === 'Rockruff' && p.cp === 492);
+    expect(rock).toBeDefined();
+    // Before #41 this was '' on cloud load (Form columns hardcoded), so the form prefix vanished.
+    expect(rock.evolvedFormG).toBe('Midday');
+    expect(rock.evolvedFormU).toBe('Midday');
+  });
+});

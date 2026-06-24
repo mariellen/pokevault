@@ -45,6 +45,9 @@ const PARSER_TO_DB = {
   evolvedNameG:   'evolved_name_g',
   evolvedNameU:   'evolved_name_u',
   evolvedNameL:   'evolved_name_l',
+  evolvedFormG:   'evolved_form_g',
+  evolvedFormU:   'evolved_form_u',
+  evolvedFormL:   'evolved_form_l',
 };
 
 describe('Schema validation — parser fields vs DB columns', () => {

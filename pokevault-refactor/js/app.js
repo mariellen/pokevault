@@ -2122,49 +2122,11 @@ function specialNavigate(name){
 // ═══════════════════════════════════════════════
 
 function processCloudRows(rows) {
-  const csvRows = rows.map((r, i) => ({
-    'Index': String(i),
-    'Name': r.name,
-    'Form': r.form||'',
-    'Pokemon Number': r.pokemon_num||'',
-    'CP': String(r.cp||0),
-    'HP': '0',
-    'Atk IV': String(r.atk_iv||0),
-    'Def IV': String(r.def_iv||0),
-    'Sta IV': String(r.sta_iv||0),
-    'IV Avg': String(r.iv_avg||0),
-    'Level Min': String(r.level||0),
-    'Level Max': String(r.level||0),
-    'Quick Move': r.quick_move||'',
-    'Charge Move': r.charge_move1||'',
-    'Charge Move 2': r.charge_move2||'',
-    'Lucky': r.is_lucky?'1':'0',
-    'Shadow/Purified': r.is_shadow?'1':r.is_purified?'2':'0',
-    'Favorite': r.is_favorite?'1':'0',
-    'Catch Date': r.catch_date||'',
-    'Marked for PvP use': r.pvp_tag||'',
-    'Rank % (G)': r.rank_pct_g?r.rank_pct_g+'%':'',
-    'Rank % (U)': r.rank_pct_u?r.rank_pct_u+'%':'',
-    'Rank % (L)': r.rank_pct_l?r.rank_pct_l+'%':'',
-    'Rank # (G)': String(r.rank_num_g||''),
-    'Rank # (U)': String(r.rank_num_u||''),
-    'Rank # (L)': String(r.rank_num_l||''),
-    'Dust Cost (G)': String(r.dust_g||''),
-    'Dust Cost (U)': String(r.dust_u||''),
-    'Dust Cost (L)': String(r.dust_l||''),
-    'Name (G)': r.evolved_name_g||'',
-    'Name (U)': r.evolved_name_u||'',
-    'Name (L)': r.evolved_name_l||'',
-    'Form (G)':'','Form (U)':'','Form (L)':'',
-    'Sha/Pur (G)':'0','Sha/Pur (U)':'0','Sha/Pur (L)':'0',
-    'Stat Prod (G)':'','Stat Prod (U)':'','Stat Prod (L)':'',
-    'Rank # (L)': String(r.rank_num_l||''),
-    'Dust Cost (L)': String(r.dust_l||''),
-    'Candy Cost (G)':'','Candy Cost (U)':'','Candy Cost (L)':'',
-    'Original Scan Date':r.original_scan_date||'','Scan Date':r.scan_date||'','Catch Date':r.catch_date||'',
-    'Weight':'','Height':'','Dust':'0','Gender':r.gender||(r.pokemon_index||'').split('|')[2]||'',
-    'Pokemon Number': r.pokemon_num||''
-  }));
+  // #41 — row→CSV reconstruction lives in supabase.js (cloudRowToCsvRow) so it is a pure,
+  // unit-testable function and stays co-located with the inverse save mapping. It now also
+  // restores Form (G/U/L) from evolved_form_* (previously hardcoded '' here, which dropped
+  // the #39 form-aware nick on every cloud load).
+  const csvRows = rows.map((r, i) => cloudRowToCsvRow(r, i));
   // Task 3: count verification — warn if loaded count is much lower than last save
   const lastCount = parseInt(localStorage.getItem('pokevault_last_cloud_save_count') || '0', 10);
   if (lastCount && rows.length < lastCount * 0.9) {
