@@ -56,7 +56,7 @@ to the existing placeholder guards (Group 35/45/49) or `analyse.dust_tiebreak.te
 
 ## 5. PR URL
 
-`feature/sort-and-placeholder-fixes` → main: <!-- PR_URL -->
+`feature/sort-and-placeholder-fixes` → main: https://github.com/mariellen/pokevault/pull/44
 
 ## 6. Deviations
 
