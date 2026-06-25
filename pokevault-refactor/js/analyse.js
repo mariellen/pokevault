@@ -1017,10 +1017,17 @@ function analyse(rows) {
           // Then cheapest effective dust wins the tie (Lucky pays half — its tier-7 edge).
           const da = effectiveDust(a), db = effectiveDust(b);
           if (da !== db) return da - db;
-          // Fully tied on rounded rank, evolved-state, type and dust → higher raw rank, then a
-          // stable terminal tiebreak on scan index (Amendment B — do not rely on sort stability).
+          // Still tied on rounded rank, evolved-state, type and dust → prefer the genuinely
+          // higher RAW rank (e.g. 99.9 over 99.6, both rounding to 100).
           if (Math.abs(rb - ra) > 1e-9) return rb - ra;
-          return (Number(a.idx)||0) - (Number(b.idx)||0);
+          // Issue #22 — deterministic terminal tiebreaks so the slot winner never flickers
+          // between sessions/data sources (CSV scan idx is NOT stable across exports or a cloud
+          // reload). isFavorite first (saves the user unstar/restar-ing in GO), then higher CP,
+          // then stableKey (intrinsic: pokeNum|form|gender|IVs — identical across every load).
+          const favA = a.isFavorite ? 1 : 0, favB = b.isFavorite ? 1 : 0;
+          if (favA !== favB) return favB - favA;
+          if ((b.cp||0) !== (a.cp||0)) return (b.cp||0) - (a.cp||0);
+          return String(a.stableKey||a.idx||'').localeCompare(String(b.stableKey||b.idx||''));
         });
 
         // Option C+D: affordable-first two-pass. ML always single pass (Option D — exempt by design).
@@ -1919,19 +1926,52 @@ function analyse(rows) {
       // is needed (and a Gmax-suppressed Normal must not be re-promoted into one).
       const hasConfirmedMlKeeper = members.some(m =>
         (m.slots.includes('M') && m.slotConfirmed) || m.wonDynamaxMaster || m.wonGigantamaxMaster);
-      const candidates = members.filter(m =>
-        !m.slots.some(s => RULES.leagues.includes(s) || s.endsWith('_affordable')) &&
-        m.decision !== 'keep' && m.decision !== 'protected'
-      );
+      // Issues #24/#37 — the grey "star-for-Master" placeholder must not land on a weak
+      // slot-less member while a genuinely better member is already surfaced. A member is
+      // "surfaced" when it holds a tentative capped/Master review or an affordable backup
+      // (slotConfirmed=false → never a real winner, but visible to the user). Real keepers
+      // (decision keep/protected) and confirmed winners are excluded entirely.
+      const phDust = p => { const d = p.dustCostBest || p.dustMin || 0; return p.isLucky ? Math.round(d/2) : d; };
+      const isFinalEvo = p => !(p.evolvedNameG || p.evolvedNameU || p.evolvedNameL);
+      const notConfirmedWinner = m =>
+        !((m.hasBattleSlot && m.slotConfirmed) || m.wonMasterSlot || m.wonDynamaxMaster || m.wonGigantamaxMaster)
+        && m.decision !== 'keep' && m.decision !== 'protected';
+      const holdsSlot = m => m.slots.some(s =>
+        RULES.leagues.includes(s) || s.endsWith('_tentative') || s.endsWith('_affordable'));
       if (!hasConfirmedMlKeeper) {
-        if (candidates.length > 0) {
-          const best = candidates.reduce((a, b) => (b.ivAvg||0) > (a.ivAvg||0) ? b : a);
-          best.slots.push('M');
-          best.isMlPlaceholder = true;
-          best.decision = 'review';
-          best.reason = 'ML placeholder — best available (no confirmed ML keeper in family)';
-          best.nickname = buildNickname(best, 'M_placeholder');
-          best.starType = 'grey';
+        // Only slot-less members can RECEIVE the grey placeholder.
+        const slotless = members.filter(m => notConfirmedWinner(m) && !holdsSlot(m));
+        // Highest IV among already-surfaced (tentative-slot) non-winners — the grey star only
+        // fires if the best slot-less candidate strictly out-IVs all of them (else they already
+        // represent the family's best Master candidate; greying a weaker member is the #24 bug:
+        // CP1581 40% Ultra was grey-starred over CP1572 77% Ultra and CP1580 84% IV).
+        const maxSurfacedIv = members
+          .filter(m => notConfirmedWinner(m) && holdsSlot(m))
+          .reduce((mx, m) => Math.max(mx, m.ivAvg||0), -Infinity);
+        if (slotless.length > 0) {
+          // Master-League IV logic: highest ivAvg ALWAYS wins regardless of evo stage (#37: 89%
+          // pre-evo beats 84% evolved). Ties: already-evolved → cheaper dust → isFavorite → CP
+          // → stableKey (deterministic, Issue #22).
+          const best = slotless.slice().sort((a, b) => {
+            const iv = (b.ivAvg||0) - (a.ivAvg||0);
+            if (Math.abs(iv) > 1e-9) return iv;
+            const ev = (isFinalEvo(b)?1:0) - (isFinalEvo(a)?1:0);
+            if (ev) return ev;
+            const d = phDust(a) - phDust(b);
+            if (d) return d;
+            const fav = (b.isFavorite?1:0) - (a.isFavorite?1:0);
+            if (fav) return fav;
+            if ((b.cp||0) !== (a.cp||0)) return (b.cp||0) - (a.cp||0);
+            return String(a.stableKey||'').localeCompare(String(b.stableKey||''));
+          })[0];
+          if ((best.ivAvg||0) > maxSurfacedIv) {
+            best.slots.push('M');
+            best.isMlPlaceholder = true;
+            best.decision = 'review';
+            best.reason = 'ML placeholder — best available (no confirmed ML keeper in family)';
+            best.nickname = buildNickname(best, 'M_placeholder');
+            best.starType = 'grey';
+          }
         }
       }
     }
