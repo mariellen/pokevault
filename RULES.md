@@ -201,8 +201,13 @@ Hundo  >  Lucky-adjusted IV (Lucky +5pp)  >  shiny-lucky  >  purified  >  normal
   (`isPurifySlot` on the `M` league).
 
 ### Sorting within each group (best candidate wins)
-Priority: **highest rounded rank% → prefer already-evolved → cheapest effective dust →
-higher raw rank** (final deterministic tiebreak only).
+Priority: **highest rounded rank% → prefer already-evolved → type-priority → cheapest
+effective dust → higher raw rank → `isFavorite` → higher CP → `stableKey`**.
+The last three (v3.5.58, Issue #22) are deterministic terminal tiebreaks so the slot winner
+never flickers between sessions/data sources — the CSV scan index is **not** stable across
+re-exports or a cloud reload, whereas `stableKey` (pokeNum|form|gender|IVs) is intrinsic.
+`isFavorite` sits above CP (an already-starred Pokémon wins → saves unstar/restar in GO) but
+**both are below the dust tiebreak**.
 
 #### Rank comparison and dust tiebreak (regression-critical)
 - **Rounded integer ranks.** All league rank percentages are rounded to the nearest whole
@@ -492,9 +497,15 @@ Star type is set by `p.starType` in `analyse.js` and rendered by `render.js`.
              → "Currently starred — may not be needed"
 7. SWIRL  🌀 evolutionUnknown (Wurmple/Clamperl) && max league rank ≥ 90%
              → "Unknown evo path — high PvP rank, consider evolving"
-8. GREY   ★  ML placeholder — best slot-less family member when no confirmed ML keeper
+8. GREY   ★  ML placeholder — highest-IV slot-less family member when no confirmed ML keeper
              exists (isMlPlaceholder, decision='review', nick via M_placeholder)
              → "Master League candidate — star before culling"
+             #24/#37 (v3.5.58): a slot-less member only earns this when its IV STRICTLY
+             exceeds every member already surfaced via a tentative capped/Master slot
+             (slotConfirmed=false). Otherwise those tentative-slot holders already represent
+             the family's best Master candidate, so no grey star is added and they keep their
+             slot — prevents a weak member (e.g. 40% Ultra) being grey-starred over a stronger
+             tentative-slot holder (77% Ultra / higher IV).
 9. VISIBILITY ★ decision='trade' && (isDynamax || isGigantamax || isLegendary)
              → "Notable — tradeable but worth reviewing"
 10. NONE  ·  Everything else
