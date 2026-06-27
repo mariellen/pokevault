@@ -2218,6 +2218,10 @@ function setOverride(idx, field, value) {
   const fieldMap = {is_shiny:'isShiny',is_dynamax:'isDynamax',is_gigantamax:'isGigantamax',
     is_costumed:'isCostumed',vivillon_pattern:'vivillonPattern',special_form:'specialForm',manual_decision:'manualDecision',notes:'notes'};
   if (fieldMap[field]) p[fieldMap[field]] = value;
+  // #48 Q2: keep specialForm + vivillonPattern in lock-step. The nick reads specialForm;
+  // the list form-tag and search read vivillonPattern. Writing both from one action means a
+  // form set anywhere lights up everywhere (and persists both columns — see save below).
+  if (field === 'special_form' || field === 'vivillon_pattern') { p.specialForm = value; p.vivillonPattern = value; }
   // If manual decision, update display
   if (field === 'manual_decision' && value) {
     p.decision = value;
@@ -2286,8 +2290,11 @@ function setOverride(idx, field, value) {
     // override indicator / reset affordance stay in sync with the new structure).
     if (NICK_FIELDS.has(field)) rerenderNickCell(p);
   }
-  // Save to Supabase
-  saveOverride(idx, {[field]: value});
+  // Save to Supabase (#48 Q2: form fields persist to BOTH columns)
+  const saveFields = (field === 'special_form' || field === 'vivillon_pattern')
+    ? { special_form: value, vivillon_pattern: value }
+    : { [field]: value };
+  saveOverride(idx, saveFields);
   updateSyncStatus('Saving...', 'ok');
   // Update summary counts
   if (allPokemon.length) renderSummary(allPokemon);

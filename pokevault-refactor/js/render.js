@@ -230,8 +230,10 @@ function buildRow(p){
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_dynamax',this.checked)" ${p.isDynamax?'checked':''}> Dynamax</label>
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_gigantamax',this.checked)" ${p.isGigantamax?'checked':''}> Gigantamax</label>
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_costumed',this.checked)" ${p.isCostumed?'checked':''}> 🎭 Costumed</label>
-          <label style="display:flex;align-items:center;gap:4px">Vivillon:
-            <input type="text" value="${esc(p.vivillonPattern)}" placeholder="e.g. Polar" style="width:80px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','vivillon_pattern',this.value)">
+          <label style="display:flex;align-items:center;gap:4px">Form:
+            ${(typeof FORM_DROPDOWNS!=='undefined' && FORM_DROPDOWNS[p.name])
+              ? `<select style="background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','special_form',this.value)">${FORM_DROPDOWNS[p.name].map(f=>`<option value="${esc(f)}" ${(p.specialForm===f||p.vivillonPattern===f)?'selected':''}>${esc(f)}</option>`).join('')}</select>`
+              : `<input type="text" value="${esc(p.vivillonPattern||p.specialForm||'')}" placeholder="e.g. Polar" style="width:80px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px" onchange="setOverride('${p.stableKey}','special_form',this.value)">`}
           </label>
           <label style="display:flex;align-items:center;gap:4px">Override:
             <select onchange="setOverride('${p.stableKey}','manual_decision',this.value)" style="background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text);font-size:11px">

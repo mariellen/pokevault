@@ -162,8 +162,12 @@ const FORM_NICK_PREFIXES = {
   'Modern':'Modn', 'Monsoon':'Mnsn', 'Ocean':'Ocen', 'River':'Rivr',
   'Sandstorm':'Sand', 'Savanna':'Savn', 'Sun':'Sun', 'Jungle':'Jngl',
   'Archipelago':'Arch', 'High Plains':'HiPl', 'Pokéball':'PBal', 'Fancy':'Fanc',
-  // Flabébé / Floette / Florges colours (via Set Forms modal)
-  'Red':'Red', 'Orange':'Orng', 'Yellow':'Yell', 'Blue':'Blue', 'White':'Whit',
+  // Flabébé / Floette / Florges colours intentionally OMITTED (#55): these are DECORATIVE
+  // forms (fixed at catch, evolution is automatic) so the colour must NOT appear in the nick
+  // — a Blue Florges reads 'FlorgesⓊ100', not 'BlueⓊ100'. The colour is still selectable in
+  // the Set Forms dropdown and tracked via COLLECTION_SETS. Decision-forms (Lycanroc battle
+  // forms, Burmy/Wormadam cloaks) keep their prefixes above. (A general decision-vs-decorative
+  // FORM_IN_NICK_SPECIES whitelist is deferred to a later issue.)
 };
 
 // ── Nick convention ───────────────────────────────
