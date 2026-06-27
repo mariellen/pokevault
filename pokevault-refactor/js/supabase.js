@@ -345,12 +345,31 @@ async function checkCloudCollection() {
   return false;
 }
 
+// Fetch every override row in pages. PostgREST caps a single response at 1000 rows,
+// so an un-paginated GET silently dropped overrides past 1000 (#53). Mirrors the
+// loadCollectionFromCloud batching. Returns null on failure so the retry/offline
+// handling below still works.
+async function fetchAllOverrides() {
+  const BATCH = 1000;
+  let all = [], offset = 0;
+  while (true) {
+    const page = await supabaseFetch('GET',
+      `pokemon_overrides?select=*&order=pokemon_index&limit=${BATCH}&offset=${offset}`);
+    if (page === null) return null;
+    if (!page.length) break;
+    all = all.concat(page);
+    offset += page.length;
+    if (page.length < BATCH) break;
+  }
+  return all;
+}
+
 async function loadOverrides() {
-  let data = await supabaseFetch('GET', 'pokemon_overrides?select=*');
+  let data = await fetchAllOverrides();
   if (data === null) {
     // Retry once after a short delay before declaring offline (handles transient mobile drops)
     await new Promise(r => setTimeout(r, 2000));
-    data = await supabaseFetch('GET', 'pokemon_overrides?select=*');
+    data = await fetchAllOverrides();
   }
   if (data === null) {
     supabaseConnected = false;
@@ -449,12 +468,15 @@ function applyOverridesToPokemon() {
 
 async function saveOverride(pokemonIdx, fields) {
   overridesCache[pokemonIdx] = Object.assign(overridesCache[pokemonIdx]||{}, fields, {pokemon_index: pokemonIdx});
-  if (!supabaseConnected) return;
+  // #53: surface the live override total so the count reflects new saves immediately
+  // (the load-time "N overrides loaded" message otherwise never changed).
+  const overrideCount = Object.keys(overridesCache).length;
+  if (!supabaseConnected) { updateSyncStatus('✓ Saved (offline) — ' + overrideCount + ' overrides', 'ok'); return; }
   const userId = await getCurrentUserId();
   if (!userId) return;
   const payload = Object.assign({pokemon_index: pokemonIdx, updated_at: new Date().toISOString(), user_id: userId}, fields);
   await supabaseFetch('POST', 'pokemon_overrides', payload);
-  updateSyncStatus('✓ Saved', 'ok');
+  updateSyncStatus('✓ Saved — ' + overrideCount + ' overrides', 'ok');
 }
 
 // Save a user-authored nick override with an optimistic local update + rollback.
