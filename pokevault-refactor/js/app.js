@@ -1993,7 +1993,7 @@ function openCleanupModal(){
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
             <div class="pv-modal-name"><a href="#" data-name="${cleanNameEsc}" onclick="event.preventDefault();cleanupNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${esc(p.name)}</a></div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV${cleanNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${cleanNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(cleanNick)}</span>`:''} · ${p.catchDate||'no catch date'} · ${stableTag}</div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV · ${p.atkIV}/${p.defIV}/${p.staIV}${cleanNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${cleanNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(cleanNick)}</span>`:''} · ${p.catchDate||'no catch date'} · ${stableTag}</div>
           </div>
           <div class="pv-modal-controls">
             <select class="pv-modal-select" onchange="setOverride('${p.stableKey}','special_form',this.value);allPokemon.find(x=>x.stableKey==='${p.stableKey}').specialForm=this.value;">${opts}</select>
