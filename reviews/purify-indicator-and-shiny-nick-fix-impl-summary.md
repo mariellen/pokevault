@@ -65,4 +65,4 @@ purified Dusknoir 99.1%). This makes the indicator exact and removes the guesswo
 
 ## PR
 
-<!-- filled in after push -->
+https://github.com/mariellen/pokevault/pull/50
