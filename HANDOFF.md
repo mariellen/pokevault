@@ -10,7 +10,24 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Set Forms modal: show IVs + fix override count (#52 + #53, v3.5.60)
+### Known-form dropdowns (#48) + decision-only nick prefix (#55, v3.5.61)
+**Status:** Implemented on `feature/known-forms-and-decision-prefix` (from main, post-#54).
+#48: Deerling/Sawsbuck/Squawkabilly added to FORM_DROPDOWNS + FORM_SEARCH + COLLECTION_SETS;
+the main-list per-row form box is now a dropdown for known-form species; `setOverride` writes
+BOTH `special_form` + `vivillon_pattern` so the nick and the list tag/search stay in lock-step
+(Q2=write-both). #55 (targeted, Q1=b): removed Flabébé/Floette/Florges colours from
+FORM_NICK_PREFIXES so a Blue Florges nicks `FlorgesⓊ100`, not `BlueⓊ100` — Lycanroc/Burmy
+decision-forms keep prefixes; Furfrou/Vivillon/Castform/Deoxys retained (full whitelist deferred
+to a later issue). Suite: **797 passed** (4 failures are the pre-existing untracked `csp.test.js`
+thread). v3.5.60 → v3.5.61.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/57 , then in-app:
+confirm a Blue Florges reads `Florges…`, Deerling/Squawkabilly appear in 🎨 Set Forms, and the
+per-row Form dropdown + orange tag/search work. See
+`reviews/known-forms-and-decision-prefix-impl-summary.md`.
+_Updated: 27 Jun 2026_
+
+### Set Forms modal: show IVs + fix override count (#52 + #53, v3.5.60) — ✅ MERGED (PR #54)
 **Status:** Implemented on `feature/set-forms-modal-improvements` (branched from main after #50
 merged). Fix 1: modal rows now show Atk/Def/Sta (`… % IV · 14/13/14 · …`) so same-CP duplicates
 are distinguishable. Fix 2: `loadOverrides` now paginates (`fetchAllOverrides`) — the un-paginated

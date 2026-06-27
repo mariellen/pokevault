@@ -159,6 +159,11 @@ const FORM_DROPDOWNS = {
   Shellos:    ['Unknown','West Sea','East Sea'],
   Gastrodon:  ['Unknown','West Sea','East Sea'],
   Burmy:      ['Unknown','Plant Cloak','Sandy Cloak','Trash Cloak'],
+  // #48 — Pokégenie doesn't export these forms, so they're set manually here.
+  // Decorative (no nick prefix, see #55) — selectable + tracked via COLLECTION_SETS.
+  Deerling:     ['Unknown','Spring','Summer','Autumn','Winter'],
+  Sawsbuck:     ['Unknown','Spring','Summer','Autumn','Winter'],
+  Squawkabilly: ['Unknown','Green Plumage','Blue Plumage','Yellow Plumage','White Plumage'],
 };
 
 const FORM_SEARCH = {
@@ -171,6 +176,9 @@ const FORM_SEARCH = {
   'Orange':'orange flower','Blue':'blue flower','White':'white flower',
   'West Sea':'west','East Sea':'east',
   'Plant Cloak':'plant','Sandy Cloak':'sandy','Trash Cloak':'trash',
+  // #48 — Deerling/Sawsbuck seasons + Squawkabilly plumage
+  'Spring':'spring','Summer':'summer','Autumn':'autumn','Winter':'winter',
+  'Green Plumage':'green','Blue Plumage':'blue','Yellow Plumage':'yellow','White Plumage':'white',
 };
 
 const COSTUME_SPECIES = new Set([
@@ -429,4 +437,7 @@ const COLLECTION_SETS = {
   'Flabébé':    { forms: ['Red','Yellow','Orange','Blue','White'], target: 5, label: 'Flabébé colours' },
   'Floette':    { forms: ['Red','Yellow','Orange','Blue','White'], target: 5, label: 'Floette colours' },
   'Florges':    { forms: ['Red','Yellow','Orange','Blue','White'], target: 5, label: 'Florges colours' },
+  'Deerling':   { forms: ['Spring','Summer','Autumn','Winter'], target: 4, label: 'Deerling seasons' },
+  'Sawsbuck':   { forms: ['Spring','Summer','Autumn','Winter'], target: 4, label: 'Sawsbuck seasons' },
+  'Squawkabilly':{ forms: ['Green Plumage','Blue Plumage','Yellow Plumage','White Plumage'], target: 4, label: 'Squawkabilly plumage' },
 };

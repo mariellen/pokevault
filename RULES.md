@@ -419,7 +419,17 @@ When `p.specialForm`/`p.form` matches a key in `FORM_NICK_PREFIXES` (`config.js`
 prefix replaces the species name as `base` (e.g. `SnowyⒼ97`, `DandⓊ100`). Examples:
 Castform Snowy→`Snow`, Lycanroc Midnight→`Night`/Midday→`Day`/Dusk→`Dusk`, Deoxys
 Attack→`Atk`/Defense→`Def`/Speed→`Spd`, Origin→`Orig`, Therian→`Ther`, Primal→`Prml`,
-Furfrou trims, Vivillon patterns, Flabébé colours. Full table in `config.js`.
+Furfrou trims, Vivillon patterns. Full table in `config.js`.
+
+> **Decorative vs decision forms (#55, v3.5.61):** the own-form prefix only belongs in the nick
+> when the form is not auto-determined at catch. **Flabébé/Floette/Florges colours,
+> Deerling/Sawsbuck seasons, and Squawkabilly plumage are DECORATIVE** (fixed at catch,
+> evolution automatic) → **no prefix** — a Blue Florges nicks `FlorgesⓊ100`, not `BlueⓊ100`.
+> They're still selectable in the Set Forms dropdown and counted via `COLLECTION_SETS`.
+> **Decision forms** (Lycanroc battle forms, Burmy/Wormadam cloaks — the form changes how/what
+> you evolve) keep their prefix. Implemented for now by omitting the decorative colours from
+> `FORM_NICK_PREFIXES` (Furfrou/Vivillon/Castform/Deoxys retained as useful rare-form tags); a
+> general decision-vs-decorative `FORM_IN_NICK_SPECIES` whitelist is deferred to a later issue.
 
 ### Evo-target form prefix (per-league form from CSV)
 Apply the recommended-form prefix **only when the form differs across leagues** for the same
@@ -747,10 +757,17 @@ Table `pokemon_overrides`, keyed by `stableKey`.
 | `is_dynamax` | Dynamax |
 | `is_gigantamax` | Gigantamax |
 | `is_costumed` | Costumed |
-| `vivillon_pattern` | Vivillon form |
-| `special_form` | Furfrou trim etc. |
+| `vivillon_pattern` | Form value — drives the list form-tag + search (`p.vivillonPattern`) |
+| `special_form` | Form value — drives the nick prefix (`p.specialForm`) |
 | `manual_decision` | Force keep/trade/review |
 | `notes` | Free text |
+
+> **Forms write both columns (#48 Q2, v3.5.61):** historically the Set Forms modal wrote only
+> `special_form` (nick) while the main-list box wrote only `vivillon_pattern` (tag/search), so a
+> form set in one place didn't fully show in the other. `setOverride` now mirrors them — a form
+> set anywhere persists to **both** columns and updates both `p.specialForm` and
+> `p.vivillonPattern`. Both setters are dropdowns for known-form species (`FORM_DROPDOWNS`) and
+> free-text otherwise.
 
 A nick override (user-authored) is re-applied as the final post-derivation step so it
 survives every earlier nick reassignment.
