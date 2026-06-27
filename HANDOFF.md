@@ -10,6 +10,21 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
+### Purify indicator `p` + shiny/purify evolved name (#43 + #47, v3.5.59)
+**Status:** Implemented on `feature/purify-indicator-and-shiny-nick-fix`. Replaced the broken
+`rank + improvement*0.4` purify heuristic with Pokégenie's own `Sha/Pur (G/U/L)` verdict — a
+shadow gets `p` only when `Sha/Pur(lg)=2` AND `Rank %(lg) ≥ 90`, using that (already-purified)
+rank verbatim. The brief's stat-product alternative was shown to also misfire, so we used the
+Sha/Pur columns instead (you confirmed semantics against Duskull in-app). Bundled #47: shiny +
+purify-review nicks now show the evolved target name (`ArctibaxⒼ95※`, not `FrigibaxⒼ95※`).
+Suite: **797 passed**. ⚠️ 4 remaining failures are the **pre-existing untracked `csp.test.js`
+thread** (CSP hardening), NOT from this change — verified by stashing. v3.5.58 → v3.5.59.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/50 . See
+`reviews/purify-indicator-and-shiny-nick-fix-impl-summary.md`. Note: the unrelated `csp.test.js`
+failures will keep CI red until that separate CSP thread lands — flag if that blocks merge.
+_Updated: 27 Jun 2026_
+
 ### Evolved-form Supabase persistence (#41, v3.5.57)
 **Status:** Implemented on `feature/evolved-form-supabase-persistence`. Persists `evolved_form_g/u/l`
 so the #39 form-aware nick (Lycanroc Day/Night/Dusk, Burmy cloak) survives a cloud round-trip.

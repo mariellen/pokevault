@@ -220,11 +220,13 @@ describe('Group 6 — Totodile/Croconaw/Feraligatr', () => {
 });
 
 // ─── Group 7 — Purify modal ──────────────────────────────────────────────────
-// simulatePurify fires when estimatedPurifiedRank = rank + improvement*0.4 ≥ 92
-// and rank is in (0, 90) — already-qualifying shadows are skipped.
+// simulatePurify fires for L/G/U when Pokégenie recommends purify (Sha/Pur=2) AND the
+// CSV Rank % (which already IS the purified rank in that case) ≥ keepThreshold. Shadows
+// Pokégenie keeps as-is (Sha/Pur=1/blank) are never purify candidates — this is what
+// killed the old `rank + improvement*0.4` heuristic false-positives.
 
 describe('Group 7 — Purify modal candidates', () => {
-  it('Gastly shadow CP:82 (G=89.5%, improvement≈6.7%) appears in purify modal', () => {
+  it('Gastly shadow CP:82 (Sha/Pur(G)=2, purified Rank% (G)=93.5) appears in purify modal', () => {
     const p = find('Gastly', 82);
     expect(p).toBeDefined();
     expect(p.isShadow).toBe(true);
@@ -232,7 +234,7 @@ describe('Group 7 — Purify modal candidates', () => {
     expect(p.purifyRankPct).toBeGreaterThanOrEqual(92);
   });
 
-  it('Cacnea shadow CP:80 (G=80%, improvement≈11.1%) does NOT appear — estimate too low', () => {
+  it('Cacnea shadow CP:80 (Sha/Pur(G)=0 → Pokégenie keeps shadow) does NOT appear as purify candidate', () => {
     const p = find('Cacnea', 80);
     expect(p).toBeDefined();
     expect(p.isShadow).toBe(true);
