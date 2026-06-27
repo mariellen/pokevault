@@ -177,6 +177,22 @@ function buildNickname(p, slot, convention) {
   const isNundo = atkIV===0&&defIV===0&&staIV===0;
   const isHundo = atkIV===15&&defIV===15&&staIV===15;
 
+  // #47 / purify nick: display name for an evolved target. Strips the form qualifier
+  // ('Arcanine|Hisui' → 'Arcanine') and applies the short battle-form prefix
+  // ('Lycanroc|Midnight' → 'Night'); regional forms keep the plain species name since
+  // they live in their own PokéVault families. Mirrors the G/U/L slot handling below.
+  const evoDisplayName = (evoName, evoForm) => {
+    if (!evoName) return p.name;
+    const bare = evoName.split('|')[0];
+    const formPart = evoName.includes('|') ? evoName.split('|')[1] : (evoForm || '');
+    const REG = new Set(['Alola','Galar','Hisui','Paldea']);
+    if (formPart && !REG.has(formPart) && formPart !== (p.form||'')
+        && typeof FORM_NICK_PREFIXES !== 'undefined' && FORM_NICK_PREFIXES[formPart]) {
+      return FORM_NICK_PREFIXES[formPart];
+    }
+    return bare;
+  };
+
   // Target name for this slot; also capture the evo target's form for B1 nick prefix.
   let base = p.name;
   let evolvedFormForSlot = '';
@@ -335,7 +351,8 @@ function buildNickname(p, slot, convention) {
       });
       if (!ownSlotExists) {
         const pv = Math.round(p.purifyRankPct || 0);
-        return fitName(p.name, (LC[p.purifyLeague]||LC.R) + String(pv), nickSuf, 12);
+        // Show the purified evo target (set by simulatePurify), not the base name.
+        return fitName(evoDisplayName(p.purifyEvo, p['evolvedForm'+p.purifyLeague]||''), (LC[p.purifyLeague]||LC.R) + String(pv), nickSuf, 12);
       }
     }
     // Holding name: Name + best league IV% + lowercase league letter + next league IV% etc
@@ -389,16 +406,22 @@ function buildNickname(p, slot, convention) {
     return fitName(base, mid, nickSuf, 12);
   } else if (slot==='shiny'||slot==='shiny_lower') {
     const best=['G','U','L'].find(l=>(p['rankPct'+l]||0)>=RULES.keepThreshold);
+    // #47: render the evolved target name for the displayed league (e.g. shiny Frigibax
+    // shown as Great → 'Arctibax'), not the base species name. Falls back to the U/G evo
+    // target when no league qualifies.
+    let shinyName;
     if (best) {
       const pv=Math.round(p['rankPct'+best]||0);
       mid=LC[best]+(pv===100?PERFECT:String(pv));
+      shinyName=evoDisplayName(p['evolvedName'+best]||p.name, p['evolvedForm'+best]||'');
     } else {
       mid=LC.R+String(iv);
+      shinyName=evoDisplayName(p.evolvedNameU||p.evolvedNameG||p.name, p.evolvedFormU||p.evolvedFormG||'');
     }
     // suf may already carry a trailing purified '*' (Decision 2). Re-order so ※ then * trail.
     const sufNoStar = (p.isPurified && suf.endsWith('*')) ? suf.slice(0, -1) : suf;
     nickSuf = sufNoStar + SHINY_SFX + (p.isPurified ? '*' : '');
-    return fitName(p.name, mid, nickSuf, 12);
+    return fitName(shinyName, mid, nickSuf, 12);
   } else if (slot==='dynamax') {
     // Change 6: the 'dynamax' slot is only held by a Dmax that did NOT win a capped league slot
     // (a capped-slot Dmax routes through the L/G/U handler instead). A non-winning Dmax is a
@@ -540,22 +563,38 @@ function simulatePurify(p) {
   p.purifyHundo = pAtk===15 && pDef===15 && pSta===15;
 
   const purifyIvAvg = ((pAtk+pDef+pSta)/45)*100;
-  const improvement = purifyIvAvg - (p.ivAvg||0);
   const purifiedMinLevel = Math.max(p.level||1, 25);
   const hasBaseStats = typeof GO_BASE_STATS_BY_NAME !== 'undefined' && typeof CP_MULTIPLIERS !== 'undefined';
 
+  // Per-league purify candidacy.
+  //   L/G/U: trust Pokégenie's Sha/Pur recommendation. When Sha/Pur(lg)===2 the CSV
+  //     Rank % already IS the purified (battle-simulated) rank, so use it verbatim — no
+  //     heuristic. When ===1 (keep shadow) or blank, purifying does not improve PvP
+  //     standing, so the shadow is never a purify candidate for that league. This kills
+  //     the old `rank + improvement*0.4` false-positives (e.g. shadow Annihilape Ultra,
+  //     which Pokégenie keeps as shadow → Sha/Pur(U)=1) AND surfaces purify-keepers whose
+  //     Rank % already reflects purification (Sha/Pur=2, rank>=threshold), which the old
+  //     `rank >= keepThreshold` early-return mislabelled as shadow keepers.
+  //   M: deterministic IV-avg gain (purify floors level 25 and adds +2 IVs); only worth
+  //     flagging when the shadow isn't already a Master keeper on its own IVs.
   const leagueChecks = [
-    {lg:'L', cap:500,      rank:p.rankPctL||0, evo:p.evolvedNameL||p.name},
-    {lg:'G', cap:1500,     rank:p.rankPctG||0, evo:p.evolvedNameG||p.name},
-    {lg:'U', cap:2500,     rank:p.rankPctU||0, evo:p.evolvedNameU||p.name},
-    {lg:'M', cap:Infinity, rank:p.ivAvg||0,    evo:p.evolvedNameU||p.evolvedNameG||p.name},
+    {lg:'L', cap:500,      rank:p.rankPctL||0, evo:p.evolvedNameL||p.name,                 shaPur:p.shaPurL||0},
+    {lg:'G', cap:1500,     rank:p.rankPctG||0, evo:p.evolvedNameG||p.name,                 shaPur:p.shaPurG||0},
+    {lg:'U', cap:2500,     rank:p.rankPctU||0, evo:p.evolvedNameU||p.name,                 shaPur:p.shaPurU||0},
+    {lg:'M', cap:Infinity, rank:p.ivAvg||0,    evo:p.evolvedNameU||p.evolvedNameG||p.name, shaPur:0},
   ];
 
   let bestLeague='', bestPct=0;
-  leagueChecks.forEach(({lg, cap, rank, evo}) => {
+  leagueChecks.forEach(({lg, cap, rank, evo, shaPur}) => {
     if (rank <= 0) return;
-    if (rank >= RULES.keepThreshold) return;
-    const estimatedPurified = lg==='M' ? purifyIvAvg : Math.min(100, rank + improvement * 0.4);
+    let estimatedPurified;
+    if (lg === 'M') {
+      if (rank >= RULES.keepThreshold) return; // already a Master keeper as-is
+      estimatedPurified = purifyIvAvg;
+    } else {
+      if (shaPur !== 2) return;                // Pokégenie: keep shadow / no purify benefit
+      estimatedPurified = rank;                // Sha/Pur===2 → Rank % IS the purified rank
+    }
     if (estimatedPurified < RULES.keepThreshold) return;
 
     if (cap < Infinity) {
@@ -717,6 +756,7 @@ function analyse(rows) {
       isNundo:atkIV===0&&defIV===0&&staIV===0,
       rankPctG:rG, rankPctU:rU, rankPctL:rL, rankPctM:iv,
       rankNumG:Number(r['Rank # (G)'])||null, rankNumU:Number(r['Rank # (U)'])||null, rankNumL:Number(r['Rank # (L)'])||null,
+      shaPurG:Number(r['Sha/Pur (G)'])||0, shaPurU:Number(r['Sha/Pur (U)'])||0, shaPurL:Number(r['Sha/Pur (L)'])||0,
       evolvedNameG, evolvedNameU, evolvedNameL,
       evolvedFormG, evolvedFormU, evolvedFormL,
       standaloneEvoG:!!(r['Name (G)'] && r['Name (G)']!==r['Name'] && STANDALONE_SPECIES.has(r['Name (G)'])),

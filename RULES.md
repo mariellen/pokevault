@@ -41,7 +41,7 @@ Defined in `config.js`.
 - **Input:** Pokégenie CSV export.
 - **Key columns:** `Name`, `Pokemon Number`, `Form`, `Gender`, `CP`, `HP`, `Atk IV`,
   `Def IV`, `Sta IV`, `IV Avg`, `Level Min/Max`, `Rank % (L/G/U)`, `Rank # (L/G/U)`,
-  `Name (L/G/U)`, `Form (L/G/U)`, `Dust Cost (L/G/U)`, `Lucky`, `Shadow/Purified`,
+  `Name (L/G/U)`, `Form (L/G/U)`, `Sha/Pur (L/G/U)`, `Dust Cost (L/G/U)`, `Lucky`, `Shadow/Purified`,
   `Favorite`, `Scan Date`, `Catch Date`, `Quick Move`, `Charge Move`, `Charge Move 2`.
 
 ### League Symbols (circled letters — displayed in nicknames)
@@ -277,6 +277,10 @@ that league's `rankPct` is ignored and no slot is assigned for that league.
   (Pokégenie doesn't export it).
 - Best shiny → `shiny`; others → `shiny_lower`.
 - Nick uses league symbol + rank% if a qualifying slot exists, else `NameⓇ{IV%}※`.
+- **The name is the evolved target** for the displayed league (#47, v3.5.59) — e.g. a shiny
+  Frigibax shown as Great renders `ArctibaxⒼ95※`, not `FrigibaxⒼ95※`. The no-league fallback
+  uses the Ultra/Great evo target. Regional/battle-form targets get the same `|`-strip +
+  short-form prefix as the L/G/U slots.
 - `※` trails everything except a purified `*`. Duplicate shinies: highest IV keeps, others trade.
 
 ### Lucky
@@ -299,8 +303,9 @@ that league's `rankPct` is ignored and no slot is assigned for that league.
   `lucky` slot handler).
 - Purify suffix `p` (or `p✪` if purified IVs would be 15/15/15) appended **only when the
   shadow holds no confirmed own-league slot** (purify slot excluded).
-- If purified IVs would qualify (≥92% estimated, see §7), the shadow gets a purify league
-  slot and league-style nick with `p`.
+- If Pokégenie recommends purifying (`Sha/Pur(lg)=2`) and the purified `Rank %(lg) ≥ 90`
+  (see §7), the shadow gets a purify league slot and league-style nick with `p` on the
+  evolved target name.
 - Frustration as fast move always generates a TM note.
 
 ### Purified (`Shadow/Purified = '2'`)
@@ -563,16 +568,30 @@ exceedsCap = cp > leagueCap
 ```
 Falls back to heuristic `round(cp * 1.07) > cap` when base stats unavailable.
 
-### Qualifying threshold
-`estimatedPurifiedRank ≥ 92%` (raised from 90% to buffer the heuristic). Capped leagues
-also require purified CP not to exceed the cap; Master uses `purifyIvAvg` directly.
+### Qualifying threshold (Sha/Pur-driven, v3.5.59)
+Pokégenie already battle-simulates the shadow-vs-purify decision per league and exports it,
+so we no longer estimate the purified rank:
+- **`Sha/Pur (L/G/U)`** = `1` (keep shadow), `2` (purify recommended), or blank.
+- When `Sha/Pur(lg) = 2` the league's **`Rank %` IS the purified rank** (verified: Duskull
+  `Sha/Pur(U)=2`, CSV `Rank % (U)=99.17%` matches in-app purified Dusknoir 99.1%).
+
+For **L/G/U**, a shadow is a purify candidate only when `Sha/Pur(lg) === 2` **and**
+`Rank %(lg) ≥ keepThreshold (90)`; `purifyRankPct` is taken **verbatim** from the CSV — no
+estimation. Shadows Pokégenie keeps as-is (`Sha/Pur = 1`/blank) are never candidates. This
+replaced the old `rank + improvement*0.4` heuristic, which mis-fired on attack-weighted
+shadows (e.g. Annihilape) whose purified rank actually *drops* below the shadow's.
+**Master** has no `Sha/Pur` column and is uncapped → still uses `purifyIvAvg` directly, only
+when the shadow isn't already a Master keeper on its own IVs. The exact CP-cap check above is
+retained as a defensive guard for the capped leagues.
 
 ### Result
-`p.purifyLeague` = best qualifying league after purification; `p.purifyRankPct` = estimated
-rank%. If `purifyRankPct ≥ 90%`, the purify league is added to `p.slots` (`isPurifySlot`,
-`slotConfirmed`) and the shadow gets a league-style nick with `p`. The `p`/`p✪` suffix
-appears **only if** the shadow holds no confirmed own-league slot at ≥90% (excluding the
-purify slot).
+`p.purifyLeague` = best qualifying league after purification; `p.purifyRankPct` = the purified
+rank (CSV `Rank %` for L/G/U, `purifyIvAvg` for M); `p.purifyEvo` = that league's evolved
+target. If `purifyRankPct ≥ 90%`, the purify league is added to `p.slots` (`isPurifySlot`,
+`slotConfirmed`) and the shadow gets a league-style nick with `p`. The `p`/`p✪` suffix appears
+**only if** the shadow holds no confirmed own-league slot at ≥90% (excluding the purify slot).
+The league-style purify nick renders the **evolved target name** (`purifyEvo`), not the base
+species.
 
 ---
 
