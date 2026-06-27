@@ -60,4 +60,4 @@ Briefs/issues: `briefs/known-forms-dropdown.md` (#48), GitHub issue #55.
   main-list dropdown).
 
 ## PR
-https://github.com/mariellen/pokevault/pull/<TBD>
+https://github.com/mariellen/pokevault/pull/57
