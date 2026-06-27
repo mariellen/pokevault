@@ -52,4 +52,4 @@ same-CP duplicates apart, and an accurate override count to trust that all forms
 
 ## PR
 
-https://github.com/mariellen/pokevault/pull/<TBD>
+https://github.com/mariellen/pokevault/pull/54

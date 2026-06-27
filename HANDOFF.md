@@ -10,7 +10,21 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Purify indicator `p` + shiny/purify evolved name (#43 + #47, v3.5.59)
+### Set Forms modal: show IVs + fix override count (#52 + #53, v3.5.60)
+**Status:** Implemented on `feature/set-forms-modal-improvements` (branched from main after #50
+merged). Fix 1: modal rows now show Atk/Def/Sta (`… % IV · 14/13/14 · …`) so same-CP duplicates
+are distinguishable. Fix 2: `loadOverrides` now paginates (`fetchAllOverrides`) — the un-paginated
+GET was hitting PostgREST's 1000-row cap and **silently dropping overrides past 1000** (your
+"stuck at 1000"); and `saveOverride` now reports the live total (`✓ Saved — N overrides`). These
+unblock manual testing of the #48 forms dropdown. Suite: **797 passed** (4 failures are the
+pre-existing untracked `csp.test.js` thread, not this change). v3.5.59 → v3.5.60.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/54 , then load the app
+and confirm the Set Forms modal (IVs visible, count moves, >1000 overrides all load). See
+`reviews/set-forms-modal-improvements-impl-summary.md`.
+_Updated: 27 Jun 2026_
+
+### Purify indicator `p` + shiny/purify evolved name (#43 + #47, v3.5.59) — ✅ MERGED (PR #50)
 **Status:** Implemented on `feature/purify-indicator-and-shiny-nick-fix`. Replaced the broken
 `rank + improvement*0.4` purify heuristic with Pokégenie's own `Sha/Pur (G/U/L)` verdict — a
 shadow gets `p` only when `Sha/Pur(lg)=2` AND `Rank %(lg) ≥ 90`, using that (already-purified)
