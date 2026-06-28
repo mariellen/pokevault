@@ -82,6 +82,11 @@ pokevault-refactor/
 Bump the version number in `index.html` as part of every PR before merge.
 Current version: check `index.html` for the latest.
 
+Local JS/CSS are loaded with a `?v=<version>` cache-busting query string (added v3.5.62, #61).
+Bump these **together** with the `<title>`/logo version — the simplest way is a bare-number
+global replace so all three update at once: `sed 's/3\.5\.62/3.5.63/g' index.html`. (A plain
+`v3.5.NN` replace misses the `?v=` strings.)
+
 ### After implementing — HANDOFF.md
 Update `HANDOFF.md` and write `reviews/[brief-name]-impl-summary.md`.
 Include the PR URL in the HANDOFF.md next action block.

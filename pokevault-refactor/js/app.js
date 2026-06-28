@@ -1954,6 +1954,9 @@ function openCleanupModal(){
     .sort((a,b)=>{
       if(cleanupSortMode==='cp') return (b.cp||0)-(a.cp||0);
       if(cleanupSortMode==='iv') return (b.ivAvg||0)-(a.ivAvg||0);
+      // #59: most-recent scan first. scanDate is an ISO-ish string ("YYYY-MM-DD HH:MM"),
+      // so a descending string compare orders chronologically; blanks sort last.
+      if(cleanupSortMode==='scan') return (b.scanDate||'').localeCompare(a.scanDate||'');
       if(a.catchDate&&!b.catchDate) return -1;
       if(!a.catchDate&&b.catchDate) return 1;
       return a.name.localeCompare(b.name);
@@ -1971,6 +1974,7 @@ function openCleanupModal(){
     <button onclick="cleanupSortMode='stable';openCleanupModal()" style="background:${cleanupSortMode==='stable'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='stable'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">Stable ID</button>
     <button onclick="cleanupSortMode='cp';openCleanupModal()" style="background:${cleanupSortMode==='cp'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='cp'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">CP ↓</button>
     <button onclick="cleanupSortMode='iv';openCleanupModal()" style="background:${cleanupSortMode==='iv'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='iv'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">IV% ↓</button>
+    <button onclick="cleanupSortMode='scan';openCleanupModal()" style="background:${cleanupSortMode==='scan'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='scan'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">Scan Date ↓</button>
   </div>
   <div class="mark-special-date-row">
     <span>From:</span>
