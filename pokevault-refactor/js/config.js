@@ -161,7 +161,7 @@ const FORM_NICK_PREFIXES = {
   'Garden':'Grdn', 'Elegant':'Elgt', 'Icy Snow':'IcyS', 'Marine':'Marn',
   'Modern':'Modn', 'Monsoon':'Mnsn', 'Ocean':'Ocen', 'River':'Rivr',
   'Sandstorm':'Sand', 'Savanna':'Savn', 'Sun':'Sun', 'Jungle':'Jngl',
-  'Archipelago':'Arch', 'High Plains':'HiPl', 'Pokéball':'PBal', 'Fancy':'Fanc',
+  'Archipelago':'Arch', 'High Plains':'HiPl', 'Poké Ball':'PBal', 'Fancy':'Fanc',
   // Flabébé / Floette / Florges colours intentionally OMITTED (#55): these are DECORATIVE
   // forms (fixed at catch, evolution is automatic) so the colour must NOT appear in the nick
   // — a Blue Florges reads 'FlorgesⓊ100', not 'BlueⓊ100'. The colour is still selectable in

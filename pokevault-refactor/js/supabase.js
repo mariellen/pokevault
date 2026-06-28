@@ -426,8 +426,9 @@ function applyOverridesToPokemon() {
       if (!['keep','protected'].includes(p.decision)) p.decision = 'keep';
     }
     if (ov.is_costumed) p.isCostumed = true;
-    if (ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
-    if (ov.special_form) p.specialForm = ov.special_form;
+    // #64: normalize legacy form strings (e.g. 'Poke Ball' → 'Poké Ball') on read.
+    if (ov.vivillon_pattern) p.vivillonPattern = (typeof normalizeFormString==='function') ? normalizeFormString(ov.vivillon_pattern) : ov.vivillon_pattern;
+    if (ov.special_form) p.specialForm = (typeof normalizeFormString==='function') ? normalizeFormString(ov.special_form) : ov.special_form;
     if (ov.manual_decision) p.manualDecision = ov.manual_decision;
     if (ov.notes) p.notes = ov.notes;
     // Recompute the suggested nick when a nick-affecting flag changed, then apply

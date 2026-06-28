@@ -149,9 +149,9 @@ const BEST_MOVES = {
 // FORM UTILITIES
 // ═══════════════════════════════════════════════
 const FORM_DROPDOWNS = {
-  Vivillon:   ['Unknown','Archipelago','Continental','Elegant','Fancy','Garden','High Plains','Icy Snow','Jungle','Marine','Meadow','Modern','Monsoon','Ocean','Polar','River','Sandstorm','Savanna','Sun','Tundra','Poke Ball'],
-  Scatterbug: ['Unknown','Archipelago','Continental','Elegant','Fancy','Garden','High Plains','Icy Snow','Jungle','Marine','Meadow','Modern','Monsoon','Ocean','Polar','River','Sandstorm','Savanna','Sun','Tundra','Poke Ball'],
-  Spewpa:     ['Unknown','Archipelago','Continental','Elegant','Fancy','Garden','High Plains','Icy Snow','Jungle','Marine','Meadow','Modern','Monsoon','Ocean','Polar','River','Sandstorm','Savanna','Sun','Tundra','Poke Ball'],
+  Vivillon:   ['Unknown','Archipelago','Continental','Elegant','Fancy','Garden','High Plains','Icy Snow','Jungle','Marine','Meadow','Modern','Monsoon','Ocean','Polar','River','Sandstorm','Savanna','Sun','Tundra','Poké Ball'],
+  Scatterbug: ['Unknown','Archipelago','Continental','Elegant','Fancy','Garden','High Plains','Icy Snow','Jungle','Marine','Meadow','Modern','Monsoon','Ocean','Polar','River','Sandstorm','Savanna','Sun','Tundra','Poké Ball'],
+  Spewpa:     ['Unknown','Archipelago','Continental','Elegant','Fancy','Garden','High Plains','Icy Snow','Jungle','Marine','Meadow','Modern','Monsoon','Ocean','Polar','River','Sandstorm','Savanna','Sun','Tundra','Poké Ball'],
   'Flabébé':  ['Unknown','Red','Yellow','Orange','Blue','White'],
   Floette:    ['Unknown','Red','Yellow','Orange','Blue','White'],
   Florges:    ['Unknown','Red','Yellow','Orange','Blue','White'],
@@ -166,13 +166,20 @@ const FORM_DROPDOWNS = {
   Squawkabilly: ['Unknown','Green Plumage','Blue Plumage','Yellow Plumage','White Plumage'],
 };
 
+// #64: legacy form-string aliases. Before v3.5.64 the Poké Ball Vivillon pattern was stored
+// inconsistently ('Poke Ball' / 'Pokéball'); applied on the override READ path so an
+// already-set form still matches COLLECTION_SETS / FORM_NICK_PREFIXES (no Supabase migration
+// needed). New writes from the Set Forms dropdown are already canonical.
+const FORM_STRING_ALIASES = { 'Poke Ball': 'Poké Ball', 'Pokéball': 'Poké Ball' };
+function normalizeFormString(s) { return (s && FORM_STRING_ALIASES[s]) || s; }
+
 const FORM_SEARCH = {
   'Polar':'polar','Marine':'marine','Savanna':'savanna','Jungle':'jungle',
   'Meadow':'meadow','Modern':'modern','Tundra':'tundra','Continental':'continental',
   'Garden':'garden','Elegant':'elegant','Icy Snow':'icysnow','Monsoon':'monsoon',
   'High Plains':'highplains','River':'river','Sandstorm':'sandstorm',
   'Sun':'sun','Archipelago':'archipelago','Ocean':'ocean','Fancy':'fancy',
-  'Poke Ball':'pokeball','Red':'red flower','Yellow':'yellow flower',
+  'Poké Ball':'pokeball','Red':'red flower','Yellow':'yellow flower',
   'Orange':'orange flower','Blue':'blue flower','White':'white flower',
   'West Sea':'west','East Sea':'east',
   'Plant Cloak':'plant','Sandy Cloak':'sandy','Trash Cloak':'trash',
