@@ -10,7 +10,25 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Dmax/Gmax nicks use terminal evolution (#60, v3.5.63)
+### Per-form collection keepers (#64, v3.5.64)
+**Status:** Implemented on `feature/per-form-collection-keepers` (OPUS-FIRST, from main post-#63).
+Keeps the best IV of EACH tagged form (was top-N by IV → rare forms dropped); grey star sub-90,
+green ≥90, gold favourite; nick is `NameⓇ{IV%}` (no colour prefix, #55). Fixed the four-way
+Poké Ball string split + legacy read-path normalisation. Badge now shows "N/M patterns · missing:
+…". **⚠️ One judgment call to review:** the brief said "don't change PvP slot assignment," but its
+own example (`SquawkabⓇ84`) requires it — Master rank = IV%, so collection species were getting
+pulled into Master (`Ⓜ`/review). I **excluded cosmetic collection-form species from IV-based
+Master** so they render `Ⓡ` keepers; real Great/Ultra wins untouched. Push back if you'd rather
+they show `Ⓜ`. Suite: **813 passed** (+11 new; no existing assertion changed; 4 failures = the
+pre-existing untracked `csp.test.js` thread). v3.5.63 → v3.5.64.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/66 — and confirm the
+Master-exclusion judgment call is what you want. Then set forms on your Squawkabilly and check
+Blue/White each get a keeper + the "missing: …" badge. See
+`reviews/per-form-collection-keepers-impl-summary.md`.
+_Updated: 28 Jun 2026_
+
+### Dmax/Gmax nicks use terminal evolution (#60, v3.5.63) — ✅ MERGED (PR #63)
 **Status:** Implemented on `feature/dmax-gmax-terminal-evo` (from main, post-#62). Confirmed via
 your real CSV row: `ElectabuⓂ96Ⓓ` happens because Pokégenie recommends NO PvP evo (Name(G/U)=
 Electabuzz), so base falls back to the species — the handlers already use the evolved base. New
