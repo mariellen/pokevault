@@ -52,4 +52,4 @@ is a raid power-up, so it should still show the final evolution.
   was terminal-evo resolution + the 2 fixture updates. #59/#61 shipped separately in v3.5.62.
 
 ## PR
-https://github.com/mariellen/pokevault/pull/<TBD>
+https://github.com/mariellen/pokevault/pull/63
