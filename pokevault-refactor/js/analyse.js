@@ -841,8 +841,8 @@ function analyse(rows) {
       if (ov.is_dynamax) p.isDynamax = true;
       if (ov.is_gigantamax) p.isGigantamax = true;
       if (ov.is_costumed) p.isCostumed = true;
-      if (ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
-      if (ov.special_form) p.specialForm = ov.special_form;
+      if (ov.vivillon_pattern) p.vivillonPattern = normalizeFormString(ov.vivillon_pattern);
+      if (ov.special_form) p.specialForm = normalizeFormString(ov.special_form);
     });
   }
 
@@ -1487,6 +1487,36 @@ function analyse(rows) {
         const maxRank = Math.max(p.rankPctG||0, p.rankPctU||0, p.rankPctL||0, p.rankPctM||0);
         p.formUnset = !!(targetsFormSet && !p.specialForm && maxRank >= 90);
       }
+      // Collection species (#64): keep the BEST IV of EACH tagged form (was top-N by IV across
+      // the whole species, which left rare forms unrepresented — e.g. only Green/Yellow
+      // Squawkabilly kept, Blue/White dropped). Bucket by the set form (specialForm||
+      // vivillonPattern); the m.name===p.name guard stops Deerling and Sawsbuck — which share a
+      // family — from cross-contaminating each other's per-form keepers. Untagged members (no
+      // form set) are skipped here and fall through to the "set pattern" review path below.
+      // Runs BEFORE the dustCostBest / hasLeagueSlot computation so the Master strip is seen.
+      if (COLLECTION_SETS && COLLECTION_SETS[p.name]) {
+        const form = p.specialForm || p.vivillonPattern;
+        if (form) {
+          const sameForm = members.filter(m => m.name === p.name
+            && (m.specialForm || m.vivillonPattern) === form);
+          const best = sameForm.sort((a,b) =>
+            (b.ivAvg||0) - (a.ivAvg||0)
+            || (b.isFavorite?1:0) - (a.isFavorite?1:0)
+            || (b.cp||0) - (a.cp||0))[0];
+          if (best === p && !p.slots.includes('collection')) p.slots.push('collection');
+        }
+        // Cosmetic collection-form species are kept PER FORM (NameⓇ{IV%} collection keepers),
+        // never as IV-based Master mons — strip the Master slot + affordability winner flags the
+        // PvP passes assigned them (Master rank = IV%, so every species "qualifies"), so they
+        // render Ⓡ collection keepers, not Ⓜ/cyan/blue, and skip the Master-review branch below.
+        // Real Great/Ultra rank wins (form-blind PvP) are untouched. (The ML grey-placeholder
+        // pass also excludes these species.)
+        p.slots = p.slots.filter(s => s !== 'M' && s !== 'M_tentative');
+        p.wonMasterSlot = false;
+        p.isAffordableWinner = false;
+        p.isExpensiveWinner = false;
+      }
+
       // Fix dustCostBest to use the dust for the assigned league slot
       const leagueSlot = p.slots.find(s=>['L','G','U','M'].includes(s));
       if (leagueSlot === 'L' && p.dustL > 0) p.dustCostBest = p.dustL;
@@ -1505,15 +1535,6 @@ function analyse(rows) {
       const hasAffordableBackup=p.slots.some(s=>s.endsWith('_affordable'));
       const hasProtectedSlot=isLegendary&&p.slots.length>0;
       const qualifiesAny=RULES.leagues.some(l=>(p[`rankPct${l}`]||0)>=RULES.keepThreshold);
-
-      // Collection species: slot top N by IV%
-      if (COLLECTION_SETS && COLLECTION_SETS[p.name]) {
-        const cset = COLLECTION_SETS[p.name];
-        const sorted = [...members].sort((a,b) => (b.ivAvg||0)-(a.ivAvg||0));
-        if (sorted.indexOf(p) < cset.target && !p.slots.includes('collection')) {
-          p.slots.push('collection');
-        }
-      }
 
       if (p.slots.includes('nundo')) {
         p.decision='keep'; p.reason='Nundo — 0/0/0';
@@ -1591,13 +1612,18 @@ function analyse(rows) {
       } else if (p.slots.includes('purified')) {
         p.decision='keep'; p.reason='Best purified';
         p.nickname=buildNickname(p,'review');
-      } else if (qualifiesAny) {
+      } else if (qualifiesAny && !p.slots.includes('collection')) {
+        // #64: a per-form collection keeper (best of its tagged form) must be KEPT even when its
+        // IV clears keepThreshold but it lost the form-blind, IV-based Master race to a
+        // higher-IV sibling — otherwise the rarer forms fall to "review" instead of keep. Let it
+        // fall through to the collection branch. (The overall-best still wins Master via the
+        // hasLeagueSlot branch above; PvP slot assignment itself is unchanged.)
         p.decision='review'; p.reason='≥90% but not best in family — review';
         p.nickname=buildNickname(p,'review');
       } else if (p.slots.includes('collection')) {
         p.decision='keep';
-        const cset = COLLECTION_SETS && COLLECTION_SETS[p.name];
-        p.reason = cset ? `Collection — keeping ${cset.target} for full set` : 'Collection species';
+        const cForm = p.specialForm || p.vivillonPattern;
+        p.reason = cForm ? `Collection — best ${cForm} kept for full set` : 'Collection species';
         const pv = Math.round(p.rankPctM||p.ivAvg||0);
         p.nickname = fitName(p.name, LC.R+(pv>=100?PERFECT:String(pv)), '', 12);
         if (!p.slots.includes('collection_keep')) p.slots.push('collection_keep');
@@ -1631,8 +1657,8 @@ function analyse(rows) {
       if (ov && ov.is_dynamax) p.isDynamax = true;
       if (ov && ov.is_gigantamax) p.isGigantamax = true;
       if (ov && ov.is_costumed) p.isCostumed = true;
-      if (ov && ov.vivillon_pattern) p.vivillonPattern = ov.vivillon_pattern;
-      if (ov && ov.special_form) p.specialForm = ov.special_form;
+      if (ov && ov.vivillon_pattern) p.vivillonPattern = normalizeFormString(ov.vivillon_pattern);
+      if (ov && ov.special_form) p.specialForm = normalizeFormString(ov.special_form);
       if (ov && ov.notes) p.notes = ov.notes;
 
       // Suggest star: only confirmed best, lucky, best shiny, protected, nundo
@@ -1658,7 +1684,11 @@ function analyse(rows) {
             // → keep, no star". The won*Master power-up candidates are starred below.
             p.slots.includes('best_overall') ||
             p.wonDynamaxMaster ||
-            p.wonGigantamaxMaster
+            p.wonGigantamaxMaster ||
+            // #64: a per-form collection keeper earns a star when it's a power-up candidate
+            // (IV ≥ keepThreshold → green) or favourited (→ gold). Sub-threshold collection
+            // keepers get a grey star via the ladder precedence below (no suggestStar).
+            (p.slots.includes('collection') && ((p.ivAvg||0) >= RULES.keepThreshold || p.isFavorite))
           )) ||
           isProtectedBest ||
           (p.isLucky && !p.luckyNonWinner) ||  // Change 8: a losing Lucky earns no star
@@ -1696,6 +1726,10 @@ function analyse(rows) {
       if (p.gmaxSuppressedHundo) p.starType = 'grey';
       else if (p.luckyNonWinner) p.starType = 'none';
       else if (p.formUnset) p.starType = 'formset'; // #39 Burmy cloak carve-out — overrides gold/red
+      // #64: a sub-threshold per-form collection keeper (no PvP/lucky/shiny reason → suggestStar
+      // false) gets a grey star — kept for collection completeness, not a power-up priority.
+      // Favourited or IV≥90 collection keepers set suggestStar above and fall through to gold/green.
+      else if (p.slots.includes('collection') && !p.suggestStar && !p.suggestStarCheaper && !p.isShiny) p.starType = 'grey';
       else if (p.suggestStar && p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'gold';
       else if (p.suggestStar && !p.isFavorite && !p.suggestStarCheaper && (!p.isShiny || hasRealSlot)) p.starType = 'green';
       else if (p.suggestStarExpensive && p.isFavorite) p.starType = 'gold';
@@ -2014,8 +2048,10 @@ function analyse(rows) {
       const holdsSlot = m => m.slots.some(s =>
         RULES.leagues.includes(s) || s.endsWith('_tentative') || s.endsWith('_affordable'));
       if (!hasConfirmedMlKeeper) {
-        // Only slot-less members can RECEIVE the grey placeholder.
-        const slotless = members.filter(m => notConfirmedWinner(m) && !holdsSlot(m));
+        // Only slot-less members can RECEIVE the grey placeholder. #64: cosmetic collection-form
+        // species are excluded — they're per-form Ⓡ keepers, never IV-based Master placeholders.
+        const slotless = members.filter(m => notConfirmedWinner(m) && !holdsSlot(m)
+          && !(typeof COLLECTION_SETS !== 'undefined' && COLLECTION_SETS[m.name]));
         // Highest IV among already-surfaced (tentative-slot) non-winners — the grey star only
         // fires if the best slot-less candidate strictly out-IVs all of them (else they already
         // represent the family's best Master candidate; greying a weaker member is the #24 bug:

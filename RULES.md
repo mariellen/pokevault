@@ -133,7 +133,7 @@ implemented in the decision/nick block of `analyse.js`.)
 | 10 | `shadow` slot | `keep` | `Best shadow — keep for raids/Master League` |
 | 11 | `purified` slot | `keep` | `Best purified` |
 | 12 | Qualifies in any league (≥90%) but not best in family | `review` | `≥90% but not best in family — review` |
-| 13 | `collection` slot | `keep` | `Collection — keeping N for full set` |
+| 13 | `collection` slot | `keep` | `Collection — best <form> kept for full set` |
 | 14 | `isLucky` fallthrough (no slot above) | `keep` | `Lucky — always keep (Master/Raid candidate)` |
 | 15 | Hundo (15/15/15) fallthrough | `keep` | `Hundo (15/15/15) — always keep` (sets `suggestStar=true`) |
 | 16 | Everything else | `trade` | `IV X% — not best in any slot` |
@@ -258,7 +258,7 @@ self-flag path only, not on the blue/expensive path).
 | `dynamax` | Assigned to **every** Dynamax without a capped league slot, kept as a raid candidate (`NameⓇ{IV%}Ⓓ`, IV-based — **no star**). The best-IV Dynamax per max-evo target additionally gets `wonDynamaxMaster` → `NameⓂ{IV%}Ⓓ` (Master power-up candidate, starred), even if it also holds a capped slot. Dynamax **compete with normals in the same capped pool** (best rounded rank wins; type-priority breaks exact ties — see §3 tiebreak) and are excluded from the regular Master pass. |
 | `gigantamax` | Full parity with `dynamax` (v3.5.54). Assigned to **every** Gigantamax without a capped league slot (`NameⓇ{IV%}Ⓧ`, IV-based — **no star**). The best-IV Gigantamax per max-evo target gets `wonGigantamaxMaster` → `NameⓂ{IV%}Ⓧ` (Master power-up candidate, starred), even if it also holds a capped slot. Gmax compete with normals in the capped pool and are excluded from the regular Master pass. |
 | `best_overall` | Best-IV per species with no confirmed league slot — **all species** (legendary and non-legendary; non-legendaries must qualify ≥90% in some league and have no confirmed family keeper unless `masterDemoted`). Nick: `NameⓇ{IV%}` |
-| `collection` / `collection_keep` | Top N by IV% for `COLLECTION_SETS` species |
+| `collection` / `collection_keep` | Best IV per tagged form for `COLLECTION_SETS` species (#64) |
 
 Shadow / purified / lucky are **separate slot groups** — a shadow Great winner and a regular
 Great winner coexist in the same family. **Gender-dimorphic** species get separate slot
@@ -388,10 +388,27 @@ Gmax, Dmax, and Normal serve non-substitutable Master roles (different Max Battl
 ### Costumed
 - `isCostumed=true` (override) → `suggestStar=true` always.
 
-### Collection species (`COLLECTION_SETS`)
-- Top N by `ivAvg` (N = `cset.target`) → `collection` slot.
-- No `specialForm`/`vivillonPattern` set → `review` to prompt the user.
-- Nick: `NameⓇ{IV%}`.
+### Collection species (`COLLECTION_SETS`) — per-form keepers (#64, v3.5.64)
+- **Keep the BEST IV of EACH tagged form**, bucketed by `specialForm||vivillonPattern` (was
+  top-N by IV across the whole species, which left rare forms unrepresented). The
+  `m.name === p.name` guard stops Deerling and Sawsbuck (same family) from cross-contaminating.
+- **Cosmetic collection-form species are NOT IV-based Master mons.** Master rank = IV%, so every
+  species "qualifies"; the per-form keeper strips any `M`/`M_tentative` slot + affordability
+  winner flags and is excluded from the ML grey-placeholder pass, so they render `NameⓇ{IV%}`
+  collection keepers — never `Ⓜ`/cyan/blue. **Real Great/Ultra rank wins are untouched**
+  (form-blind PvP — a Green Plumage that wins GL still gets its `Ⓖ` slot).
+- **Star:** favourited → gold; `ivAvg ≥ keepThreshold (90)` → green (power-up candidate);
+  else → grey (collection-only, not a power-up priority).
+- No `specialForm`/`vivillonPattern` set → `review` to prompt the user ("set pattern").
+- Nick: `NameⓇ{IV%}` — the **species** name, no colour/form prefix (decorative forms, #55), so a
+  Blue Florges at 84% is `FlorgesⓇ84` (grey), not `BlueⓇ84`.
+- **Lucky/shiny** of a form keep via their own always-keep rules (per form) — orthogonal to the
+  collection keeper.
+- **Form strings** are canonical across `FORM_DROPDOWNS`/`COLLECTION_SETS`/`FORM_NICK_PREFIXES`
+  (the four-way `Poké Ball` split was fixed in v3.5.64); legacy stored values are normalised on
+  the override read path via `normalizeFormString`.
+- **Missing-form badge** (`app.js`): the family header shows `N/M patterns · missing: …` (inline
+  list capped at 3; full list in the tooltip), keyed by the same form bucket as the keeper.
 
 ---
 

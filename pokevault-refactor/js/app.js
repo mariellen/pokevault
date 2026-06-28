@@ -703,9 +703,16 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const collBadge = collSet ? (() => {
     const havePatterns = new Set(members.map(p=>p.specialForm||p.vivillonPattern).filter(Boolean));
     const totalPatterns = collSet.forms.length;
+    // #64: which canonical forms have no tagged member yet → surface for collection completeness.
+    // Same specialForm||vivillonPattern key as the keeper, so they agree by construction (and the
+    // Poké Ball string fix means a set form no longer reads as missing). Cap the inline list to 3
+    // so a 20-pattern Vivillon header stays readable — the full list lives in the tooltip.
+    const missing = collSet.forms.filter(f => !havePatterns.has(f));
     const col = havePatterns.size >= totalPatterns ? 'var(--green)'
                : havePatterns.size >= totalPatterns * 0.7 ? 'var(--gold)' : 'var(--muted)';
-    return `<span style="color:${col};font-size:10px;margin-left:4px" title="${havePatterns.size}/${totalPatterns} ${collSet.label} identified (${members.length} total)">[${havePatterns.size}/${totalPatterns} patterns${members.length>havePatterns.size?' · '+members.length+' total':''}]</span>`;
+    const missingInline = missing.length && missing.length <= 3 ? ' · missing: ' + missing.join(', ') : '';
+    const missingTip = missing.length ? ' — missing: ' + missing.join(', ') : '';
+    return `<span style="color:${col};font-size:10px;margin-left:4px" title="${havePatterns.size}/${totalPatterns} ${collSet.label} identified (${members.length} total)${missingTip}">[${havePatterns.size}/${totalPatterns} patterns${missingInline}${members.length>havePatterns.size?' · '+members.length+' total':''}]</span>`;
   })() : '';
 
   const thead=`<thead><tr>
