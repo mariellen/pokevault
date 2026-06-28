@@ -10,7 +10,25 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Known-form dropdowns (#48) + decision-only nick prefix (#55, v3.5.61)
+### Set Forms scan-date sort (#59) + JS cache-busting (#61, v3.5.62)
+**Status:** Implemented on `feature/scan-sort-and-cache-busting` (from main, post-#57).
+#59: added a "Scan Date ↓" sort to the 🎨 Set Forms modal (most-recent scan first). #61: the
+"Squawkabilly/Deerling show free text" report was a **stale cached `data.js`** — your hard refresh
+fixed it; the dropdown code already keyed off FORM_DROPDOWNS (#57). To stop it recurring, all local
+css/js now load with `?v=3.5.62` cache-busting (future bumps must bump these too — documented in
+CLAUDE.md + index.html). Suite: **797 passed** (4 failures = the pre-existing untracked
+`csp.test.js` thread). v3.5.61 → v3.5.62.
+**#60 (Dmax/Gmax evolved-name nick) deferred:** the handlers already use the evolved base; the
+base-name case only happens when Pokégenie recommends no league evo, and the existing
+dynamax_master tests assert the base name. Waiting on a real mis-nicking example from you before
+scoping it (needs terminal-evo resolution + test rewrites).
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/62 . When you find the
+Dmax/Gmax naming example, paste the species + its `Name (G)`/`Name (U)` and I'll scope #60. See
+`reviews/scan-sort-and-cache-busting-impl-summary.md`.
+_Updated: 28 Jun 2026_
+
+### Known-form dropdowns (#48) + decision-only nick prefix (#55, v3.5.61) — ✅ MERGED (PR #57)
 **Status:** Implemented on `feature/known-forms-and-decision-prefix` (from main, post-#54).
 #48: Deerling/Sawsbuck/Squawkabilly added to FORM_DROPDOWNS + FORM_SEARCH + COLLECTION_SETS;
 the main-list per-row form box is now a dropdown for known-form species; `setOverride` writes

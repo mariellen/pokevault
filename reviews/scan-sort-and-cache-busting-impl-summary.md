@@ -47,4 +47,4 @@ The cache-busting prevents that class of "stale JS after deploy" from recurring.
   was already done in #57 (would have been a no-op). #60 deferred per discussion.
 
 ## PR
-https://github.com/mariellen/pokevault/pull/<TBD>
+https://github.com/mariellen/pokevault/pull/62
