@@ -74,16 +74,21 @@ describe('Dynamax Master Ⓜ — Electabuzz golden case', () => {
       .pokemon.filter(p => p.name === 'Electabuzz');
   });
 
-  it('best Dynamax (96% IV) → ElectabuⓂ96Ⓓ (Master power-up candidate)', () => {
+  it('best Dynamax (96% IV) → ElectiviⓂ96Ⓓ (Master power-up candidate, evolved target #60)', () => {
     const p = find(mons, 1326);
     expect(p).toBeDefined();
     expect(p.isDynamax).toBe(true);
     expect(p.wonDynamaxMaster).toBe(true);
     expect(p.decision).toBe('keep');
-    expect(p.nickname).toBe('ElectabuⓂ96Ⓓ');
+    // #60: Pokégenie recommends no PvP evolution (Name(G/U)=Electabuzz), but a Dmax is a raid
+    // power-up → the nick shows the terminal evo (Electivire) resolved via VALID_EVOLUTIONS.
+    expect(p.nickname).toBe('ElectiviⓂ96Ⓓ');
     expect(p.nickname).not.toContain('Ⓡ');
   });
 
+  // #60 scope: this Dmax ALSO wins an Ultra PvP slot, so it routes through the L/G/U handler
+  // (not the dmax slot) and keeps its Pokégenie-recommended unevolved name — only Master /
+  // slot-less Dmax+Gmax get the terminal-evo treatment.
   it('Dynamax that wins an Ultra slot (89% IV) → ElectabuⓊ95Ⓓ (Ⓤ, not Ⓜ, not Ⓡ)', () => {
     const p = find(mons, 1310);
     expect(p).toBeDefined();
@@ -95,12 +100,13 @@ describe('Dynamax Master Ⓜ — Electabuzz golden case', () => {
     expect(p.nickname).not.toContain('Ⓡ');
   });
 
-  it('slot-less Dynamax (87% IV) → ElectabuⓇ87Ⓓ (keep as raid candidate)', () => {
+  it('slot-less Dynamax (87% IV) → ElectiviⓇ87Ⓓ (keep as raid candidate, evolved target #60)', () => {
     const p = find(mons, 1303);
     expect(p).toBeDefined();
     expect(p.wonDynamaxMaster).toBeFalsy();
     expect(p.decision).toBe('keep');
-    expect(p.nickname).toBe('ElectabuⓇ87Ⓓ');
+    // #60: slot-less Dmax routes through the dynamax slot → terminal evo (Electivire).
+    expect(p.nickname).toBe('ElectiviⓇ87Ⓓ');
     expect(p.nickname).not.toContain('Ⓜ');
   });
 
@@ -274,5 +280,35 @@ describe('Dynamax are always kept — never traded', () => {
     expect(raid.slots).toContain('dynamax');
     expect(raid.nickname).toContain('Ⓡ');
     expect(raid.nickname).toContain('Ⓓ');
+  });
+});
+
+// #60 — terminalEvo fallback for Dmax/Gmax when Pokégenie recommends no league evo
+// (evolvedName* empty so base === species). Exercised directly via buildNickname.
+describe('Dmax/Gmax terminal-evo fallback (#60)', () => {
+  const { buildNickname } = loader;
+  const dmax = (name, form='') => buildNickname({
+    name, form, atkIV:14, defIV:15, staIV:14, ivAvg:96, isDynamax:true,
+    wonDynamaxMaster:true, slots:['dynamax'], evolvedNameG:'', evolvedNameU:'', evolvedNameL:'',
+    evolvedFormG:'', evolvedFormU:'', evolvedFormL:'', rankPctM:96, rankPctU:0, rankPctG:0, rankPctL:0,
+    hasAllBestMoves:false, hasTwoMoves:false, hasBestMoves:false,
+  }, 'dynamax');
+
+  it('single-line mid-evo resolves to terminal: Electabuzz → Electivi…', () => {
+    expect(dmax('Electabuzz')).toBe('ElectiviⓂ96Ⓓ');
+    expect(dmax('Magmar')).toBe('MagmortaⓂ96Ⓓ');
+  });
+  it('already-final species unchanged: Snorlax', () => {
+    expect(dmax('Snorlax')).toBe('SnorlaxⓂ96Ⓓ');
+  });
+  it('branching family keeps base name (never guesses): Eevee', () => {
+    expect(dmax('Eevee')).toBe('EeveeⓂ96Ⓓ');
+  });
+  it('regional form resolves via form key: Galar Meowth → Perrserker, Hisui Growlithe → Arcanine', () => {
+    expect(dmax('Meowth', 'Galar')).toBe('PerrserkⓂ96Ⓓ');
+    expect(dmax('Growlithe', 'Hisui')).toBe('ArcanineⓂ96Ⓓ');
+  });
+  it('normal form excludes regional-claimed targets: Kanto Meowth → Persian (not the union)', () => {
+    expect(dmax('Meowth')).toBe('PersianⓂ96Ⓓ');
   });
 });

@@ -322,6 +322,13 @@ that league's `rankPct` is ignored and no slot is assigned for that league.
   - **Other Dynamax that win a capped league slot** → `NameⒼ/Ⓤ/ⓛ{rank}Ⓓ`.
   - **Other Dynamax with no slot** → `NameⓇ{IV%}Ⓓ` (IV-based) — kept as a raid candidate,
     **no star**.
+  - **Nick `Name` = the final evolution** even when Pokégenie recommends staying unevolved for
+    PvP (#60, v3.5.63). A Dmax/Gmax is a raid power-up, so a Dmax Electabuzz whose `Name (G/U)`
+    is just `Electabuzz` still nicks `ElectiviⓂ96Ⓓ`. Resolved by `terminalEvo()` from
+    `VALID_EVOLUTIONS`, form-aware (Galar Meowth→Perrserker, Hisui Growlithe→Arcanine, Kanto
+    Meowth→Persian via regional-target exclusion). Applies **only** to the `dynamax`/`gigantamax`
+    slots; branching families with no Pokégenie evo (Eevee) keep the base name; and a Dmax that
+    *wins a capped PvP slot* routes through the L/G/U handler and keeps its Pokégenie name.
 - **Dynamax COMPETE with regular Pokémon for capped league slots** (v3.5.54 — reverses the
   PR #27 `|dynamax` sub-group). Best rounded rank wins; an exact rounded-rank tie is broken
   by the type-priority ladder (Dmax (3) > Normal (1) — see §3). A Dmax that loses on rank

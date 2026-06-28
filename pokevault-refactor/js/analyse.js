@@ -171,6 +171,33 @@ function applyNickOverride(p, ov, suggestedNick) {
   return p;
 }
 
+// #60: resolve a species' single TERMINAL evolution via VALID_EVOLUTIONS, form-aware.
+// Used only as a fallback for Dmax/Gmax nicks when Pokégenie recommended no league evo.
+//   • Regional form (Alola/Galar/Hisui/Paldea) → use the 'Name|Form' chain
+//     (Galar Meowth → Perrserker, Hisui Growlithe → Arcanine|Hisui).
+//   • Normal form → use the base chain, MINUS any targets claimed by this species' regional
+//     form keys (so Kanto Meowth → Persian, not the Persian/Perrserker union). Every other
+//     regional base key is already normal-only, so this only matters for Meowth.
+//   • The terminal is the target that itself has no further evolution. If the chain branches
+//     to >1 terminal (Eevee, Kanto Meowth after a future data change), return the input name
+//     unchanged — never guess. Returned 'Name|Form' targets are pipe-stripped by the caller.
+function terminalEvo(name, form) {
+  if (typeof VALID_EVOLUTIONS === 'undefined' || !name) return name;
+  const REGIONAL = ['Alola', 'Galar', 'Hisui', 'Paldea'];
+  const isFinal = n => { const sub = VALID_EVOLUTIONS[n] || VALID_EVOLUTIONS[n.split('|')[0]]; return !sub || !sub.length; };
+  let targets;
+  if (form && REGIONAL.includes(form)) {
+    targets = VALID_EVOLUTIONS[name + '|' + form] || VALID_EVOLUTIONS[name] || [];
+  } else {
+    const claimed = new Set();
+    REGIONAL.forEach(f => (VALID_EVOLUTIONS[name + '|' + f] || []).forEach(t => claimed.add(t)));
+    targets = (VALID_EVOLUTIONS[name] || []).filter(t => !claimed.has(t));
+  }
+  if (!targets.length) return name;
+  const finals = targets.filter(isFinal);
+  return finals.length === 1 ? finals[0] : name;
+}
+
 function buildNickname(p, slot, convention) {
   const iv = Math.round(p.ivAvg||0);
   const atkIV=p.atkIV||0, defIV=p.defIV||0, staIV=p.staIV||0;
@@ -202,6 +229,14 @@ function buildNickname(p, slot, convention) {
   else if (slot==='M' || slot==='dynamax' || slot==='gigantamax') {
     base=p.evolvedNameU||p.evolvedNameG||p.name;
     evolvedFormForSlot=p.evolvedFormU||p.evolvedFormG||'';
+    // #60: Dmax/Gmax are raid power-ups, so show the FINAL evolution even when Pokégenie
+    // recommends staying unevolved for PvP (Name(G/U)=base → evolvedName* empty → base fell
+    // back to the species, e.g. Electabuzz). Only the dmax/gmax slots (Master keeps its
+    // PvP-recommended evo), only when base wasn't already an evo, and only when the terminal
+    // evolution is unambiguous — branching families (Eevee, Kanto Meowth) keep the base name.
+    if ((slot==='dynamax'||slot==='gigantamax') && base===p.name && typeof terminalEvo==='function') {
+      base = terminalEvo(p.name, p.form);
+    }
   }
   // Burmy→Wormadam carve-out (#39): the evo-target cloak is catch-locked and unknowable
   // pre-evolution (Pokégenie defaults to 'Plant'). Suppress the evo-target form prefix so we

@@ -10,7 +10,22 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Set Forms scan-date sort (#59) + JS cache-busting (#61, v3.5.62)
+### Dmax/Gmax nicks use terminal evolution (#60, v3.5.63)
+**Status:** Implemented on `feature/dmax-gmax-terminal-evo` (from main, post-#62). Confirmed via
+your real CSV row: `ElectabuⓂ96Ⓓ` happens because Pokégenie recommends NO PvP evo (Name(G/U)=
+Electabuzz), so base falls back to the species — the handlers already use the evolved base. New
+`terminalEvo(name, form)` resolves the final evo from VALID_EVOLUTIONS (form-aware: Galar Meowth→
+Perrserker, Kanto Meowth→Persian via regional-target exclusion; branching Eevee keeps base name).
+Applied to dmax/gmax slots only → a raid Electabuzz now nicks `ElectiviⓂ96Ⓓ`; a Dmax that wins a
+capped PvP slot keeps its (unevolved) Ultra name. Suite: **802 passed** (+5 guard tests; 2 dmax
+assertions updated; 4 failures = pre-existing untracked `csp.test.js`). v3.5.62 → v3.5.63.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/63 , then confirm a
+raid-kept Dmax (no PvP evo) shows the final-evo name. See
+`reviews/dmax-gmax-terminal-evo-impl-summary.md`. This closes the #59/#61/#60 UI batch.
+_Updated: 28 Jun 2026_
+
+### Set Forms scan-date sort (#59) + JS cache-busting (#61, v3.5.62) — ✅ MERGED (PR #62)
 **Status:** Implemented on `feature/scan-sort-and-cache-busting` (from main, post-#57).
 #59: added a "Scan Date ↓" sort to the 🎨 Set Forms modal (most-recent scan first). #61: the
 "Squawkabilly/Deerling show free text" report was a **stale cached `data.js`** — your hard refresh
