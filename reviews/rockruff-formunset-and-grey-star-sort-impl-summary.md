@@ -54,4 +54,4 @@ keep its gold star and only the pure-review ones get 📝, that's a one-line gat
 v3.5.64 → v3.5.65.
 
 ## PR
-https://github.com/mariellen/pokevault/pull/<TBD>
+https://github.com/mariellen/pokevault/pull/70
