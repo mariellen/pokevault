@@ -498,6 +498,17 @@ value). `FORM_SET_REQUIRED_EVOS` (`config.js`, currently `{Wormadam}`) gates thi
   and a distinct **FORMSET 📝** star (`star-formset`, amber). Already-evolved Wormadam (real fixed
   form in the base Form column) is unaffected.
 
+### Rockruff form-choice formUnset (v3.5.65, #68)
+Rockruff's Lycanroc form (Midday/Midnight/Dusk) is a **user choice** GO decides at evolution time.
+`FORM_CHOICE_PREVOS` (`config.js`, `{Rockruff}`) is keyed on the **pre-evo** and used **only** for
+the `formUnset` indicator — it does NOT touch `slotEvoTarget`/nicks, so #39's `DayⒼ`/`NightⒼ`
+form-aware slotting on Rockruffs that WIN a capped slot is preserved. `formUnset` fires when a
+Rockruff has **no league slot at all** (`L/G/U/M`) — i.e. its nick would fall back to the formless
+`RockruffⓇ96`/review holding name — AND no `specialForm` AND `maxRank ≥ 90` (which already covers
+high-IV Master candidates via `rankPctM = ivAvg`). A Rockruff that wins any league slot keeps its
+Pokégenie-form keeper nick (`DayⓂ91`, `RockrⒼ100`); the no-league-slot gate also avoids a
+decision(`keep`)-vs-star(`📝`) split since the `hasLeagueSlot` branch runs before `formUnset`.
+
 ### Alt nicks
 When a Pokémon qualifies (≥90%) for both Great **and** Ultra with different evo targets, an
 alternate nick for the non-primary league is computed and shown in smaller UI text
@@ -557,9 +568,12 @@ Two sort functions, both in `app.js`:
 ```
 Gold(0) → Green(1) → Cyan(2) → Blue(3) → Grey(3.5) → Red(4) → Visibility(5) → None(6)
 ```
-The Grey ML-placeholder rank is a **half-integer (3.5)**, distinct from Blue (3, action
-needed), and **Cyan sorts ahead of Blue** — the reverse of the assignment order above. A
-shiny with no other star reason falls through to None(6) here. (Red requires `!isShiny`.)
+The Grey rank is a **half-integer (3.5)**, distinct from Blue (3, action needed), and **Cyan
+sorts ahead of Blue** — the reverse of the assignment order above. **All grey stars sort at 3.5
+(v3.5.65, #69)** — `pokemonStarRank` matches `p.starType === 'grey'` (collection sub-90 keepers,
+gmax-suppressed hundos) as well as the ML placeholder; before the fix, flag-less greys fell
+through to None(6). A shiny with no other star reason falls through to None(6) here. (Red requires
+`!isShiny` and now `starType !== 'grey'`.)
 
 **Family-level — `familyStarPriority(fam)`** (orders families in the list by their best
 member): `Gold(0) → Green(1) → Cyan(2) → Blue(3) → Shiny(4) → Red(5) → None(6)`. Note shiny

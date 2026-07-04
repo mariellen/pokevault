@@ -109,6 +109,15 @@ const GENDER_LOCKED_EVO = new Set(['Combee', 'Kirlia', 'Snorunt', 'Burmy']);
 // TARGET species (Wormadam), never on the base species name 'Burmy'.
 const FORM_SET_REQUIRED_EVOS = new Set(['Wormadam']);
 
+// #68: pre-evo species whose evolved battle form is a USER choice GO decides at evolution time
+// (Rockruff → Midday/Midnight/Dusk Lycanroc, time-of-day based). Unlike FORM_SET_REQUIRED_EVOS
+// this is keyed on the PRE-EVO name and is used ONLY for the formUnset indicator (📝) — it does
+// NOT touch slotEvoTarget or the nick prefix, so #39's DayⒼ/NightⒼ form-aware slotting on
+// Rockruffs that WIN a capped league slot is preserved. formUnset only fires when such a mon has
+// NO league slot at all (its nick would otherwise fall back to the formless 'RockruffⓇ96'/review
+// holding name) AND no user form is set AND it clears the keep threshold.
+const FORM_CHOICE_PREVOS = new Set(['Rockruff']);
+
 // ── Special family overrides ──────────────────────────────
 // Pokémon that need custom family grouping behaviour
 const FAMILY_OVERRIDES = {

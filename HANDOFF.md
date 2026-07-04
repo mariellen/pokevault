@@ -10,7 +10,25 @@ _Last updated: 21 Jun 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Per-form collection keepers (#64, v3.5.64)
+### Grey star sort (#69) + Rockruff formUnset (#68, v3.5.65)
+**Status:** Implemented on `feature/rockruff-formunset-grey-sort` (from main, post-#66). #69:
+`pokemonStarRank` now returns 3.5 for grey stars (were falling to the bottom); RULES.md already
+documented 3.5. #68: **the brief's approach was wrong** — I confirmed against your real export
+(`poke_genie_export 212.csv`) that Master Rockruffs do NOT have blank evo recs (all have
+Name(G/U)=Lycanroc+form), FORM_SET_REQUIRED_EVOS is target-keyed (adding 'Rockruff' is a no-op;
+'Lycanroc' breaks #39), and Part B was redundant. Redesigned: new `FORM_CHOICE_PREVOS={Rockruff}`
+(formUnset-only) fires 📝 when a Rockruff has no league slot + no form + IV≥90. Verified: #39
+winners (DayⓂ/RockrⒼ) unchanged, 28/81 real Rockruffs → 📝. **⚠️ Sign-off needed:** your best
+Rockruff CP402 (was gold RockruffⓇ96 best-overall) is now 📝 review — one-line tweak if you'd
+rather it keep gold. Suite: **822 passed** (+9; 4 failures = pre-existing untracked `csp.test.js`).
+v3.5.64 → v3.5.65.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/70 , and confirm the
+CP402-best-overall → 📝 behavior is what you want. See
+`reviews/rockruff-formunset-and-grey-star-sort-impl-summary.md`.
+_Updated: 4 Jul 2026_
+
+### Per-form collection keepers (#64, v3.5.64) — ✅ MERGED (PR #66)
 **Status:** Implemented on `feature/per-form-collection-keepers` (OPUS-FIRST, from main post-#63).
 Keeps the best IV of EACH tagged form (was top-N by IV → rare forms dropped); grey star sub-90,
 green ≥90, gold favourite; nick is `NameⓇ{IV%}` (no colour prefix, #55). Fixed the four-way
