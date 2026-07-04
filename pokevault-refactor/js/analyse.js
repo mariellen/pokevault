@@ -1484,8 +1484,16 @@ function analyse(rows) {
         const FSR = typeof FORM_SET_REQUIRED_EVOS !== 'undefined' ? FORM_SET_REQUIRED_EVOS : null;
         const targetsFormSet = FSR && [p.evolvedNameG, p.evolvedNameU, p.evolvedNameL]
           .some(n => n && FSR.has(n.split('|')[0]));
+        // #68: Rockruff-style form-choice pre-evos (Lycanroc form GO decides at evolution).
+        // Only fire when the mon holds NO league slot (L/G/U/M) — a Rockruff that WON a capped
+        // slot keeps its #39 form-aware nick (DayⒼ/NightⒼ) via the hasLeagueSlot branch, and
+        // gating on no-league-slot also avoids a decision(kept)-vs-star(📝) split. maxRank
+        // already includes rankPctM (=ivAvg), so high-IV Master candidates are covered.
+        const FCP = typeof FORM_CHOICE_PREVOS !== 'undefined' ? FORM_CHOICE_PREVOS : null;
+        const noLeagueSlot = !p.slots.some(s => RULES.leagues.includes(s));
+        const formChoiceUnset = !!(FCP && FCP.has(p.name) && noLeagueSlot);
         const maxRank = Math.max(p.rankPctG||0, p.rankPctU||0, p.rankPctL||0, p.rankPctM||0);
-        p.formUnset = !!(targetsFormSet && !p.specialForm && maxRank >= 90);
+        p.formUnset = !!((targetsFormSet || formChoiceUnset) && !p.specialForm && maxRank >= 90);
       }
       // Collection species (#64): keep the BEST IV of EACH tagged form (was top-N by IV across
       // the whole species, which left rare forms unrepresented — e.g. only Green/Yellow

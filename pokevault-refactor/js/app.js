@@ -112,8 +112,11 @@ function pokemonStarRank(p) {
   if (p.suggestStar && !p.isFavorite) return 1;
   if (p.suggestStarCheaper) return 2;
   if (p.suggestStarExpensive) return 3;
-  if (p.isMlPlaceholder) return 3.5;
-  if (!p.isShiny && p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper && !p.isMlPlaceholder) return 4;
+  // #69: grey stars (collection sub-90 keepers, gmax-suppressed hundos, ML placeholders) sort at
+  // 3.5 — below blue, just ABOVE red. They're flag-less (no suggestStar*), so without this they
+  // fell through to 6 (bottom, with no-star). ML placeholders already carry starType 'grey'.
+  if (p.isMlPlaceholder || p.starType === 'grey') return 3.5;
+  if (!p.isShiny && p.isFavorite && !p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper && !p.isMlPlaceholder && p.starType !== 'grey') return 4;
   if (p.starType === 'visibility') return 5;
   return 6;
 }
