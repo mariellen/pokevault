@@ -1,5 +1,5 @@
 # PokéVault Handoff
-_Last updated: 21 Jun 2026_
+_Last updated: 19 Jul 2026_
 
 > **How to use this file**
 > Open this whenever you come back to PokéVault.
@@ -9,6 +9,24 @@ _Last updated: 21 Jun 2026_
 ---
 
 ## 🔴 NEEDS YOU NOW
+
+### Collection nick + mobile form tag + Dmax flicker (#72, #67, v3.5.66)
+**Status:** Implemented on `feature/collection-nick-mobile-tag-dmax-flicker` (the three source fixes
+were already sitting uncommitted in the working tree pre-restart; this session added tests, bumped the
+version, committed, and opened the PR). Three independent display fixes: (#72 Bug A) a per-form
+collection keeper carrying a **tentative sub-90 league-slot artifact** now nicks `NameⓇ{IV%}` via a
+shared `applyCollectionNick()` helper instead of the `Squawk98u95g` review holding nick; (#72 Bug B)
+the cosmetic-form tag carries a `vt-form` class + the mobile collapse rule excludes it, so form tags
+stay visible on mobile; (#67) ticking Dmax/Gmax in the override panel pushes the matching slot so the
+nick preview immediately shows the evolved terminal name (`UnfezantⓇ84Ⓓ`), killing the `PidoveⓇ84Ⓓ`
+flicker. New `set-override-loader.js` splices the **real** `setOverride()` so #67 is tested against
+production code. Suite: **833 passed** (+11; 4 failures = the pre-existing untracked `csp.test.js`
+thread). v3.5.65 → v3.5.66.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/75 , then on a phone
+confirm form tags are visible and the override-panel Dmax tick shows the evolved name with no flicker.
+See `reviews/collection-keeper-nick-and-display-fixes-impl-summary.md`.
+_Updated: 19 Jul 2026_
 
 ### Grey star sort (#69) + Rockruff formUnset (#68, v3.5.65)
 **Status:** Implemented on `feature/rockruff-formunset-grey-sort` (from main, post-#66). #69:

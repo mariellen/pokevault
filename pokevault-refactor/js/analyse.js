@@ -1475,6 +1475,19 @@ function analyse(rows) {
       });
     }
 
+    // #72: a per-form collection keeper renders NameⓇ{IV%} (species name, no colour prefix — #55),
+    // NOT the review holding nick. Shared so it applies both from the collection branch AND when a
+    // collection keeper carries a tentative/unconfirmed league-slot artifact that would otherwise
+    // route it to buildNickname(p,'review') → 'Squawk98u95g'.
+    const applyCollectionNick = (p) => {
+      p.decision = 'keep';
+      const cForm = p.specialForm || p.vivillonPattern;
+      p.reason = cForm ? `Collection — best ${cForm} kept for full set` : 'Collection species';
+      const pv = Math.round(p.rankPctM || p.ivAvg || 0);
+      p.nickname = fitName(p.name, LC.R + (pv >= 100 ? PERFECT : String(pv)), '', 12);
+      if (!p.slots.includes('collection_keep')) p.slots.push('collection_keep');
+    };
+
     // Set decisions and nicknames
     members.forEach(p=>{
       // Burmy→Wormadam cloak carve-out (#39): flag when the evo target requires a recorded
@@ -1591,6 +1604,10 @@ function analyse(rows) {
             ? 'Affordable backup for '+RULES.leagueNames[nickSlot]
             : 'Best '+lgNames.join(' + ');
           p.nickname=buildNickname(p,nickSlot);
+        } else if (p.slots.includes('collection')) {
+          // #72: a collection keeper with only a tentative (unconfirmed) league artifact is still a
+          // per-form keeper → NameⓇ{IV%}, not the 'below 90% threshold' review holding nick.
+          applyCollectionNick(p);
         } else {
           // Auto-promoted but below 90% — keep but use review name so you know it's tentative
           p.decision='review';
@@ -1629,12 +1646,7 @@ function analyse(rows) {
         p.decision='review'; p.reason='≥90% but not best in family — review';
         p.nickname=buildNickname(p,'review');
       } else if (p.slots.includes('collection')) {
-        p.decision='keep';
-        const cForm = p.specialForm || p.vivillonPattern;
-        p.reason = cForm ? `Collection — best ${cForm} kept for full set` : 'Collection species';
-        const pv = Math.round(p.rankPctM||p.ivAvg||0);
-        p.nickname = fitName(p.name, LC.R+(pv>=100?PERFECT:String(pv)), '', 12);
-        if (!p.slots.includes('collection_keep')) p.slots.push('collection_keep');
+        applyCollectionNick(p);
       } else if (p.isLucky) {
         // Lucky can never be traded — always keep as Master/Raid candidate
         p.decision='keep';
