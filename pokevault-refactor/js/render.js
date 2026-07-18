@@ -149,7 +149,7 @@ function variantTags(p){
   if(p.isCostumed) t+='<span class="vtag" style="background:rgba(255,166,87,.2);color:var(--master)">🎭 Costume</span>';
   if(p.isDynamax) t+='<span class="vtag" style="background:rgba(88,166,255,.2);color:var(--great)">Dmax</span>';
   if(p.isGigantamax) t+='<span class="vtag" style="background:rgba(168,85,247,.2);color:var(--ultra)">Gmax</span>';
-  if(p.vivillonPattern) t+='<span class="vtag" style="background:rgba(255,166,87,.2);color:var(--master)">'+esc(p.vivillonPattern)+'</span>';
+  if(p.vivillonPattern) t+='<span class="vtag vt-form" style="background:rgba(255,166,87,.2);color:var(--master)">'+esc(p.vivillonPattern)+'</span>';
   if(p.manualDecision) t+='<span class="vtag" style="background:rgba(255,215,0,.15);color:var(--gold)">Manual</span>';
   if(p.isFavorite) t+='<span class="vt-fav">★</span>';
   return t;

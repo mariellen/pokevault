@@ -275,7 +275,7 @@ tr.row-merge-candidate{opacity:0.7;}
   .poke-name-cell{min-width:60px!important;}
   .poke-name{font-size:10px!important;}
   .poke-variants{flex-wrap:wrap;}
-  .vtag:not(.vt-shadow):not(.vt-purified):not(.vt-lucky):not(.vt-shiny){display:none;}
+  .vtag:not(.vt-shadow):not(.vt-purified):not(.vt-lucky):not(.vt-shiny):not(.vt-form){display:none;}
   .nick-suggested,.nick-starred{font-size:10px!important;}
   .iv-bar{display:none;}
   .iv-ivs{font-size:9px!important;}

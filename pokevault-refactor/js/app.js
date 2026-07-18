@@ -2265,6 +2265,13 @@ function setOverride(idx, field, value) {
   const NICK_FIELDS = new Set(['is_shiny','is_dynamax','is_gigantamax','special_form','vivillon_pattern']);
   if (NICK_FIELDS.has(field)) {
     if (field === 'is_shiny' && value && !(p.slots||[]).includes('shiny')) p.slots.push('shiny');
+    // #67: mirror the shiny slot-push so the immediate nick preview routes through the dynamax/
+    // gigantamax slot handler (evolved target via terminalEvo) instead of falling through to the
+    // base-name review nick (the PidoveⓇ84Ⓓ → UnfezantⓇ84Ⓓ flicker). Remove on untick so it reverts.
+    if (field === 'is_dynamax') p.slots = value
+      ? [...new Set([...(p.slots||[]), 'dynamax'])] : (p.slots||[]).filter(s => s !== 'dynamax');
+    if (field === 'is_gigantamax') p.slots = value
+      ? [...new Set([...(p.slots||[]), 'gigantamax'])] : (p.slots||[]).filter(s => s !== 'gigantamax');
     const slots = p.slots || [];
     const lgSlots = slots.filter(s => ['L','G','U','M'].includes(s));
     let ns;
@@ -2274,6 +2281,8 @@ function setOverride(idx, field, value) {
       ns = capped.length > 0 ? capped.sort((a,b)=>(p['rankPct'+b]||0)-(p['rankPct'+a]||0))[0] : 'M';
     } else if (slots.includes('shiny') || slots.includes('shiny_lower')) ns = 'shiny';
     else if (slots.includes('lucky')) { const ll=['U','G','L','M'].find(l=>(p['rankPct'+l]||0)>=90); ns=ll||'M'; }
+    else if (slots.includes('dynamax')) ns = 'dynamax';
+    else if (slots.includes('gigantamax')) ns = 'gigantamax';
     else ns = 'review';
     const suggested = buildNickname(p, ns);
     // Re-apply any nick override on top of the recomputed suggested nick so toggling
