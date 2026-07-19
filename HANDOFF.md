@@ -10,18 +10,27 @@ _Last updated: 19 Jul 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Per-family form filter dropdown (#65, v3.5.71)
-**Status:** Implemented on `feature/form-filter-dropdown` (from main). Adds a form-filter `<select>`
-to each family header (right side) for FORM_DROPDOWNS species — pick "Rock Star" and only Rock Star
-Pikachu remain (client-side show/hide, no re-analysis, live "(N)" count, "All forms" resets). Each
-row now carries `data-form`; the pure `<select>` builder is `formFilterSelect` (render.js), the DOM
-handler is `filterFamilyByForm` (app.js). Untagged members hide under a specific form. **Note:** brief
-said render.js but the header is in app.js — split pure builder (render.js) vs DOM handler (app.js).
-Suite: **855 passed** (+7; 4 failures = pre-existing untracked `csp.test.js`). v3.5.70 → v3.5.71.
+### Pikachu list updates + sort-preserves-filter (#82/#77, v3.5.72)
+**Status:** Implemented on `feature/pikachu-list-and-sort-filter-fix` (from main, post-#81 merge).
+Fix 1 (data.js): renames Party Hat→Party Hat Purple, Party Top Hat→Party Top Hat Purple, Safari Hat→
+Safari Cap; adds Party Top Hat New Years; adds `None` pinned second (after Unknown) for Pikachu/Pichu/
+Raichu. Fix 2 (app.js): `sortFamilyBy` rebuilt the tbody without re-applying the active form filter,
+so a sort revealed all members — it now re-applies the filter from the header `<select>` (which keeps
+its value across the rebuild), preserving the filtered set + count. **Note:** brief said render.js but
+sortFamilyBy is in app.js. Suite: **856 passed** (4 failures = pre-existing untracked `csp.test.js`).
+v3.5.71 → v3.5.72.
 **Owner:** YOU
-**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/81 (urgent — for trading),
-then open the Pikachu family and confirm the form dropdown filters + shows the visible count. See
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/83 , then filter Pikachu to
+"Rock Star", click Master, and confirm only Rock Star Pikachu remain (sorted, count intact). See
+`reviews/issue-82-pikachu-list-and-sort-filter-fix-impl-summary.md`.
+_Updated: 19 Jul 2026_
+
+### Per-family form filter dropdown (#65, v3.5.71) — ✅ MERGED (PR #81)
+**Status:** Merged. Form-filter `<select>` in each family header (FORM_DROPDOWNS species) with
+client-side show/hide + visible count. #82 above builds on it (sort now preserves the filter). See
 `reviews/issue-65-form-filter-dropdown-impl-summary.md`.
+**Owner:** YOU
+**Next action:** Done.
 _Updated: 19 Jul 2026_
 
 ### Pikachu costume list finalized (#77, v3.5.70) — ✅ MERGED (PR #80)

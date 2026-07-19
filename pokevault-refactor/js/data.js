@@ -169,7 +169,7 @@ const FORM_DROPDOWNS = {
   // in COLLECTION_SETS — no completeness tracking. Alphabetical, 'Unknown' pinned first (keep it
   // sorted on additions). Sources: theclick.gg tracker + GO Fest 2026 Global team hats (#77).
   Pikachu: [
-    'Unknown', 'Adventure Hat', 'Akari Kerchief', 'Amethyst Crown', 'Anniversary 2017',
+    'Unknown', 'None', 'Adventure Hat', 'Akari Kerchief', 'Amethyst Crown', 'Anniversary 2017',
     'Aquamarine Crown', 'Ash Hat', 'Batik Shirt', 'Beanie', 'Blue Shirt Citrus', 'Brendan Hat',
     'Cake', 'Cap Hat', 'Charizard Hat', 'Cherry Blossom', 'Clone', 'Dapper Blue', 'Dapper Red',
     'Dapper Yellow', 'Dawn Hat', 'Detective', 'Detective 2023', 'Diamond Crown',
@@ -181,16 +181,16 @@ const FORM_DROPDOWNS = {
     'Halloween 2017', 'Halloween Mischief', 'Hilbert Hat', 'Hilda Hat', 'Holiday',
     'Indonesia Football', 'Kariyushi', 'Kurta', 'Lucario Hat', 'Lucas Hat', 'Lyra Hat',
     'Malachite Crown', 'May Bandana', 'Meloetta Hat', 'Mimikyu', 'Moon Crown', 'Nate Visor',
-    'Party Hat', 'Party Hat Red', 'Party Top Hat', 'Pikachu Libre', 'Pop Star',
-    'Professor Willow Assistant', 'Pumpkaboo', 'Purple Shirt', 'Quartz Crown', 'Rayquaza Hat',
-    'Rei Cap', 'Rock Star', 'Rosa Visor', 'Safari Hat', 'Santa Hat', 'Saree', 'Scuba',
-    'Serena Hat', 'Shaymin Scarf', 'Straw Hat', 'Summer 2018', 'Sun Crown', 'TCG Hat',
-    'Team Instinct Hat', 'Team Mystic Hat', 'Team Valor Hat', 'Umbreon Hat', 'Varsity Jacket',
-    'Winter Holiday 2023', 'Witch Hat', 'World Cap 2022', 'World Cap 2023', 'World Cap 2024',
-    'World Cap 2025',
+    'Party Hat Purple', 'Party Hat Red', 'Party Top Hat New Years', 'Party Top Hat Purple',
+    'Pikachu Libre', 'Pop Star', 'Professor Willow Assistant', 'Pumpkaboo', 'Purple Shirt',
+    'Quartz Crown', 'Rayquaza Hat', 'Rei Cap', 'Rock Star', 'Rosa Visor', 'Safari Cap',
+    'Santa Hat', 'Saree', 'Scuba', 'Serena Hat', 'Shaymin Scarf', 'Straw Hat', 'Summer 2018',
+    'Sun Crown', 'TCG Hat', 'Team Instinct Hat', 'Team Mystic Hat', 'Team Valor Hat',
+    'Umbreon Hat', 'Varsity Jacket', 'Winter Holiday 2023', 'Witch Hat', 'World Cap 2022',
+    'World Cap 2023', 'World Cap 2024', 'World Cap 2025',
   ],
-  Pichu:  ['Unknown', 'Fragment Hat', 'Meloetta Hat', 'Party Hat Red', 'Santa Hat', 'Witch Hat'],
-  Raichu: ['Unknown', 'Pop Star', 'Rock Star'],
+  Pichu:  ['Unknown', 'None', 'Fragment Hat', 'Meloetta Hat', 'Party Hat Red', 'Santa Hat', 'Witch Hat'],
+  Raichu: ['Unknown', 'None', 'Pop Star', 'Rock Star'],
   // #77 GO Fest 2026 Global — Pikachu Visor survives evolution, so all three stages of each Kanto
   // starter carry it. (Focused dropdowns; add more labels here if these species get other costumes.)
   Bulbasaur:  ['Unknown', 'Pikachu Visor'],
