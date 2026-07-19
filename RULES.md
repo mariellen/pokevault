@@ -258,7 +258,7 @@ self-flag path only, not on the blue/expensive path).
 | `dynamax` | Assigned to **every** Dynamax without a capped league slot, kept as a raid candidate (`NameⓇ{IV%}Ⓓ`, IV-based — **no star**). The best-IV Dynamax per max-evo target additionally gets `wonDynamaxMaster` → `NameⓂ{IV%}Ⓓ` (Master power-up candidate, starred), even if it also holds a capped slot. Dynamax **compete with normals in the same capped pool** (best rounded rank wins; type-priority breaks exact ties — see §3 tiebreak) and are excluded from the regular Master pass. |
 | `gigantamax` | Full parity with `dynamax` (v3.5.54). Assigned to **every** Gigantamax without a capped league slot (`NameⓇ{IV%}Ⓧ`, IV-based — **no star**). The best-IV Gigantamax per max-evo target gets `wonGigantamaxMaster` → `NameⓂ{IV%}Ⓧ` (Master power-up candidate, starred), even if it also holds a capped slot. Gmax compete with normals in the capped pool and are excluded from the regular Master pass. |
 | `best_overall` | Best-IV per species with no confirmed league slot — **all species** (legendary and non-legendary; non-legendaries must qualify ≥90% in some league and have no confirmed family keeper unless `masterDemoted`). Nick: `NameⓇ{IV%}` |
-| `collection` / `collection_keep` | Best IV per tagged form for `COLLECTION_SETS` species (#64) |
+| `collection` / `collection_keep` | Best IV per tagged form — `COLLECTION_SETS` species (#64) + `COSTUME_KEEPER_SPECIES` Pikachu family (#83) |
 
 Shadow / purified / lucky are **separate slot groups** — a shadow Great winner and a regular
 Great winner coexist in the same family. **Gender-dimorphic** species get separate slot
@@ -388,10 +388,18 @@ Gmax, Dmax, and Normal serve non-substitutable Master roles (different Max Battl
 ### Costumed
 - `isCostumed=true` (override) → `suggestStar=true` always.
 
-### Collection species (`COLLECTION_SETS`) — per-form keepers (#64, v3.5.64)
+### Collection species — per-form keepers (#64, v3.5.64; extended #83, v3.5.73)
+Eligibility is `isCollectionKeeperSpecies(name)` = a tracked `COLLECTION_SETS` species **or** a
+`COSTUME_KEEPER_SPECIES` (Pikachu / Pichu / Raichu, #83). The latter get the same best-IV-per-form
+keeper **without** a completeness set — Pikachu has 100+ costumes, so no "missing" badge.
 - **Keep the BEST IV of EACH tagged form**, bucketed by `specialForm||vivillonPattern` (was
   top-N by IV across the whole species, which left rare forms unrepresented). The
   `m.name === p.name` guard stops Deerling and Sawsbuck (same family) from cross-contaminating.
+- **#83 — a tagged form means a real costume.** `'Unknown'` (not yet identified) and `'None'`
+  (confirmed plain) are NOT costumes: those members get no keeper and compete normally. For
+  `COSTUME_KEEPER_SPECIES` the Master-strip below applies **only to tagged** members, so an
+  untagged / `'None'` Pikachu can still be an IV-based Master/best-overall keeper. (For
+  `COLLECTION_SETS` species the strip stays unconditional — unchanged v3.5.64 behaviour.)
 - **Cosmetic collection-form species are NOT IV-based Master mons.** Master rank = IV%, so every
   species "qualifies"; the per-form keeper strips any `M`/`M_tentative` slot + affordability
   winner flags and is excluded from the ML grey-placeholder pass, so they render `NameⓇ{IV%}`
@@ -400,8 +408,11 @@ Gmax, Dmax, and Normal serve non-substitutable Master roles (different Max Battl
 - **Star:** favourited → gold; `ivAvg ≥ keepThreshold (90)` → green (power-up candidate);
   else → grey (collection-only, not a power-up priority).
 - No `specialForm`/`vivillonPattern` set → `review` to prompt the user ("set pattern").
-- Nick: `NameⓇ{IV%}` — the **species** name, no colour/form prefix (decorative forms, #55), so a
-  Blue Florges at 84% is `FlorgesⓇ84` (grey), not `BlueⓇ84`.
+- Nick: `NameⓇ{IV%}` — no colour/form prefix (decorative forms, #55), so a Blue Florges at 84% is
+  `FlorgesⓇ84` (grey), not `BlueⓇ84`. **#83:** the name is the **final evolution** via
+  `terminalEvo(name, form)`, so a Pikachu costume keeper is `RaichuⓇ98`. This is a no-op for
+  single-/final-stage collection species (Squawkabilly/Furfrou/Florges). A form keeper that also
+  wins a real league slot keeps the **league** nick (`RaichuⒼ99`) — that branch runs first.
 - **Lucky/shiny** of a form keep via their own always-keep rules (per form) — orthogonal to the
   collection keeper.
 - **Form strings** are canonical across `FORM_DROPDOWNS`/`COLLECTION_SETS`/`FORM_NICK_PREFIXES`

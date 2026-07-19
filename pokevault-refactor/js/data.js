@@ -233,6 +233,11 @@ const COSTUME_SPECIES = new Set([
   'Eevee','Snorlax'
 ]);
 
+// #83: species that get per-costume best-IV keepers (same per-form logic as the v3.5.64
+// COLLECTION_SETS keepers) but WITHOUT a completeness set — too many costumes to track a
+// "missing" badge. Keyed on the specialForm costume value; 'Unknown'/'None' are not costumes.
+const COSTUME_KEEPER_SPECIES = new Set(['Pikachu', 'Pichu', 'Raichu']);
+
 // ═══════════════════════════════════════════════
 // VALID EVOLUTIONS — hardcoded from Pokégenie data
 // Used to validate evolution targets and reject scan errors
