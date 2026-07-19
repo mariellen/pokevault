@@ -10,6 +10,28 @@ _Last updated: 19 Jul 2026_
 
 ## 🔴 NEEDS YOU NOW
 
+### Pikachu costume dropdown (#77, v3.5.68) — URGENT
+**Status:** Implemented on `feature/pikachu-costume-dropdown` (from main, post-#75+#76 merge).
+Data-only: added `Pikachu` (83 costumes), `Pichu` (5), `Raichu` (2) to `FORM_DROPDOWNS` in data.js
+so the ~1000 costumed Pikachu can be bulk-tagged via dropdown instead of free text. No engine
+changes — the dropdown mechanism already keys off FORM_DROPDOWNS. NOT added to COLLECTION_SETS (83
+costumes, no completeness tracking) per the brief. Costume strings are manual human-readable labels
+(Pokégenie doesn't export costume data). Suite: **845 passed** (+5; 4 failures = pre-existing
+untracked `csp.test.js`). v3.5.67 → v3.5.68.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/78 (urgent — for today's
+trading session), then open a Pikachu row's override panel / 🎨 Set Forms modal and confirm the
+costume dropdown appears and saves. See `reviews/issue-77-pikachu-costume-dropdown-impl-summary.md`.
+_Updated: 19 Jul 2026_
+
+### Purify dedup (#73) + mobile override-panel wrap (#74, v3.5.67) — ✅ MERGED (PR #76)
+**Status:** Merged to main. One `p` per final evolution target (pre-evos collapse into the evolved
+keeper; branching families keep one per target). Mobile override panel pinned to viewport. See
+`reviews/issue-73-74-purify-dedup-and-mobile-override-wrap-impl-summary.md`.
+**Owner:** YOU
+**Next action:** On your real export, confirm only the evolved shadow in a line keeps `p`.
+_Updated: 19 Jul 2026_
+
 ### Collection nick + mobile form tag + Dmax flicker (#72, #67, v3.5.66)
 **Status:** Implemented on `feature/collection-nick-mobile-tag-dmax-flicker` (the three source fixes
 were already sitting uncommitted in the working tree pre-restart; this session added tests, bumped the
