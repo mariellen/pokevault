@@ -424,6 +424,7 @@ function renderFamily(fam,isOpen){
         ${completeIcons?`<span class="fam-badge" style="font-size:11px" title="Completeness icons">${completeIcons}</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
+        ${formFilterSelect(primaryName,key)}
         <span class="fam-league-dots">${leagueDots}</span>
         <button class="copy-search-btn" data-fam="${nameEsc}" onclick="event.stopPropagation();openCullModal(this.dataset.fam)" title="View in Cull modal" aria-label="View ${primaryName} in Cull modal">🗑</button>
         <span class="fam-chevron">▶</span>
@@ -746,6 +747,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
         ${completeIcons?`<span class="fam-badge" style="font-size:11px" title="Completeness icons">${completeIcons}</span>`:''}
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
+        ${formFilterSelect(primaryName,key)}
         <span class="fam-league-dots">${leagueDots}</span>
         <button class="copy-search-btn" data-fam="${nameEsc}" onclick="event.stopPropagation();openCullModal(this.dataset.fam)" title="View in Cull modal" aria-label="View ${primaryName} in Cull modal">🗑</button>
         <span class="fam-chevron">▶</span>
@@ -757,6 +759,26 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
       ${filteredNote}
     </div>
   </div>`;
+}
+
+// #65 — client-side family form filter (no re-analysis). Shows only member rows whose form
+// (specialForm/vivillonPattern, captured as data-form on each row by buildRow) matches the
+// selection; 'All forms' (__all__) resets. Untagged members (data-form='') are hidden when a
+// specific form is chosen. Family-scoped — only touches rows inside this family card.
+function filterFamilyByForm(key, form){
+  const card = document.getElementById('fam-'+key);
+  if (!card) return;
+  const all = !form || form === '__all__';
+  let visible = 0;
+  card.querySelectorAll('tbody > tr').forEach(tr => {
+    // Override panels: collapse them while a specific form is active; leave alone for 'All forms'.
+    if (tr.classList.contains('override-row')) { if (!all) tr.style.display = 'none'; return; }
+    const match = all || (tr.getAttribute('data-form') || '') === form;
+    tr.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  const cnt = card.querySelector('.fam-form-count');
+  if (cnt) cnt.textContent = all ? '' : ' ('+visible+')';
 }
 
 function toggleFamily(id){const el=document.getElementById(id);if(!el)return;const nowOpen=el.classList.toggle('open');if(nowOpen)trackEvent('family_expand');}

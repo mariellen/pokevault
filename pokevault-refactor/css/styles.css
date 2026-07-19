@@ -45,6 +45,9 @@ header{background:var(--surf);border-bottom:1px solid var(--border);padding:10px
 
 /* FAMILY LEAGUE DOTS */
 .fam-league-dots{font-size:11px;letter-spacing:2px;flex-shrink:0;}
+/* #65 — per-family form filter dropdown in the header */
+.fam-form-filter{background:var(--surf);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;padding:2px 4px;max-width:130px;flex-shrink:0;}
+.fam-form-count{color:var(--muted);font-size:11px;flex-shrink:0;}
 
 /* SUMMARY STRIP — removed from main view; styles kept for compatibility */
 .summary-strip{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;}

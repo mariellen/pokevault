@@ -97,6 +97,22 @@ function moveHTML(p){
   return h;
 }
 
+// #65 — per-family form filter dropdown. Rendered in the family header, but only for species
+// that have a FORM_DROPDOWNS entry (Pikachu/Furfrou/Squawkabilly/…). Options are 'All forms' plus
+// each real form (the 'Unknown' override sentinel is excluded). The actual show/hide runs
+// client-side in filterFamilyByForm() (app.js) against each row's data-form attribute — no
+// re-analysis. Returns '' for species without a dropdown so the header is unchanged.
+function formFilterSelect(primaryName, key){
+  const forms = (typeof FORM_DROPDOWNS !== 'undefined') && FORM_DROPDOWNS[primaryName];
+  if (!forms) return '';
+  const opts = ['<option value="__all__">All forms</option>'].concat(
+    forms.filter(f => f && f !== 'Unknown').map(f => `<option value="${esc(f)}">${esc(f)}</option>`)
+  ).join('');
+  return `<select class="fam-form-filter" title="Filter this family by form" aria-label="Filter ${esc(primaryName)} by form"`
+    + ` onclick="event.stopPropagation()" onchange="event.stopPropagation();filterFamilyByForm('${esc(key)}',this.value)">${opts}</select>`
+    + `<span class="fam-form-count" aria-live="polite"></span>`;
+}
+
 function slotBadges(p){
   const slots = p.slots || [];
   const m={L:['sl-L','Little'],G:['sl-G','Great'],U:['sl-U','Ultra'],M:['sl-M','Master'],
@@ -200,7 +216,7 @@ function buildRow(p){
   const evoSearchTag=p._evoSearchTag||'';
   const isMergeCandidate=mergeCandidateKeys.has(p.stableKey);
 
-  return `<tr class="row-${p.decision}${p.isHundo?' row-hundo':''}${isMergeCandidate?' row-merge-candidate':''}" data-idx="${p.idx}">
+  return `<tr class="row-${p.decision}${p.isHundo?' row-hundo':''}${isMergeCandidate?' row-merge-candidate':''}" data-idx="${p.idx}" data-form="${esc((p.specialForm||p.vivillonPattern||'').trim())}">
     <td style="min-width:44px;white-space:nowrap">${starCell(p)}<button class="edit-btn" onclick="toggleOverride('${p.stableKey}')" title="Overrides">✎</button></td>
     <td class="poke-name-cell">
       <div class="poke-variants">${variantTags(p)}</div>
