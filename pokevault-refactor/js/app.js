@@ -239,6 +239,12 @@ function sortFamilyBy(thEl,col){
   // (#23). fam.members keeps the new sort order; we just drop the filtered-out rows.
   const tbody=card.querySelector('tbody');
   if(tbody) tbody.innerHTML=fam.members.filter(p=>isMemberVisible(p,fam)).map(p=>buildRow(p)).join('');
+
+  // #82: rebuilding the tbody drops the active form filter's show/hide (every new row renders
+  // visible). The header <select> lives outside the tbody so it keeps its value across the
+  // rebuild — re-apply the filter from it so a sort preserves the filtered set + visible count.
+  const formSel=card.querySelector('.fam-form-filter');
+  if(formSel && formSel.value && formSel.value!=='__all__') filterFamilyByForm(famKey, formSel.value);
 }
 
 // ═══════════════════════════════════════════════

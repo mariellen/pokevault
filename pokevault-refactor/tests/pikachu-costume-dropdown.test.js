@@ -14,11 +14,11 @@ const { FORM_DROPDOWNS } = new Function(
   read('config.js') + '\n' + read('data.js') + '\nreturn { FORM_DROPDOWNS };'
 )();
 
-// 'Unknown' pinned first, the rest alphabetical (case-insensitive, numeric-aware) — the invariant
-// every costume dropdown must hold.
+// 'Unknown' pinned first, 'None' (if present, #82) pinned second, the rest alphabetical
+// (case-insensitive, numeric-aware) — the invariant every costume dropdown must hold.
 const isAlphabetical = (arr) => {
   expect(arr[0]).toBe('Unknown');
-  const rest = arr.slice(1);
+  const rest = arr[1] === 'None' ? arr.slice(2) : arr.slice(1);
   const sorted = [...rest].sort((a, b) =>
     a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }));
   expect(rest).toEqual(sorted);
@@ -32,12 +32,13 @@ describe('#77 — Pikachu costume dropdown data', () => {
     expect(list.length).toBeGreaterThanOrEqual(80);
     // spot-check costumes across the source groups (incl. the newest additions)
     ['Santa Hat', 'Ash Hat', 'World Cap 2025', 'Detective', 'Pikachu Libre', 'Saree',
-     'Lyra Hat', 'Serena Hat', 'Amethyst Crown', 'Party Hat', 'Witch Hat',
-     'Professor Willow Assistant']
+     'Lyra Hat', 'Serena Hat', 'Amethyst Crown', 'Party Hat Purple', 'Witch Hat',
+     'Professor Willow Assistant', 'None', 'Party Top Hat New Years', 'Safari Cap']
       .forEach(c => expect(list).toContain(c));
-    // 'Party Hat' and 'Party Hat Red' are distinct costumes; 'Professor' was renamed.
-    expect(list).toContain('Party Hat Red');
-    expect(list).not.toContain('Professor');
+    expect(list).toContain('Party Hat Red'); // distinct from Party Hat Purple
+    // #82 renames + #77 rename: the old labels are gone
+    ['Party Hat', 'Party Top Hat', 'Safari Hat', 'Professor']
+      .forEach(c => expect(list).not.toContain(c));
     // no duplicate labels
     expect(new Set(list).size).toBe(list.length);
   });
@@ -55,8 +56,21 @@ describe('#77 — Pikachu costume dropdown data', () => {
 
   it('Pichu and Raichu have their own (shorter) alphabetical lists', () => {
     expect(FORM_DROPDOWNS.Pichu).toEqual(
-      ['Unknown', 'Fragment Hat', 'Meloetta Hat', 'Party Hat Red', 'Santa Hat', 'Witch Hat']);
-    expect(FORM_DROPDOWNS.Raichu).toEqual(['Unknown', 'Pop Star', 'Rock Star']);
+      ['Unknown', 'None', 'Fragment Hat', 'Meloetta Hat', 'Party Hat Red', 'Santa Hat', 'Witch Hat']);
+    expect(FORM_DROPDOWNS.Raichu).toEqual(['Unknown', 'None', 'Pop Star', 'Rock Star']);
+  });
+
+  it('#82 — None pinned second for Pikachu/Pichu/Raichu; renames applied in order', () => {
+    ['Pikachu', 'Pichu', 'Raichu'].forEach(sp => {
+      expect(FORM_DROPDOWNS[sp][0]).toBe('Unknown');
+      expect(FORM_DROPDOWNS[sp][1]).toBe('None');
+    });
+    // Kanto starters do NOT get 'None'
+    expect(FORM_DROPDOWNS.Bulbasaur).not.toContain('None');
+    // renames + new 'Party Top Hat New Years', alphabetical
+    const seg = FORM_DROPDOWNS.Pikachu.filter(x => /^Party |^Safari/.test(x));
+    expect(seg).toEqual(['Party Hat Purple', 'Party Hat Red',
+      'Party Top Hat New Years', 'Party Top Hat Purple', 'Safari Cap']);
   });
 
   it('Kanto starter families (all 3 stages) carry the Pikachu Visor — costume survives evolution', () => {
