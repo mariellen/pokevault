@@ -166,53 +166,41 @@ const FORM_DROPDOWNS = {
   Squawkabilly: ['Unknown','Green Plumage','Blue Plumage','Yellow Plumage','White Plumage'],
   // #77 — Pikachu costume family. Pokégenie does NOT export costume data; these are manual,
   // human-readable labels Mariellen sets herself (just need to be consistent). Deliberately NOT
-  // in COLLECTION_SETS — 83 costumes, no completeness tracking. Source: theclick.gg tracker.
-  Pikachu: ['Unknown',
-    // Holiday / Seasonal
-    'Santa Hat', 'Beanie', 'Holiday', 'Flower Crown', 'Flower Hat',
-    'Cherry Blossom', 'Pumpkaboo', 'Halloween 2017', 'Halloween Mischief',
-    // Anniversary / Summer
-    'Anniversary 2017', 'Ash Hat', 'Summer 2018', 'Cake',
-    'Fragment Hat', 'Party Hat Red', 'Party Top Hat',
-    // Flying variants
-    'Flying', 'Flying 5th Anniversary', 'Flying Plain Balloons',
-    'Flying Pink', 'Flying Orange', 'Flying Black', 'Flying Green',
-    // Rock Star / Pop Star
-    'Rock Star', 'Pop Star',
-    // World Championships
-    'World Cap 2022', 'World Cap 2023', 'World Cap 2024', 'World Cap 2025',
-    // GO Fest / GO Tour crowns
-    'Meloetta Hat', 'Gracidea Flower', 'Shaymin Scarf',
-    'Amethyst Crown', 'Aquamarine Crown', 'Diamond Crown',
-    'Malachite Crown', 'Quartz Crown',
-    'Moon Crown', 'Sun Crown',
-    // GO Tour character hats
-    'Brendan Hat', 'May Bandana',
-    'Akari Kerchief', 'Dawn Hat', 'Lucas Hat', 'Rei Cap',
-    'Hilbert Hat', 'Hilda Hat', 'Nate Visor', 'Rosa Visor',
-    // GO Tour 2024 / 2026
-    'GO Tour 2024 A', 'GO Tour 2024 B', 'GO Tour 2026 A', 'GO Tour 2026 B',
-    // GO Fest Goggles
-    'GO Fest Goggles Yellow', 'GO Fest Goggles Red', 'GO Fest Goggles Blue',
-    // Formal / Dapper
-    'Formal Blue', 'Formal Yellow', 'Formal Red',
-    'Dapper Blue', 'Dapper Yellow', 'Dapper Red',
-    // Safari / Explorer
-    'Safari Hat', 'Explorer Hat', 'Adventure Hat',
-    // Detective
-    'Detective', 'Detective 2023',
-    // Special hats
-    'Straw Hat', 'Mimikyu', 'Umbreon Hat', 'Rayquaza Hat',
-    'Lucario Hat', 'Charizard Hat', 'TCG Hat', 'Cap Hat',
-    // Regional shirts / cultural
-    'Kariyushi', 'Green Shirt', 'Purple Shirt', 'Blue Shirt Citrus',
-    'Batik Shirt', 'Kurta', 'Saree', 'Indonesia Football',
-    // Other
-    'Pikachu Libre', 'Clone', 'Professor', 'Varsity Jacket', 'Scuba',
-    'Fall 2023', 'Winter Holiday 2023',
+  // in COLLECTION_SETS — no completeness tracking. Alphabetical, 'Unknown' pinned first (keep it
+  // sorted on additions). Sources: theclick.gg tracker + GO Fest 2026 Global team hats (#77).
+  Pikachu: [
+    'Unknown', 'Adventure Hat', 'Akari Kerchief', 'Amethyst Crown', 'Anniversary 2017',
+    'Aquamarine Crown', 'Ash Hat', 'Batik Shirt', 'Beanie', 'Blue Shirt Citrus', 'Brendan Hat',
+    'Cake', 'Cap Hat', 'Charizard Hat', 'Cherry Blossom', 'Clone', 'Dapper Blue', 'Dapper Red',
+    'Dapper Yellow', 'Dawn Hat', 'Detective', 'Detective 2023', 'Diamond Crown',
+    'Explorer Hat', 'Fall 2023', 'Flower Crown', 'Flower Hat', 'Flying',
+    'Flying 5th Anniversary', 'Flying Black', 'Flying Green', 'Flying Orange', 'Flying Pink',
+    'Flying Plain Balloons', 'Formal Blue', 'Formal Red', 'Formal Yellow', 'Fragment Hat',
+    'GO Fest Goggles Blue', 'GO Fest Goggles Red', 'GO Fest Goggles Yellow', 'GO Tour 2024 A',
+    'GO Tour 2024 B', 'GO Tour 2026 A', 'GO Tour 2026 B', 'Gracidea Flower', 'Green Shirt',
+    'Halloween 2017', 'Halloween Mischief', 'Hilbert Hat', 'Hilda Hat', 'Holiday',
+    'Indonesia Football', 'Kariyushi', 'Kurta', 'Lucario Hat', 'Lucas Hat', 'Malachite Crown',
+    'May Bandana', 'Meloetta Hat', 'Mimikyu', 'Moon Crown', 'Nate Visor', 'Party Hat Red',
+    'Party Top Hat', 'Pikachu Libre', 'Pop Star', 'Professor', 'Pumpkaboo', 'Purple Shirt',
+    'Quartz Crown', 'Rayquaza Hat', 'Rei Cap', 'Rock Star', 'Rosa Visor', 'Safari Hat',
+    'Santa Hat', 'Saree', 'Scuba', 'Shaymin Scarf', 'Straw Hat', 'Summer 2018', 'Sun Crown',
+    'TCG Hat', 'Team Instinct Hat', 'Team Mystic Hat', 'Team Valor Hat', 'Umbreon Hat',
+    'Varsity Jacket', 'Winter Holiday 2023', 'World Cap 2022', 'World Cap 2023',
+    'World Cap 2024', 'World Cap 2025',
   ],
-  Pichu:  ['Unknown', 'Party Hat Red', 'Santa Hat', 'Witch Hat', 'Meloetta Hat', 'Fragment Hat'],
-  Raichu: ['Unknown', 'Rock Star', 'Pop Star'],
+  Pichu:  ['Unknown', 'Fragment Hat', 'Meloetta Hat', 'Party Hat Red', 'Santa Hat', 'Witch Hat'],
+  Raichu: ['Unknown', 'Pop Star', 'Rock Star'],
+  // #77 GO Fest 2026 Global — Pikachu Visor survives evolution, so all three stages of each Kanto
+  // starter carry it. (Focused dropdowns; add more labels here if these species get other costumes.)
+  Bulbasaur:  ['Unknown', 'Pikachu Visor'],
+  Ivysaur:    ['Unknown', 'Pikachu Visor'],
+  Venusaur:   ['Unknown', 'Pikachu Visor'],
+  Charmander: ['Unknown', 'Pikachu Visor'],
+  Charmeleon: ['Unknown', 'Pikachu Visor'],
+  Charizard:  ['Unknown', 'Pikachu Visor'],
+  Squirtle:   ['Unknown', 'Pikachu Visor'],
+  Wartortle:  ['Unknown', 'Pikachu Visor'],
+  Blastoise:  ['Unknown', 'Pikachu Visor'],
 };
 
 // #64: legacy form-string aliases. Before v3.5.64 the Poké Ball Vivillon pattern was stored
