@@ -10,6 +10,29 @@ _Last updated: 19 Jul 2026_
 
 ## 🔴 NEEDS YOU NOW
 
+### Per-family form filter dropdown (#65, v3.5.71)
+**Status:** Implemented on `feature/form-filter-dropdown` (from main). Adds a form-filter `<select>`
+to each family header (right side) for FORM_DROPDOWNS species — pick "Rock Star" and only Rock Star
+Pikachu remain (client-side show/hide, no re-analysis, live "(N)" count, "All forms" resets). Each
+row now carries `data-form`; the pure `<select>` builder is `formFilterSelect` (render.js), the DOM
+handler is `filterFamilyByForm` (app.js). Untagged members hide under a specific form. **Note:** brief
+said render.js but the header is in app.js — split pure builder (render.js) vs DOM handler (app.js).
+Suite: **855 passed** (+7; 4 failures = pre-existing untracked `csp.test.js`). v3.5.70 → v3.5.71.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/81 (urgent — for trading),
+then open the Pikachu family and confirm the form dropdown filters + shows the visible count. See
+`reviews/issue-65-form-filter-dropdown-impl-summary.md`.
+_Updated: 19 Jul 2026_
+
+### Pikachu costume list finalized (#77, v3.5.70) — ✅ MERGED (PR #80)
+**Status:** Merged. Full authoritative Pikachu costume list (Amethyst Crown, Lyra/Serena Hat, Party
+Hat, Witch Hat, Professor Willow Assistant) + Pichu/Raichu + Kanto-starter Pikachu Visors, all
+alphabetical. Consolidated after PRs #78/#79 each merged before their follow-up commits landed.
+**Owner:** YOU
+**Next action:** Done. (Optional: confirm any Pikachu previously tagged `Professor` — that label was
+renamed to `Professor Willow Assistant`, so it'll show unset until re-picked.)
+_Updated: 19 Jul 2026_
+
 ### GO Fest 2026 Global costumes + alphabetized dropdowns (#77 follow-up, v3.5.69)
 **Status:** Implemented on `feature/gofest-2026-costumes-alphabetize` (from main, post-#78 merge).
 Follow-up to PR #78: Pikachu gets the GO Fest 2026 Global team hats (Team Instinct/Mystic/Valor Hat);
