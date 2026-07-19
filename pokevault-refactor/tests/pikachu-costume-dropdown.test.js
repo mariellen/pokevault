@@ -14,23 +14,51 @@ const { FORM_DROPDOWNS } = new Function(
   read('config.js') + '\n' + read('data.js') + '\nreturn { FORM_DROPDOWNS };'
 )();
 
+// 'Unknown' pinned first, the rest alphabetical (case-insensitive, numeric-aware) — the invariant
+// every costume dropdown must hold.
+const isAlphabetical = (arr) => {
+  expect(arr[0]).toBe('Unknown');
+  const rest = arr.slice(1);
+  const sorted = [...rest].sort((a, b) =>
+    a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }));
+  expect(rest).toEqual(sorted);
+};
+
 describe('#77 — Pikachu costume dropdown data', () => {
   it('Pikachu is a dropdown species starting with Unknown, with the full costume list', () => {
     const list = FORM_DROPDOWNS.Pikachu;
     expect(Array.isArray(list)).toBe(true);
     expect(list[0]).toBe('Unknown');
-    expect(list.length).toBeGreaterThanOrEqual(80); // ~83 costumes + Unknown
-    // spot-check costumes across the groups in the brief
+    expect(list.length).toBeGreaterThanOrEqual(80);
+    // spot-check costumes across the source groups
     ['Santa Hat', 'Ash Hat', 'World Cap 2025', 'Detective', 'Pikachu Libre', 'Saree']
       .forEach(c => expect(list).toContain(c));
     // no duplicate labels
     expect(new Set(list).size).toBe(list.length);
   });
 
-  it('Pichu and Raichu have their own (shorter) costume lists', () => {
+  it('Pikachu includes the GO Fest 2026 Global team hats', () => {
+    ['Team Instinct Hat', 'Team Mystic Hat', 'Team Valor Hat']
+      .forEach(c => expect(FORM_DROPDOWNS.Pikachu).toContain(c));
+  });
+
+  it('Pikachu / Pichu / Raichu lists are alphabetical (Unknown first)', () => {
+    isAlphabetical(FORM_DROPDOWNS.Pikachu);
+    isAlphabetical(FORM_DROPDOWNS.Pichu);
+    isAlphabetical(FORM_DROPDOWNS.Raichu);
+  });
+
+  it('Pichu and Raichu have their own (shorter) alphabetical lists', () => {
     expect(FORM_DROPDOWNS.Pichu).toEqual(
-      ['Unknown', 'Party Hat Red', 'Santa Hat', 'Witch Hat', 'Meloetta Hat', 'Fragment Hat']);
-    expect(FORM_DROPDOWNS.Raichu).toEqual(['Unknown', 'Rock Star', 'Pop Star']);
+      ['Unknown', 'Fragment Hat', 'Meloetta Hat', 'Party Hat Red', 'Santa Hat', 'Witch Hat']);
+    expect(FORM_DROPDOWNS.Raichu).toEqual(['Unknown', 'Pop Star', 'Rock Star']);
+  });
+
+  it('Kanto starter families (all 3 stages) carry the Pikachu Visor — costume survives evolution', () => {
+    ['Bulbasaur', 'Ivysaur', 'Venusaur', 'Charmander', 'Charmeleon', 'Charizard',
+     'Squirtle', 'Wartortle', 'Blastoise'].forEach(sp => {
+      expect(FORM_DROPDOWNS[sp]).toEqual(['Unknown', 'Pikachu Visor']);
+    });
   });
 
   it('existing dropdowns are unchanged (regression)', () => {
