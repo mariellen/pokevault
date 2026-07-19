@@ -30,9 +30,12 @@ describe('#77 — Pikachu costume dropdown data', () => {
     expect(Array.isArray(list)).toBe(true);
     expect(list[0]).toBe('Unknown');
     expect(list.length).toBeGreaterThanOrEqual(80);
-    // spot-check costumes across the source groups
-    ['Santa Hat', 'Ash Hat', 'World Cap 2025', 'Detective', 'Pikachu Libre', 'Saree']
+    // spot-check costumes across the source groups (incl. the newest additions)
+    ['Santa Hat', 'Ash Hat', 'World Cap 2025', 'Detective', 'Pikachu Libre', 'Saree',
+     'Lyra Hat', 'Serena Hat']
       .forEach(c => expect(list).toContain(c));
+    // Amethyst Crown was dropped from the authoritative list
+    expect(list).not.toContain('Amethyst Crown');
     // no duplicate labels
     expect(new Set(list).size).toBe(list.length);
   });
