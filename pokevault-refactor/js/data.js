@@ -164,6 +164,55 @@ const FORM_DROPDOWNS = {
   Deerling:     ['Unknown','Spring','Summer','Autumn','Winter'],
   Sawsbuck:     ['Unknown','Spring','Summer','Autumn','Winter'],
   Squawkabilly: ['Unknown','Green Plumage','Blue Plumage','Yellow Plumage','White Plumage'],
+  // #77 — Pikachu costume family. Pokégenie does NOT export costume data; these are manual,
+  // human-readable labels Mariellen sets herself (just need to be consistent). Deliberately NOT
+  // in COLLECTION_SETS — 83 costumes, no completeness tracking. Source: theclick.gg tracker.
+  Pikachu: ['Unknown',
+    // Holiday / Seasonal
+    'Santa Hat', 'Beanie', 'Holiday', 'Flower Crown', 'Flower Hat',
+    'Cherry Blossom', 'Pumpkaboo', 'Halloween 2017', 'Halloween Mischief',
+    // Anniversary / Summer
+    'Anniversary 2017', 'Ash Hat', 'Summer 2018', 'Cake',
+    'Fragment Hat', 'Party Hat Red', 'Party Top Hat',
+    // Flying variants
+    'Flying', 'Flying 5th Anniversary', 'Flying Plain Balloons',
+    'Flying Pink', 'Flying Orange', 'Flying Black', 'Flying Green',
+    // Rock Star / Pop Star
+    'Rock Star', 'Pop Star',
+    // World Championships
+    'World Cap 2022', 'World Cap 2023', 'World Cap 2024', 'World Cap 2025',
+    // GO Fest / GO Tour crowns
+    'Meloetta Hat', 'Gracidea Flower', 'Shaymin Scarf',
+    'Amethyst Crown', 'Aquamarine Crown', 'Diamond Crown',
+    'Malachite Crown', 'Quartz Crown',
+    'Moon Crown', 'Sun Crown',
+    // GO Tour character hats
+    'Brendan Hat', 'May Bandana',
+    'Akari Kerchief', 'Dawn Hat', 'Lucas Hat', 'Rei Cap',
+    'Hilbert Hat', 'Hilda Hat', 'Nate Visor', 'Rosa Visor',
+    // GO Tour 2024 / 2026
+    'GO Tour 2024 A', 'GO Tour 2024 B', 'GO Tour 2026 A', 'GO Tour 2026 B',
+    // GO Fest Goggles
+    'GO Fest Goggles Yellow', 'GO Fest Goggles Red', 'GO Fest Goggles Blue',
+    // Formal / Dapper
+    'Formal Blue', 'Formal Yellow', 'Formal Red',
+    'Dapper Blue', 'Dapper Yellow', 'Dapper Red',
+    // Safari / Explorer
+    'Safari Hat', 'Explorer Hat', 'Adventure Hat',
+    // Detective
+    'Detective', 'Detective 2023',
+    // Special hats
+    'Straw Hat', 'Mimikyu', 'Umbreon Hat', 'Rayquaza Hat',
+    'Lucario Hat', 'Charizard Hat', 'TCG Hat', 'Cap Hat',
+    // Regional shirts / cultural
+    'Kariyushi', 'Green Shirt', 'Purple Shirt', 'Blue Shirt Citrus',
+    'Batik Shirt', 'Kurta', 'Saree', 'Indonesia Football',
+    // Other
+    'Pikachu Libre', 'Clone', 'Professor', 'Varsity Jacket', 'Scuba',
+    'Fall 2023', 'Winter Holiday 2023',
+  ],
+  Pichu:  ['Unknown', 'Party Hat Red', 'Santa Hat', 'Witch Hat', 'Meloetta Hat', 'Fragment Hat'],
+  Raichu: ['Unknown', 'Rock Star', 'Pop Star'],
 };
 
 // #64: legacy form-string aliases. Before v3.5.64 the Poké Ball Vivillon pattern was stored
