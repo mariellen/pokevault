@@ -226,12 +226,16 @@ describe('Group 6 — Totodile/Croconaw/Feraligatr', () => {
 // killed the old `rank + improvement*0.4` heuristic false-positives.
 
 describe('Group 7 — Purify modal candidates', () => {
-  it('Gastly shadow CP:82 (Sha/Pur(G)=2, purified Rank% (G)=93.5) appears in purify modal', () => {
+  it('Gastly shadow CP:82 is deduped into the evolved Gengar keeper (#73) — no standalone purify', () => {
+    // #73: Gastly (pre-evo, Great purify) shares terminal evo Gengar with the evolved Gengar
+    // CP:1327 shadow, which wins the single per-target purify slot. Gastly's indicator is cleared
+    // (before v3.5.67 both showed `p`). Aligns with the Amaura→Aurorus one-per-target rule.
     const p = find('Gastly', 82);
     expect(p).toBeDefined();
     expect(p.isShadow).toBe(true);
-    expect(p.purifyLeague).toBeTruthy();
-    expect(p.purifyRankPct).toBeGreaterThanOrEqual(92);
+    expect(p.purifyLeague).toBe('');
+    // The evolved family keeper retains the purify slot.
+    expect(find('Gengar', 1327).isPurifySlot).toBe(true);
   });
 
   it('Cacnea shadow CP:80 (Sha/Pur(G)=0 → Pokégenie keeps shadow) does NOT appear as purify candidate', () => {
@@ -672,11 +676,13 @@ describe('Group 16b — Special suffixes work across all conventions', () => {
 // suppressing the p suffix that signals "worth purifying".
 
 describe('Group 17 — Shadow purify p suffix', () => {
-  it('Gastly shadow CP:82 (purifyRankPct≥92) → nick contains league symbol + p', () => {
+  it('Gastly shadow CP:82 deduped into evolved Gengar (#73) → no league+p suffix', () => {
+    // #73: the positive league+p case is covered by Machop CP:120 below (only shadow of its
+    // line, so never deduped). Gastly now collapses into the evolved Gengar keeper → no `p`.
     const p = find('Gastly', 82);
     expect(p).toBeDefined();
-    expect(p.purifyRankPct).toBeGreaterThanOrEqual(92);
-    expect(p.nickname).toMatch(/[ⓁⒼⓊ]\d+p/);
+    expect(p.purifyLeague).toBe('');
+    expect(p.nickname).not.toMatch(/[ⓁⒼⓊ]\d+p/);
   });
 
   it('Gastly shadow CP:82 → nick length ≤ 12', () => {

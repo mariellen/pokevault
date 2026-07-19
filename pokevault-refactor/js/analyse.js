@@ -667,6 +667,35 @@ function simulatePurify(p) {
   p.purifyRankPct = Math.round(bestPct);
 }
 
+// #73: dedup purify candidates so at most ONE shadow advertises the purify `p` per evolution
+// target. simulatePurify() fires independently per member, so a family with several qualifying
+// shadows (e.g. three Amaura + one Aurorus) shows `p` on all of them when only the single best
+// keeper should. We group by the FINAL evolution target — Amaura and Aurorus both resolve to
+// `Aurorus` and collapse to one, but branching families keep one per distinct target (a shadow
+// Eevee bound for Vaporeon and one bound for Umbreon each keep their `p`). Within a group the
+// keeper is the already-evolved form first (you'd purify+evolve to it), then higher purified
+// rank, then higher IV. Losers have purifyLeague cleared, which drops the `p` suffix and the
+// review purify nick everywhere (both gate on p.purifyLeague).
+function dedupePurifyCandidates(parsed) {
+  if (typeof terminalEvo !== 'function') return;
+  const groups = {};
+  parsed.forEach(p => {
+    if (!(p.isShadow && p.purifyLeague && p.purifyRankPct >= RULES.keepThreshold)) return;
+    const evoName = p.evolvedNameU || p.evolvedNameG || p.evolvedNameL || p.name;
+    const target = terminalEvo(evoName, p.form) || evoName;
+    (groups[target] = groups[target] || []).push({ p, isEvolved: p.name === target });
+  });
+  Object.values(groups).forEach(cands => {
+    if (cands.length < 2) return;
+    cands.sort((a, b) =>
+      (Number(b.isEvolved) - Number(a.isEvolved)) ||
+      ((b.p.purifyRankPct || 0) - (a.p.purifyRankPct || 0)) ||
+      ((b.p.ivAvg || 0) - (a.p.ivAvg || 0))
+    );
+    cands.slice(1).forEach(({ p }) => { p.purifyLeague = ''; p.isPurifySlot = false; });
+  });
+}
+
 // ═══════════════════════════════════════════════
 // FORM-AWARE EVO-TARGET IDENTITY  (v3.5.56, #39)
 // ═══════════════════════════════════════════════
@@ -847,8 +876,12 @@ function analyse(rows) {
   }
 
   // Simulate purification for shadows
+  parsed.forEach(p => simulatePurify(p));
+  // #73: keep only the best purify candidate per evolution target (drops duplicate `p` indicators
+  // on pre-evos like Amaura when the evolved keeper Aurorus already carries it) BEFORE the
+  // slot-push, so losers never get a spurious confirmed purify slot.
+  dedupePurifyCandidates(parsed);
   parsed.forEach(p => {
-    simulatePurify(p);
     // If shadow qualifies when purified, assign purify league as a slot
     // so it gets e.g. GurdurrⒼ92p instead of Ⓡ73p
     if (p.isShadow && p.purifyLeague && p.purifyRankPct >= RULES.keepThreshold) {

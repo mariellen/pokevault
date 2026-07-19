@@ -274,6 +274,11 @@ tr.row-merge-candidate{opacity:0.7;}
   .star-none{display:block!important;}
   .poke-name-cell{min-width:60px!important;}
   .poke-name{font-size:10px!important;}
+  /* #74: the override panel lives in a colspan td inside the horizontally-scrollable results
+     table, so flex-wrap alone wraps it to the wide TABLE width (still needs a horizontal scroll).
+     Pin it to the viewport's left edge and cap its width to the screen so the controls reflow
+     onto multiple lines WITHIN the viewport — no horizontal scroll for bulk form editing. */
+  .override-panel{position:sticky;left:0;max-width:calc(100vw - 16px);box-sizing:border-box;}
   .poke-variants{flex-wrap:wrap;}
   .vtag:not(.vt-shadow):not(.vt-purified):not(.vt-lucky):not(.vt-shiny):not(.vt-form){display:none;}
   .nick-suggested,.nick-starred{font-size:10px!important;}
