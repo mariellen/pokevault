@@ -225,7 +225,7 @@ function buildRow(p){
     <td><button class="hide-btn" onclick="hideRow('${p.idx}')" title="Hide">&#10005;</button></td>
     <tr class="override-row" id="ov-${p.stableKey}" style="display:none">
       <td colspan="12" style="padding:8px 12px;background:var(--surf2)">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px">
+        <div class="override-panel" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px">
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_shiny',this.checked)" ${p.isShiny?'checked':''}> ✨ Shiny</label>
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_dynamax',this.checked)" ${p.isDynamax?'checked':''}> Dynamax</label>
           <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" onchange="setOverride('${p.stableKey}','is_gigantamax',this.checked)" ${p.isGigantamax?'checked':''}> Gigantamax</label>

@@ -641,6 +641,21 @@ target. If `purifyRankPct ≥ 90%`, the purify league is added to `p.slots` (`is
 The league-style purify nick renders the **evolved target name** (`purifyEvo`), not the base
 species.
 
+### Dedup — one `p` per evolution target (#73, v3.5.67)
+`simulatePurify()` runs independently per member, so a family with several qualifying shadows
+would show `p` on all of them. `dedupePurifyCandidates(parsed)` runs right after simulation (and
+before the purify slot-push) and keeps at most **one** purify candidate per **final evolution
+target** (`terminalEvo(evolvedNameU||G||L||name)`):
+- Pre-evos collapse into the evolved keeper — three shadow Amaura + one Aurorus → only the
+  evolved **Aurorus** keeps `p`; the Amaura lose `purifyLeague`/`isPurifySlot`.
+- Branching families keep one per **distinct** target — a shadow Eevee bound for Vaporeon **and**
+  one bound for Umbreon each keep their `p`.
+- Within a target, the keeper is chosen: already-evolved form first, then higher `purifyRankPct`,
+  then higher IV.
+
+Because the purify modal and the `p` suffix both gate on `purifyLeague`/`isPurifySlot`, clearing
+them on the losers fixes the modal and the nick together.
+
 ---
 
 ## 8. Family Grouping Rules
