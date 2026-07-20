@@ -198,6 +198,14 @@ function terminalEvo(name, form) {
   return finals.length === 1 ? finals[0] : name;
 }
 
+// #83: a per-form collection keeper species — either a tracked COLLECTION_SETS set (v3.5.64,
+// with a "missing" completeness badge) or a costume-keeper species (Pikachu family) that gets
+// the same best-IV-per-costume keeper without completeness tracking.
+function isCollectionKeeperSpecies(name) {
+  return (typeof COLLECTION_SETS !== 'undefined' && !!COLLECTION_SETS[name])
+    || (typeof COSTUME_KEEPER_SPECIES !== 'undefined' && COSTUME_KEEPER_SPECIES.has(name));
+}
+
 function buildNickname(p, slot, convention) {
   const iv = Math.round(p.ivAvg||0);
   const atkIV=p.atkIV||0, defIV=p.defIV||0, staIV=p.staIV||0;
@@ -1517,7 +1525,10 @@ function analyse(rows) {
       const cForm = p.specialForm || p.vivillonPattern;
       p.reason = cForm ? `Collection — best ${cForm} kept for full set` : 'Collection species';
       const pv = Math.round(p.rankPctM || p.ivAvg || 0);
-      p.nickname = fitName(p.name, LC.R + (pv >= 100 ? PERFECT : String(pv)), '', 12);
+      // #83: show the FINAL evolution name (Pikachu costume keeper → RaichuⓇ{IV%}). terminalEvo
+      // is a no-op for single-stage collection species (Squawkabilly/Furfrou/Florges).
+      const evoName = (typeof terminalEvo === 'function') ? terminalEvo(p.name, p.form) : p.name;
+      p.nickname = fitName(evoName, LC.R + (pv >= 100 ? PERFECT : String(pv)), '', 12);
       if (!p.slots.includes('collection_keep')) p.slots.push('collection_keep');
     };
 
@@ -1548,9 +1559,12 @@ function analyse(rows) {
       // family — from cross-contaminating each other's per-form keepers. Untagged members (no
       // form set) are skipped here and fall through to the "set pattern" review path below.
       // Runs BEFORE the dustCostBest / hasLeagueSlot computation so the Master strip is seen.
-      if (COLLECTION_SETS && COLLECTION_SETS[p.name]) {
+      if (isCollectionKeeperSpecies(p.name)) {
         const form = p.specialForm || p.vivillonPattern;
-        if (form) {
+        // #83: 'Unknown' (not yet identified) and 'None' (confirmed plain) are NOT costumes — those
+        // members get no keeper and compete normally. Only a real set form buckets per-costume.
+        const isRealForm = !!form && form !== 'Unknown' && form !== 'None';
+        if (isRealForm) {
           const sameForm = members.filter(m => m.name === p.name
             && (m.specialForm || m.vivillonPattern) === form);
           const best = sameForm.sort((a,b) =>
@@ -1565,10 +1579,16 @@ function analyse(rows) {
         // render Ⓡ collection keepers, not Ⓜ/cyan/blue, and skip the Master-review branch below.
         // Real Great/Ultra rank wins (form-blind PvP) are untouched. (The ML grey-placeholder
         // pass also excludes these species.)
-        p.slots = p.slots.filter(s => s !== 'M' && s !== 'M_tentative');
-        p.wonMasterSlot = false;
-        p.isAffordableWinner = false;
-        p.isExpensiveWinner = false;
+        // #83: for COLLECTION_SETS species this is unconditional (existing v3.5.64 behaviour); for
+        // costume-keeper species (Pikachu family) only strip TAGGED costumes, so untagged / 'None'
+        // Pikachu compete normally (can still be an IV-based Master/best-overall keeper).
+        const stripMaster = (typeof COLLECTION_SETS !== 'undefined' && !!COLLECTION_SETS[p.name]) || isRealForm;
+        if (stripMaster) {
+          p.slots = p.slots.filter(s => s !== 'M' && s !== 'M_tentative');
+          p.wonMasterSlot = false;
+          p.isAffordableWinner = false;
+          p.isExpensiveWinner = false;
+        }
       }
 
       // Fix dustCostBest to use the dust for the assigned league slot
@@ -2104,7 +2124,7 @@ function analyse(rows) {
         // Only slot-less members can RECEIVE the grey placeholder. #64: cosmetic collection-form
         // species are excluded — they're per-form Ⓡ keepers, never IV-based Master placeholders.
         const slotless = members.filter(m => notConfirmedWinner(m) && !holdsSlot(m)
-          && !(typeof COLLECTION_SETS !== 'undefined' && COLLECTION_SETS[m.name]));
+          && !isCollectionKeeperSpecies(m.name));
         // Highest IV among already-surfaced (tentative-slot) non-winners — the grey star only
         // fires if the best slot-less candidate strictly out-IVs all of them (else they already
         // represent the family's best Master candidate; greying a weaker member is the #24 bug:

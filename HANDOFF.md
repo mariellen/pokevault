@@ -10,6 +10,22 @@ _Last updated: 19 Jul 2026_
 
 ## 🔴 NEEDS YOU NOW
 
+### Per-costume best-IV keeper for Pikachu family (#83, v3.5.73)
+**Status:** Implemented on `feature/per-costume-best-iv-keeper` (from main). Extends the v3.5.64
+per-form collection keeper to Pikachu costumes: new `COSTUME_KEEPER_SPECIES={Pikachu,Pichu,Raichu}`
+(no COLLECTION_SETS completeness set) + `isCollectionKeeperSpecies()` helper. Best IV per specialForm
+costume → keeper (green ≥90 / grey <90 / gold fav), nick `RaichuⓇ{IV%}` via terminalEvo. `'Unknown'`
+and `'None'` are excluded (compete normally); Master-strip only applies to tagged costumes for the
+Pikachu family. A costume that wins a real league slot keeps the league nick (`RaichuⒼ99`).
+**Gotcha:** a costume Pikachu only shows the `Ⓖ`/`Ⓤ` league nick when IV<90 — a ≥90-IV mon claims
+Master first (one-slot rule, Master rank=IV%) and renders as an `Ⓡ` keeper. Suite: **865 passed**
+(+9; 4 failures = pre-existing untracked `csp.test.js`). v3.5.72 → v3.5.73.
+**Owner:** YOU
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/86 , then tag two same-costume
+Pikachu and confirm the best IV becomes a `RaichuⓇ{IV}` keeper. See
+`reviews/issue-83-per-costume-best-iv-keeper-impl-summary.md`.
+_Updated: 19 Jul 2026_
+
 ### Pikachu list updates + sort-preserves-filter (#82/#77, v3.5.72)
 **Status:** Implemented on `feature/pikachu-list-and-sort-filter-fix` (from main, post-#81 merge).
 Fix 1 (data.js): renames Party Hat→Party Hat Purple, Party Top Hat→Party Top Hat Purple, Safari Hat→
