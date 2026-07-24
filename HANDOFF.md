@@ -1,5 +1,5 @@
 # PokéVault Handoff
-_Last updated: 19 Jul 2026_
+_Last updated: 24 Jul 2026_
 
 > **How to use this file**
 > Open this whenever you come back to PokéVault.
@@ -10,21 +10,31 @@ _Last updated: 19 Jul 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Per-costume best-IV keeper for Pikachu family (#83, v3.5.73)
-**Status:** Implemented on `feature/per-costume-best-iv-keeper` (from main). Extends the v3.5.64
-per-form collection keeper to Pikachu costumes: new `COSTUME_KEEPER_SPECIES={Pikachu,Pichu,Raichu}`
-(no COLLECTION_SETS completeness set) + `isCollectionKeeperSpecies()` helper. Best IV per specialForm
-costume → keeper (green ≥90 / grey <90 / gold fav), nick `RaichuⓇ{IV%}` via terminalEvo. `'Unknown'`
-and `'None'` are excluded (compete normally); Master-strip only applies to tagged costumes for the
-Pikachu family. A costume that wins a real league slot keeps the league nick (`RaichuⒼ99`).
-**Gotcha:** a costume Pikachu only shows the `Ⓖ`/`Ⓤ` league nick when IV<90 — a ≥90-IV mon claims
-Master first (one-slot rule, Master rank=IV%) and renders as an `Ⓡ` keeper. Suite: **865 passed**
-(+9; 4 failures = pre-existing untracked `csp.test.js`). v3.5.72 → v3.5.73.
+### Small UI fixes: form-filter persistence, modal Unknown/None, mobile header (#88/#89/#90, v3.5.74)
+**Status:** Implemented on `feature/ui-fixes-88-89-90` (from main). Three fixes:
+1. **#88** — Form filter now persists across family sort mode changes (full re-renders). Previous fix
+   (PR #83) only covered per-column sort; this adds `formFilterActiveByKey` state so the dropdown
+   pre-selects the saved form on rebuild and `reapplyAllFormFilters()` restores row visibility.
+2. **#89** — Set Forms modal `formIsSet` condition made explicit: blank/`'Unknown'` → show (needs
+   tagging); `'None'`/real form → hide. Logic was already correct; now self-documenting.
+3. **#90** — Family header split into two CSS-class rows (`fam-header-row1` / `fam-header-row2`).
+   On mobile (≤600px) rows stack vertically with `flex-wrap:nowrap` each, so search buttons and
+   filter controls no longer mix.
+Suite: **875 passed** (+10; 4 failures = pre-existing untracked `csp.test.js`). v3.5.73 → v3.5.74.
 **Owner:** YOU
-**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/86 , then tag two same-costume
-Pikachu and confirm the best IV becomes a `RaichuⓇ{IV}` keeper. See
-`reviews/issue-83-per-costume-best-iv-keeper-impl-summary.md`.
-_Updated: 19 Jul 2026_
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/92, then on mobile confirm
+search buttons and filter/dots are on separate lines; filter a Pikachu family by form, change the
+family sort mode, and confirm the form filter is still active. See
+`reviews/issue-88-89-90-ui-fixes-impl-summary.md`.
+_Updated: 24 Jul 2026_
+
+### Per-costume best-IV keeper for Pikachu family (#83, v3.5.73) — ✅ MERGED (PR #86)
+**Status:** Merged. Extends per-form collection keeper to Pikachu costumes: `COSTUME_KEEPER_SPECIES`
++ `isCollectionKeeperSpecies()`. Best IV per costume → `RaichuⓇ{IV%}` keeper. `'Unknown'`/`'None'`
+excluded. See `reviews/issue-83-per-costume-best-iv-keeper-impl-summary.md`.
+**Owner:** YOU
+**Next action:** Done.
+_Updated: 24 Jul 2026_
 
 ### Pikachu list updates + sort-preserves-filter (#82/#77, v3.5.72)
 **Status:** Implemented on `feature/pikachu-list-and-sort-filter-fix` (from main, post-#81 merge).
