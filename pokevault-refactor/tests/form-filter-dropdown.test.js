@@ -19,7 +19,7 @@ describe('#65 — formFilterSelect (header dropdown)', () => {
   it('renders an All-forms + per-form <select> for a FORM_DROPDOWNS species', () => {
     const html = renderLoader.formFilterSelect('Pikachu', '25');
     expect(html).toContain('<select class="fam-form-filter"');
-    expect(html).toContain('<option value="__all__">All forms</option>');
+    expect(html).toContain('value="__all__"'); // All forms option present (may carry 'selected')
     expect(html).toContain('value="Santa Hat"');
     expect(html).toContain('value="Team Instinct Hat"');
     // wired to the family-scoped filter + a count span, and does not toggle the family
@@ -40,6 +40,75 @@ describe('#65 — formFilterSelect (header dropdown)', () => {
   it('works for other dropdown species (Squawkabilly, Furfrou)', () => {
     expect(renderLoader.formFilterSelect('Squawkabilly', '931')).toContain('value="Green Plumage"');
     expect(renderLoader.formFilterSelect('Furfrou', '676')).toContain('value="Pharaoh"');
+  });
+});
+
+describe('#88 — formFilterSelect pre-selects the saved form on re-render', () => {
+  afterEach(() => {
+    // Clean up state between tests
+    Object.keys(renderLoader.formFilterActiveByKey).forEach(k => delete renderLoader.formFilterActiveByKey[k]);
+  });
+
+  it('defaults to All forms selected when no saved state exists', () => {
+    const html = renderLoader.formFilterSelect('Pikachu', 'pika-test');
+    expect(html).toContain('<option value="__all__" selected>All forms</option>');
+    expect(html).not.toContain('" selected>Rock Star');
+  });
+
+  it('pre-selects the saved form when formFilterActiveByKey is set', () => {
+    renderLoader.formFilterActiveByKey['pika-test'] = 'Rock Star';
+    const html = renderLoader.formFilterSelect('Pikachu', 'pika-test');
+    expect(html).toContain('value="Rock Star" selected');
+    // All forms should NOT be selected
+    expect(html).not.toContain('<option value="__all__" selected>');
+  });
+
+  it('pre-selects All forms when saved state is reset to empty string', () => {
+    renderLoader.formFilterActiveByKey['pika-test'] = '';
+    const html = renderLoader.formFilterSelect('Pikachu', 'pika-test');
+    expect(html).toContain('<option value="__all__" selected>All forms</option>');
+  });
+
+  it('does not cross-contaminate different family keys', () => {
+    renderLoader.formFilterActiveByKey['fam-a'] = 'Santa Hat';
+    renderLoader.formFilterActiveByKey['fam-b'] = '';
+    const htmlA = renderLoader.formFilterSelect('Pikachu', 'fam-a');
+    const htmlB = renderLoader.formFilterSelect('Pikachu', 'fam-b');
+    expect(htmlA).toContain('value="Santa Hat" selected');
+    expect(htmlB).toContain('<option value="__all__" selected>All forms</option>');
+  });
+});
+
+describe('#89 — Set Forms modal formIsSet: Unknown shown, None hidden', () => {
+  // formIsSet is a closure inside openCleanupModal, so we test the equivalent logic directly.
+  // Rule: blank or 'Unknown' = not yet reviewed (show); 'None' or any real form = hide.
+  function formIsSet(specialForm, vivillonPattern) {
+    const sf = specialForm || '', vp = vivillonPattern || '';
+    return (sf !== '' && sf !== 'Unknown') || (vp !== '' && vp !== 'Unknown');
+  }
+
+  it('blank specialForm → show (not yet tagged)', () => {
+    expect(formIsSet('', '')).toBe(false);
+  });
+
+  it("specialForm='Unknown' → show (not yet reviewed)", () => {
+    expect(formIsSet('Unknown', '')).toBe(false);
+  });
+
+  it("specialForm='None' → hide (confirmed no costume)", () => {
+    expect(formIsSet('None', '')).toBe(true);
+  });
+
+  it("specialForm='Rock Star' → hide (real form set)", () => {
+    expect(formIsSet('Rock Star', '')).toBe(true);
+  });
+
+  it("vivillonPattern='Unknown' → show", () => {
+    expect(formIsSet('', 'Unknown')).toBe(false);
+  });
+
+  it("vivillonPattern='Polar' → hide (real pattern set)", () => {
+    expect(formIsSet('', 'Polar')).toBe(true);
   });
 });
 

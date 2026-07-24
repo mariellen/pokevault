@@ -25,7 +25,8 @@ const shim = `const overridesCache = {};\n`;
 const factory = new Function(
   shim + combined +
   '\nreturn { buildRow, esc, variantTags, formFilterSelect, buildNickname, applyNickOverride, clampNick,' +
-  ' goSpeciesToken, buildBulkCpSearch, familyStarKeepers, familyMergeCandidates, mergeCandidateKeys };'
+  ' goSpeciesToken, buildBulkCpSearch, familyStarKeepers, familyMergeCandidates, mergeCandidateKeys,' +
+  ' formFilterActiveByKey };'
 );
 
 module.exports = factory();
