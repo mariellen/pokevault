@@ -206,6 +206,54 @@ function isCollectionKeeperSpecies(name) {
     || (typeof COSTUME_KEEPER_SPECIES !== 'undefined' && COSTUME_KEEPER_SPECIES.has(name));
 }
 
+// ── Canonical slot→nick resolver (single source of truth) ─────────────────
+// Answers "which slot string should buildNickname use for this Pokémon?" and is
+// the ONE place that encodes the shiny/lucky keepThreshold guard. Used BOTH by
+// the analyse() decision block (hasLeagueSlot branch) and by app.js getNickSlot
+// (the post-analysis nick recompute on cloud load / override toggle / nick
+// convention change). Previously these two paths had DIVERGENT copies of this
+// logic — the app.js copy lacked the guard, so a shiny/lucky with a sub-90
+// tentative league slot rendered a league nick (e.g. UxieⒼ66※) instead of the
+// Ⓡ holding nick (UxieⓇ76※) once its shiny override loaded from Supabase.
+// Issue #91 / #87. Keep this the ONLY implementation.
+function resolveNickSlot(p) {
+  if (p.slots.includes('nundo')) return 'nundo';
+  // Power-up flags win over any capped slot (mirrors the decision block ordering,
+  // where wonDynamaxMaster/wonGigantamaxMaster are routed above hasLeagueSlot).
+  if (p.wonDynamaxMaster) return 'dynamax';
+  if (p.wonGigantamaxMaster) return 'gigantamax';
+
+  const confirmed = s =>
+    (s === 'M' ? (p.ivAvg||0) : (p['rankPct'+s]||0)) >= RULES.keepThreshold
+    || (p.isPurifySlot && s === p.purifyLeague && (p.purifyRankPct||0) >= RULES.keepThreshold);
+
+  const lgSlots = p.slots
+    .filter(s => RULES.leagues.includes(s) || s.endsWith('_affordable'))
+    .map(s => s.replace('_affordable',''));
+
+  // Issue #91: a Shiny/Lucky may render a league nick ONLY when it owns a
+  // CONFIRMED (>= keepThreshold) capped/Master slot. A sub-90 tentative slot must
+  // fall through to the shiny/lucky holding nick.
+  const leagueAllowed = lgSlots.length && !((p.isLucky || p.isShiny) && !lgSlots.some(confirmed));
+  if (leagueAllowed) {
+    // Prefer a capped league (Ⓤ/Ⓖ/Ⓛ) over Master (Ⓡ); highest rank among capped.
+    const capped = lgSlots.filter(s => s !== 'M');
+    return capped.length
+      ? capped.sort((a, b) => (p['rankPct'+b]||0) - (p['rankPct'+a]||0))[0]
+      : (['M','U','G','L'].find(s => lgSlots.includes(s)) || lgSlots[0]);
+  }
+
+  if (p.slots.includes('lucky') || p.isLucky) return 'lucky';
+  if (p.slots.includes('shiny') || p.slots.includes('shiny_lower')) return 'shiny';
+  if (p.slots.includes('dynamax')) return 'dynamax';
+  if (p.slots.includes('gigantamax')) return 'gigantamax';
+  if (p.slots.includes('best_overall')) return 'lucky';
+  if (p.slots.includes('shadow')) return 'lucky';
+  if (p.slots.includes('purified')) return 'review';
+  if (p.decision === 'trade') return 'trade';
+  return 'review';
+}
+
 function buildNickname(p, slot, convention) {
   const iv = Math.round(p.ivAvg||0);
   const atkIV=p.atkIV||0, defIV=p.defIV||0, staIV=p.staIV||0;
@@ -1639,11 +1687,9 @@ function analyse(rows) {
       } else if (hasLeagueSlot) {
         const lgSlots=p.slots.filter(s=>RULES.leagues.includes(s)||s.endsWith('_affordable')).map(s=>s.replace('_affordable',''));
         const lgNames=lgSlots.map(s=>RULES.leagueNames[s]);
-        // Prefer capped league (Ⓤ/Ⓖ/Ⓛ) over Master (Ⓡ); when multiple capped leagues, pick highest rank
-        const cappedSlots = lgSlots.filter(s => s !== 'M');
-        const nickSlot = cappedSlots.length > 0
-          ? cappedSlots.sort((a, b) => (p['rankPct'+b]||0) - (p['rankPct'+a]||0))[0]
-          : (['M','U','G','L'].find(s => lgSlots.includes(s)) || lgSlots[0]);
+        // Slot→nick selection via the shared resolveNickSlot (single source of truth,
+        // also used by app.js getNickSlot on the override/convention recompute path).
+        const nickSlot = resolveNickSlot(p);
         if(nickSlot==='M') p.targetEvo=p.evolvedNameU||p.evolvedNameG||'';
         else if(nickSlot==='G') p.targetEvo=p.evolvedNameG||'';
         else if(nickSlot==='U') p.targetEvo=p.evolvedNameU||'';
