@@ -10,22 +10,23 @@ _Last updated: 24 Jul 2026_
 
 ## 🔴 NEEDS YOU NOW
 
-### Small UI fixes: form-filter persistence, modal Unknown/None, mobile header (#88/#89/#90, v3.5.74)
-**Status:** Implemented on `feature/ui-fixes-88-89-90` (from main). Three fixes:
-1. **#88** — Form filter now persists across family sort mode changes (full re-renders). Previous fix
-   (PR #83) only covered per-column sort; this adds `formFilterActiveByKey` state so the dropdown
-   pre-selects the saved form on rebuild and `reapplyAllFormFilters()` restores row visibility.
-2. **#89** — Set Forms modal `formIsSet` condition made explicit: blank/`'Unknown'` → show (needs
-   tagging); `'None'`/real form → hide. Logic was already correct; now self-documenting.
-3. **#90** — Family header split into two CSS-class rows (`fam-header-row1` / `fam-header-row2`).
-   On mobile (≤600px) rows stack vertically with `flex-wrap:nowrap` each, so search buttons and
-   filter controls no longer mix.
-Suite: **875 passed** (+10; 4 failures = pre-existing untracked `csp.test.js`). v3.5.73 → v3.5.74.
+### resolveNickSlot — shiny/lucky sub-90 league nick guard (#91/#87, v3.5.75)
+**Status:** Implemented on `feature/resolve-nick-slot-fix` (from main). New `resolveNickSlot(p)`
+in analyse.js is the single source of truth for slot→nick. It adds the shiny/lucky
+`keepThreshold` guard that was missing from app.js `getNickSlot`. Live bug: applying a shiny
+override post-analysis (Supabase cloud load path) rendered `UxieⒼ66※` instead of `UxieⓇ76※`
+because `getNickSlot` lacked the guard. `getNickSlot` is now a one-line delegate to
+`resolveNickSlot`. Suite: **861 passed** (+5; 4 failures = pre-existing `csp.test.js`).
+v3.5.74 → v3.5.75.
 **Owner:** YOU
-**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/92, then on mobile confirm
-search buttons and filter/dots are on separate lines; filter a Pikachu family by form, change the
-family sort mode, and confirm the form filter is still active. See
-`reviews/issue-88-89-90-ui-fixes-impl-summary.md`.
+**Next action:** Review + merge https://github.com/mariellen/pokevault/pull/94, then check your
+shiny Uxie renders `UxieⓇ76※` (not `UxieⒼ66※`) after cloud load. See
+`reviews/issue-91-resolve-nick-slot-impl-summary.md`.
+_Updated: 24 Jul 2026_
+
+### Small UI fixes: form-filter persistence, modal Unknown/None, mobile header (#88/#89/#90, v3.5.74) — ✅ MERGED (PR #92)
+**Status:** Merged. See `reviews/issue-88-89-90-ui-fixes-impl-summary.md`.
+**Next action:** Done.
 _Updated: 24 Jul 2026_
 
 ### Per-costume best-IV keeper for Pikachu family (#83, v3.5.73) — ✅ MERGED (PR #86)
