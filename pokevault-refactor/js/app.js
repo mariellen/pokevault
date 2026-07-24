@@ -845,24 +845,13 @@ function cycleSortMode(btn){
   applyFilters();
 }
 
+// Delegates to the canonical resolver in analyse.js (single source of truth).
+// Previously this had its own copy of the slot-selection logic that lacked the
+// shiny/lucky keepThreshold guard, so applying a shiny override to an
+// already-analysed collection rendered a sub-90 league nick (UxieⒼ66※) instead
+// of the Ⓡ holding nick (UxieⓇ76※). Issue #91 / #87. Do not re-inline this.
 function getNickSlot(p) {
-  if (p.slots.includes('nundo')) return 'nundo';
-  const lgSlots = p.slots.filter(s => RULES.leagues.includes(s));
-  if (lgSlots.length) {
-    const cappedSlots = lgSlots.filter(s => s !== 'M');
-    return cappedSlots.length
-      ? cappedSlots.sort((a,b)=>(p['rankPct'+b]||0)-(p['rankPct'+a]||0))[0]
-      : lgSlots[0];
-  }
-  if (p.slots.includes('lucky') || p.isLucky) return 'lucky';
-  if (p.slots.includes('shiny') || p.slots.includes('shiny_lower')) return 'shiny';
-  if (p.slots.includes('dynamax')) return 'dynamax';
-  if (p.slots.includes('gigantamax')) return 'gigantamax';
-  if (p.slots.includes('best_overall')) return 'lucky';
-  if (p.slots.includes('shadow')) return 'lucky';
-  if (p.slots.includes('purified')) return 'review';
-  if (p.decision === 'trade') return 'trade';
-  return 'review';
+  return resolveNickSlot(p);
 }
 
 function setNickConvention(val) {
@@ -1998,12 +1987,7 @@ function openCleanupModal(){
   if(searchRow) searchRow.style.display='';
   const cleanupSearchTerm=(document.getElementById('cleanupSearch')?.value||'').toLowerCase();
 
-  // #89: 'Unknown' = not yet reviewed (show in modal); 'None' = confirmed no costume (hide).
-  // Empty string = never tagged (show). Any real form value (e.g. 'Rock Star') = hide.
-  const formIsSet=p=>{
-    const sf=p.specialForm||'', vp=p.vivillonPattern||'';
-    return (sf!==''&&sf!=='Unknown')||(vp!==''&&vp!=='Unknown');
-  };
+  const formIsSet=p=>(p.specialForm&&p.specialForm!=='Unknown')||(p.vivillonPattern&&p.vivillonPattern!=='Unknown');
   const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!formIsSet(p)
       &&matchesDateRange(p,cleanupFromDate,cleanupToDate)
       &&(!cleanupSearchTerm||p.name.toLowerCase().includes(cleanupSearchTerm)))

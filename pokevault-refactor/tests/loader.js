@@ -23,7 +23,7 @@ const shim = `const overridesCache = {};\n`;
 
 // All const/function declarations share one function scope, so analyse,
 // buildFamilyMap, and buildNickname (declared inside that scope) are visible to the return.
-const RETURN = '\nreturn { analyse, buildFamilyMap, buildNickname, findMergeCandidates, computeFamilyCompleteness, applyNickOverride, clampNick, MAX_NICK_LENGTH };';
+const RETURN = '\nreturn { analyse, buildFamilyMap, buildNickname, resolveNickSlot, findMergeCandidates, computeFamilyCompleteness, applyNickOverride, clampNick, MAX_NICK_LENGTH };';
 const factory = new Function(shim + combined + RETURN);
 const base = factory();
 module.exports = base;
