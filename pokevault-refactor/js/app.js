@@ -418,7 +418,7 @@ function renderFamily(fam,isOpen){
 
   return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
     <div class="${headerClass}" onclick="toggleFamily('fam-${key}')">
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;min-width:0">
+      <div class="fam-header-row1">
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''} <span style="color:var(--dim);font-size:11px">(${members.length})</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
@@ -429,7 +429,7 @@ function renderFamily(fam,isOpen){
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
         ${completeIcons?`<span class="fam-badge" style="font-size:11px" title="Completeness icons">${completeIcons}</span>`:''}
       </div>
-      <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
+      <div class="fam-header-row2">
         ${formFilterSelect(primaryName,key)}
         <span class="fam-league-dots">${leagueDots}</span>
         <button class="copy-search-btn" data-fam="${nameEsc}" onclick="event.stopPropagation();openCullModal(this.dataset.fam)" title="View in Cull modal" aria-label="View ${primaryName} in Cull modal">🗑</button>
@@ -557,6 +557,7 @@ function renderPage(){
     </div>`;
   }
   document.getElementById('main-content').innerHTML=html+pagHtml;
+  reapplyAllFormFilters(); // #88: restore form filter row visibility after full re-render
 }
 
 // ── Row visibility — single source of truth ──────────────────────────────────
@@ -741,7 +742,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
 
   return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
     <div class="${headerClass}" onclick="toggleFamily('fam-${key}')">
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;min-width:0">
+      <div class="fam-header-row1">
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''}${collBadge} <span style="color:var(--dim);font-size:11px">(${members.length})${activeLeagues.length>0?' · '+visible.length+' shown':''}</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
@@ -752,7 +753,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
         ${completeIcons?`<span class="fam-badge" style="font-size:11px" title="Completeness icons">${completeIcons}</span>`:''}
       </div>
-      <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
+      <div class="fam-header-row2">
         ${formFilterSelect(primaryName,key)}
         <span class="fam-league-dots">${leagueDots}</span>
         <button class="copy-search-btn" data-fam="${nameEsc}" onclick="event.stopPropagation();openCullModal(this.dataset.fam)" title="View in Cull modal" aria-label="View ${primaryName} in Cull modal">🗑</button>
@@ -775,6 +776,8 @@ function filterFamilyByForm(key, form){
   const card = document.getElementById('fam-'+key);
   if (!card) return;
   const all = !form || form === '__all__';
+  // #88: persist active form so formFilterSelect can pre-select it on full page re-renders.
+  if (typeof formFilterActiveByKey !== 'undefined') formFilterActiveByKey[key] = all ? '' : form;
   let visible = 0;
   card.querySelectorAll('tbody > tr').forEach(tr => {
     // Override panels: collapse them while a specific form is active; leave alone for 'All forms'.
@@ -785,6 +788,16 @@ function filterFamilyByForm(key, form){
   });
   const cnt = card.querySelector('.fam-form-count');
   if (cnt) cnt.textContent = all ? '' : ' ('+visible+')';
+}
+
+// #88: after a full page re-render (applyFilters → renderPage) all family cards are rebuilt from
+// scratch, so row visibility must be re-applied for any family that had an active form filter.
+function reapplyAllFormFilters(){
+  if (typeof formFilterActiveByKey === 'undefined') return;
+  Object.keys(formFilterActiveByKey).forEach(key => {
+    const form = formFilterActiveByKey[key];
+    if (form) filterFamilyByForm(key, form);
+  });
 }
 
 function toggleFamily(id){const el=document.getElementById(id);if(!el)return;const nowOpen=el.classList.toggle('open');if(nowOpen)trackEvent('family_expand');}
@@ -1985,7 +1998,12 @@ function openCleanupModal(){
   if(searchRow) searchRow.style.display='';
   const cleanupSearchTerm=(document.getElementById('cleanupSearch')?.value||'').toLowerCase();
 
-  const formIsSet=p=>(p.specialForm&&p.specialForm!=='Unknown')||(p.vivillonPattern&&p.vivillonPattern!=='Unknown');
+  // #89: 'Unknown' = not yet reviewed (show in modal); 'None' = confirmed no costume (hide).
+  // Empty string = never tagged (show). Any real form value (e.g. 'Rock Star') = hide.
+  const formIsSet=p=>{
+    const sf=p.specialForm||'', vp=p.vivillonPattern||'';
+    return (sf!==''&&sf!=='Unknown')||(vp!==''&&vp!=='Unknown');
+  };
   const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!formIsSet(p)
       &&matchesDateRange(p,cleanupFromDate,cleanupToDate)
       &&(!cleanupSearchTerm||p.name.toLowerCase().includes(cleanupSearchTerm)))

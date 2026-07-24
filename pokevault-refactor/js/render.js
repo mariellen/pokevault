@@ -16,6 +16,9 @@ let practicalMode=false;     // Option B: hide expensive slot winners from main 
 let cullPracticalMode=false; // same for Cull modal
 const PER_PAGE=40;
 const familySortState={};
+// #88: persists the active form filter across full page re-renders (family sort mode changes
+// rebuild the entire card, losing the <select> value). Key = famKey, value = active form ('') = all.
+const formFilterActiveByKey={};
 
 // ═══════════════════════════════════════════════
 // RENDER HELPERS
@@ -105,8 +108,10 @@ function moveHTML(p){
 function formFilterSelect(primaryName, key){
   const forms = (typeof FORM_DROPDOWNS !== 'undefined') && FORM_DROPDOWNS[primaryName];
   if (!forms) return '';
-  const opts = ['<option value="__all__">All forms</option>'].concat(
-    forms.filter(f => f && f !== 'Unknown').map(f => `<option value="${esc(f)}">${esc(f)}</option>`)
+  const active = (typeof formFilterActiveByKey !== 'undefined') ? (formFilterActiveByKey[key] || '') : '';
+  const opts = [`<option value="__all__"${!active ? ' selected' : ''}>All forms</option>`].concat(
+    forms.filter(f => f && f !== 'Unknown').map(f =>
+      `<option value="${esc(f)}"${active === f ? ' selected' : ''}>${esc(f)}</option>`)
   ).join('');
   return `<select class="fam-form-filter" title="Filter this family by form" aria-label="Filter ${esc(primaryName)} by form"`
     + ` onclick="event.stopPropagation()" onchange="event.stopPropagation();filterFamilyByForm('${esc(key)}',this.value)">${opts}</select>`

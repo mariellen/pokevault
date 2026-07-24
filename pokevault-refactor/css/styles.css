@@ -48,6 +48,9 @@ header{background:var(--surf);border-bottom:1px solid var(--border);padding:10px
 /* #65 — per-family form filter dropdown in the header */
 .fam-form-filter{background:var(--surf);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;padding:2px 4px;max-width:130px;flex-shrink:0;}
 .fam-form-count{color:var(--muted);font-size:11px;flex-shrink:0;}
+/* #90 — family header split into two rows; row1=search buttons, row2=filter/dots/sort */
+.fam-header-row1{display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex:1;min-width:0;}
+.fam-header-row2{display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0;}
 
 /* SUMMARY STRIP — removed from main view; styles kept for compatibility */
 .summary-strip{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;}
@@ -282,6 +285,10 @@ tr.row-merge-candidate{opacity:0.7;}
      Pin it to the viewport's left edge and cap its width to the screen so the controls reflow
      onto multiple lines WITHIN the viewport — no horizontal scroll for bulk form editing. */
   .override-panel{position:sticky;left:0;max-width:calc(100vw - 16px);box-sizing:border-box;}
+  /* #90 — on mobile each header row sits on its own line; nowrap keeps controls within their row */
+  .family-header{flex-direction:column;align-items:stretch;}
+  .fam-header-row1{flex-wrap:nowrap;overflow-x:auto;}
+  .fam-header-row2{flex-wrap:nowrap;margin-left:0;}
   .poke-variants{flex-wrap:wrap;}
   .vtag:not(.vt-shadow):not(.vt-purified):not(.vt-lucky):not(.vt-shiny):not(.vt-form){display:none;}
   .nick-suggested,.nick-starred{font-size:10px!important;}
