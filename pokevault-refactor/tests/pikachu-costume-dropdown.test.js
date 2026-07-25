@@ -56,7 +56,7 @@ describe('#77 — Pikachu costume dropdown data', () => {
 
   it('Pichu and Raichu have their own (shorter) alphabetical lists', () => {
     expect(FORM_DROPDOWNS.Pichu).toEqual(
-      ['Unknown', 'None', 'Fragment Hat', 'Meloetta Hat', 'Party Hat Red', 'Santa Hat', 'Witch Hat']);
+      ['Unknown', 'None', 'Cherry Blossom', 'Fragment Hat', 'Meloetta Hat', 'Party Hat Red', 'Santa Hat', 'Witch Hat']);
     expect(FORM_DROPDOWNS.Raichu).toEqual(['Unknown', 'None', 'Pop Star', 'Rock Star']);
   });
 
