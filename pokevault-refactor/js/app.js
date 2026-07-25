@@ -1914,6 +1914,7 @@ function closeMergeModal(){
 let cleanupSortMode='stable';
 let cleanupFromDate='';
 let cleanupToDate='';
+let cleanupShowTagged=false;
 let specialSortMode='date';
 let specialFilterSpecies='';
 let specialFromDate='';
@@ -1988,7 +1989,8 @@ function openCleanupModal(){
   const cleanupSearchTerm=(document.getElementById('cleanupSearch')?.value||'').toLowerCase();
 
   const formIsSet=p=>(p.specialForm&&p.specialForm!=='Unknown')||(p.vivillonPattern&&p.vivillonPattern!=='Unknown');
-  const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!formIsSet(p)
+  const fmtScan=s=>{if(!s)return '';const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`scan ${parseInt(m[3])}/${parseInt(m[2])}/${m[1]}`:''};
+  const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&(cleanupShowTagged||!formIsSet(p))
       &&matchesDateRange(p,cleanupFromDate,cleanupToDate)
       &&(!cleanupSearchTerm||p.name.toLowerCase().includes(cleanupSearchTerm)))
     .sort((a,b)=>{
@@ -2002,19 +2004,21 @@ function openCleanupModal(){
       return a.name.localeCompare(b.name);
     });
 
-  const totalNeedsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&!formIsSet(p)
+  const totalNeedsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&(cleanupShowTagged||!formIsSet(p))
       &&matchesDateRange(p,cleanupFromDate,cleanupToDate)).length;
   const dateActive=cleanupFromDate||cleanupToDate;
-  sub.textContent=(cleanupSearchTerm?needsForm.length+' of '+totalNeedsForm:needsForm.length)+' Pokémon need form/pattern set'
-    +(dateActive?' in date range':' ('+needsForm.filter(p=>p.catchDate).length+' with stable IDs)');
+  sub.textContent=(cleanupSearchTerm?needsForm.length+' of '+totalNeedsForm:needsForm.length)
+    +(cleanupShowTagged?' Pokémon shown (including tagged)':' Pokémon need form/pattern set')
+    +(dateActive?' in date range':'');
 
   const clearBtnStyle=`background:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--muted);cursor:pointer;font-size:11px`;
   const sortBtns=`<div style="display:flex;gap:6px;margin-bottom:4px;font-size:11px;flex-wrap:wrap;align-items:center">
     <span style="color:var(--muted)">Sort:</span>
-    <button onclick="cleanupSortMode='stable';openCleanupModal()" style="background:${cleanupSortMode==='stable'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='stable'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">Stable ID</button>
+    <button onclick="cleanupSortMode='stable';openCleanupModal()" style="background:${cleanupSortMode==='stable'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='stable'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">Name</button>
     <button onclick="cleanupSortMode='cp';openCleanupModal()" style="background:${cleanupSortMode==='cp'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='cp'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">CP ↓</button>
     <button onclick="cleanupSortMode='iv';openCleanupModal()" style="background:${cleanupSortMode==='iv'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='iv'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">IV% ↓</button>
     <button onclick="cleanupSortMode='scan';openCleanupModal()" style="background:${cleanupSortMode==='scan'?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupSortMode==='scan'?'#000':'var(--muted)'};cursor:pointer;font-size:11px">Scan Date ↓</button>
+    <button onclick="cleanupShowTagged=!cleanupShowTagged;openCleanupModal()" style="background:${cleanupShowTagged?'var(--cyan)':'none'};border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:${cleanupShowTagged?'#000':'var(--muted)'};cursor:pointer;font-size:11px">${cleanupShowTagged?'Hide tagged':'Show tagged'}</button>
   </div>
   <div class="mark-special-date-row">
     <span>From:</span>
@@ -2028,16 +2032,14 @@ function openCleanupModal(){
     ? sortBtns+'<div class="pv-modal-empty">All forms already set! ✓</div>'
     : sortBtns+needsForm.map(p=>{
         const opts=(FORM_DROPDOWNS[p.name]||[]).map(f=>`<option value="${f}" ${p.specialForm===f?'selected':''}>${f}</option>`).join('');
-        const stableTag=p.catchDate
-          ?`<span style="color:var(--green);font-size:9px">✓ stable ID</span>`
-          :`<span style="color:var(--red);font-size:9px">⚠ no catch date</span>`;
         const cleanNick=p.nickname||'';
         const cleanNickEsc=cleanNick.replace(/"/g,'&quot;');
         const cleanNameEsc=p.name.replace(/"/g,'&quot;');
+        const scanStr=fmtScan(p.scanDate);
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
             <div class="pv-modal-name"><a href="#" data-name="${cleanNameEsc}" onclick="event.preventDefault();cleanupNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${esc(p.name)}</a></div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV · ${p.atkIV}/${p.defIV}/${p.staIV}${cleanNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${cleanNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(cleanNick)}</span>`:''} · ${p.catchDate||'no catch date'} · ${stableTag}</div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV · ${p.atkIV}/${p.defIV}/${p.staIV}${cleanNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${cleanNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(cleanNick)}</span>`:''}${scanStr?' · '+scanStr:''}</div>
           </div>
           <div class="pv-modal-controls">
             <select class="pv-modal-select" onchange="setOverride('${p.stableKey}','special_form',this.value);allPokemon.find(x=>x.stableKey==='${p.stableKey}').specialForm=this.value;">${opts}</select>
