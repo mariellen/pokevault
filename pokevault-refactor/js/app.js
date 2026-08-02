@@ -1989,7 +1989,7 @@ function openCleanupModal(){
   const cleanupSearchTerm=(document.getElementById('cleanupSearch')?.value||'').toLowerCase();
 
   const formIsSet=p=>(p.specialForm&&p.specialForm!=='Unknown')||(p.vivillonPattern&&p.vivillonPattern!=='Unknown');
-  const fmtScan=s=>{if(!s)return '';const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`scan ${parseInt(m[3])}/${parseInt(m[2])}/${m[1]}`:''};
+  const fmtScan=s=>{if(!s)return '';const m=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);return m?`scan ${parseInt(m[3])}/${parseInt(m[2])}/${m[1]} ${m[4]}:${m[5]}`:''};
   const needsForm=allPokemon.filter(p=>NEEDS_FORM.has(p.name)&&(cleanupShowTagged||!formIsSet(p))
       &&matchesDateRange(p,cleanupFromDate,cleanupToDate)
       &&(!cleanupSearchTerm||p.name.toLowerCase().includes(cleanupSearchTerm)))
