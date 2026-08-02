@@ -395,6 +395,76 @@ describe('Fix 1 regression — Shiny/Lucky falls to Ⓡ when beaten in Master', 
   });
 });
 
+// ─── Group L — Fix #103: Master effectiveDust uses dustToMax, not capped-league dust ───────
+// A lower-level Pokémon needs MORE total dust to reach L40, so it is NOT cheaper for Master.
+// Before the fix, effectiveDust for Master fell back to dustCostBest (= dustMin from capped
+// leagues), which could make a lower-level Pokémon look falsely cheap and win the eligible.sort
+// over a higher-level isFavorite at the same rounded rank, incorrectly triggering cyan.
+
+describe('Fix #103 — Master effectiveDust uses remaining dust to L40', () => {
+  // Helper accepting explicit level.
+  const raikouL = (cp, pct, lvl, opts = {}) => {
+    const iv = opts.iv || ivFor(pct);
+    return row({
+      Index: String(opts.idx || Math.floor(Math.random()*1e6)),
+      Name: 'Raikou', 'Pokemon Number': '243', CP: String(cp),
+      'Atk IV': String(iv.atk), 'Def IV': String(iv.def), 'Sta IV': String(iv.sta),
+      'IV Avg': pct.toFixed(1), 'Level Min': String(lvl),
+      Lucky: opts.lucky ? '1' : '0',
+      'Shadow/Purified': '0',
+      Favorite: opts.fav ? '1' : '0', Dust: '5000',
+      'Rank % (U)': '40.0', 'Dust Cost (U)': '300000', 'Name (U)': 'Raikou',
+    });
+  };
+  const analyseL = rows => analyse(toCSV(rows)).pokemon.filter(p => p.name === 'Raikou');
+
+  it('higher-level favourited Raikou is not isCheaperAlternative at equal rounded IV%', () => {
+    // Both 95.6% → rounds to 96. Level-35 is favourite; level-20 is not.
+    // Fix: dustToMax(35,40) < dustToMax(20,40) → level-35 wins eligible.sort → is best2.
+    // level-20 is NOT isFavorite → hasStarredAtSameRank does not fire → no cyan on either.
+    const iv = ivFor(95.6);
+    const mons = analyseL([
+      raikouL(2440, 95.6, 35, { iv, fav: true, idx: 1 }),   // higher level, favourite
+      raikouL(2200, 95.6, 20, { iv, idx: 2 }),               // lower level, not favourite
+    ]);
+    const lowerLevel = mons.find(p => p.cp === 2200);
+    expect(lowerLevel).toBeDefined();
+    expect(lowerLevel.isCheaperAlternative).toBeFalsy();
+    expect((lowerLevel.cheaperAlternativeLeagues || [])).not.toContain('M');
+  });
+
+  it('Lucky half-dust advantage is preserved under the new dustToMax formula', () => {
+    // Lucky at L39 (1 level from L40) pays half of a tiny remaining dust → cheapest.
+    // Non-lucky at L20 pays full dustToMax(20,40) → expensive.
+    // Lucky should be best2 (cheaper), confirming the 0.5 multiplier still applies.
+    const iv = ivFor(91.1);
+    const mons = analyseL([
+      raikouL(2200, 91.1, 20, { iv, idx: 1 }),               // non-lucky, L20
+      raikouL(2400, 91.1, 39, { iv, lucky: true, idx: 2 }),  // lucky, L39 → half of tiny amount
+    ]);
+    const luckyMon = mons.find(p => p.isLucky);
+    // Lucky at L39: effectiveDust = Math.round(dustToMax(39,40)/2) — very small.
+    // Non-lucky at L20: effectiveDust = dustToMax(20,40) — large.
+    // Lucky wins eligible.sort → not isCheaperAlternative.
+    expect(luckyMon).toBeDefined();
+    expect(luckyMon.isCheaperAlternative).toBeFalsy();
+  });
+
+  it('dustToMax(40,40) is 0 — an already-maxed Pokémon is free in the Master tiebreak', () => {
+    // A Pokémon at L40 needs 0 more dust → always wins the Master tiebreak.
+    const iv = ivFor(91.1);
+    const mons = analyseL([
+      raikouL(2460, 91.1, 40, { iv, fav: true, idx: 1 }),   // at L40, favourite
+      raikouL(2200, 91.1, 20, { iv, idx: 2 }),               // at L20, not favourite
+    ]);
+    const l40 = mons.find(p => p.cp === 2460);
+    const l20 = mons.find(p => p.cp === 2200);
+    // L40 wins (effectiveDust=0) → not the cheaper alternative → no cyan
+    expect(l40.isCheaperAlternative).toBeFalsy();
+    expect(l20.isCheaperAlternative).toBeFalsy();
+  });
+});
+
 // ─── Group I — global invariant on the real export (smoke test) ──────────────
 // If export_187 is available next to the tests, assert the family-level cap holds.
 describe('Global cap invariant (export_187 smoke test)', () => {
