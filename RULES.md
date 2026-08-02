@@ -594,6 +594,24 @@ The `starType` strings, the grey ML-placeholder, and the visibility star
 (`star-visibility` class) are all confirmed in `render.js`; the engine names it the
 **visibility** star, not "purple".
 
+### Star colour reference (#105)
+
+| Star | Code | Meaning |
+|------|------|---------|
+| 🟡 Gold | `gold` | Already starred in GO — correct, no action needed |
+| 🟢 Green | `green` | Should be starred, action needed, affordable |
+| 🔵 Blue | `blue` | Should be starred but expensive ($$$) — correct recommendation, unlikely to power up soon |
+| 🩵 Cyan | `cyan` | A cheaper option exists at the same rank as something already starred — check before acting |
+| ⭐ Grey | `grey` | Collection keeper or ML placeholder — keep but not a power-up priority |
+| 🔴 Red | `red` | Starred in GO but superseded by a better recommendation |
+| · None | `none` | Not starred, not recommended |
+
+**Blue vs Cyan distinction:**
+- **Blue** = the best recommendation but expensive. Correct pick, just costly.
+- **Cyan** = NOT the best pick overall, but cheaper than something already starred at the same rounded rank. A "heads up" — check if you've already invested in the more expensive one. Does not fire when the cheaper option has strictly better stats — that case gets green.
+
+**Cyan only fires when** a cheaper Pokémon is the winner of `eligible.sort` AND there is an already-favourited Pokémon in the same family at the same rounded rank with higher effective dust. The cheaper one gets `cheaperAlternativeLeagues` pushed; that resolves to `isCheaperAlternative=true` → `suggestStarCheaper` → cyan.
+
 ### Key flags
 - **`suggestStar`** (green/gold): `suggestStarExpensive=false` AND any of — `decision='keep'`
   with a league/affordable/lucky/best-shiny/nundo/shadow/purified/dynamax/gigantamax/
