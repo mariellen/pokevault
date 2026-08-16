@@ -555,18 +555,23 @@ describe.each([
     ovResult = loader.createWithOverrides(overrides).analyse(csv);
   });
 
-  it(`Snorlax CP:100 (${flagKey}, no league slot) → decision=keep, suggestStar=true`, () => {
+  // #108: Snorlax CP:100 is 33% IV (5/5/5) — below keepThreshold. Dmax/Gmax winners at this
+  // IV are no longer worth a green star (grey instead); Shiny is unaffected (not IV-gated).
+  const isSubThresholdMaxFlag = flagKey === 'is_dynamax' || flagKey === 'is_gigantamax';
+
+  it(`Snorlax CP:100 (${flagKey}, no league slot) → decision=keep`, () => {
     const p = ovFind('Snorlax', 100);
     expect(p).toBeDefined();
     expect(p[propName]).toBe(true);
     expect(p.decision).toBe('keep');
-    expect(p.suggestStar).toBe(true);
+    expect(p.suggestStar).toBe(!isSubThresholdMaxFlag);
   });
 
-  it(`Snorlax CP:100 (${flagKey}, fav=0) → green star not red`, () => {
+  it(`Snorlax CP:100 (${flagKey}, fav=0) → ${isSubThresholdMaxFlag ? 'grey star (sub-threshold)' : 'green star not red'}`, () => {
     const p = ovFind('Snorlax', 100);
     expect(p.isFavorite).toBe(false);
-    expect(p.suggestStar).toBe(true);
+    expect(p.suggestStar).toBe(!isSubThresholdMaxFlag);
+    if (isSubThresholdMaxFlag) expect(p.starType).toBe('grey');
   });
 
   it(`Snorlax CP:100 (${flagKey}, no league rank) → nick contains ${rankSym} and ${suffix}`, () => {

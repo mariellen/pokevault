@@ -1802,8 +1802,11 @@ function analyse(rows) {
             // candidate, not a capped winner) gets NO star — per brief "non-winning Dmax/Gmax
             // → keep, no star". The won*Master power-up candidates are starred below.
             p.slots.includes('best_overall') ||
-            p.wonDynamaxMaster ||
-            p.wonGigantamaxMaster ||
+            // #108: sub-threshold Dmax/Gmax Master winners (only Dmax in family but low IV)
+            // don't earn a star — not worth powering up. wonDynamaxMaster/wonGigantamaxMaster
+            // stay true for nick routing (NameⓂ{IV%}); the ladder below assigns grey instead.
+            (p.wonDynamaxMaster && (p.ivAvg||0) >= RULES.keepThreshold) ||
+            (p.wonGigantamaxMaster && (p.ivAvg||0) >= RULES.keepThreshold) ||
             // #64: a per-form collection keeper earns a star when it's a power-up candidate
             // (IV ≥ keepThreshold → green) or favourited (→ gold). Sub-threshold collection
             // keepers get a grey star via the ladder precedence below (no suggestStar).
@@ -1849,6 +1852,9 @@ function analyse(rows) {
       // false) gets a grey star — kept for collection completeness, not a power-up priority.
       // Favourited or IV≥90 collection keepers set suggestStar above and fall through to gold/green.
       else if (p.slots.includes('collection') && !p.suggestStar && !p.suggestStarCheaper && !p.isShiny) p.starType = 'grey';
+      // #108: sub-threshold Dmax/Gmax Master winner (only Dmax in family but IV below
+      // keepThreshold) — no real slot reason qualifies suggestStar, so it lands here.
+      else if ((p.wonDynamaxMaster || p.wonGigantamaxMaster) && (p.ivAvg||0) < RULES.keepThreshold && !p.suggestStar) p.starType = 'grey';
       else if (p.suggestStar && p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'gold';
       else if (p.suggestStar && !p.isFavorite && !p.suggestStarCheaper && (!p.isShiny || hasRealSlot)) p.starType = 'green';
       else if (p.suggestStarExpensive && p.isFavorite) p.starType = 'gold';
