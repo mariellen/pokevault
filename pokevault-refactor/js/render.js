@@ -66,6 +66,11 @@ function familyMergeCandidates(members){
   return (members||[]).filter(p=>mergeCandidateKeys.has(p.stableKey));
 }
 
+// #107 (v2): red-starred members — currently starred but shouldn't be (cull candidates).
+function familyRedStars(members){
+  return (members||[]).filter(p=>p.starType==='red');
+}
+
 function lrHTML(pct,num,dust,isLucky){
   if(!pct) return '<span class="lr-low">—</span>';
   const cls=pct>=90?'lr-90':pct>=70?'lr-70':'lr-low';

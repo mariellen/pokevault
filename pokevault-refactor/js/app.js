@@ -391,8 +391,10 @@ function renderFamily(fam,isOpen){
   // F1/F2: bulk GO search strings — all keepers (🔍⭐) and all merge candidates (🔍🔀).
   const _starKeepers=familyStarKeepers(members);
   const _mergeCands=familyMergeCandidates(members);
+  const _redStars=familyRedStars(members);
   const _starBulkEsc=buildBulkCpSearch(_starKeepers).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const _mergeBulkEsc=buildBulkCpSearch(_mergeCands).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const _redBulkEsc=buildBulkCpSearch(_redStars).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
   const leagueDots=['L','G','U','M'].map(lg=>{
     const col=lg==='L'?'var(--little)':lg==='G'?'var(--great)':lg==='U'?'var(--ultra)':'var(--master)';
@@ -427,6 +429,7 @@ function renderFamily(fam,isOpen){
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
         ${_starKeepers.length?`<button class="copy-search-btn" data-copy="${_starBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'keepers',count:${_starKeepers.length}})" title="Copy GO search — all recommended keepers (CP) — paste into GO, select all, bulk-star">🔍⭐</button>`:''}
         ${_mergeCands.length?`<button class="copy-search-btn" data-copy="${_mergeBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'merge',count:${_mergeCands.length}})" title="Copy GO search — all merge candidates (CP)">🔍🔀</button>`:''}
+        ${_redStars.length?`<button class="copy-search-btn" data-copy="${_redBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'red',count:${_redStars.length}})" title="Copy GO search — all red starred (CP)">🔍🔴</button>`:''}
         ${goldCount?`<span class="fam-badge" style="color:var(--gold)">${goldCount}★</span>`:''}
         ${luckyCount?`<span class="fam-badge" style="color:var(--gold)">${luckyCount}🍀</span>`:''}
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
@@ -683,8 +686,10 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   // F1/F2: bulk GO search strings — all keepers (🔍⭐) and all merge candidates (🔍🔀).
   const _starKeepers=familyStarKeepers(members);
   const _mergeCands=familyMergeCandidates(members);
+  const _redStars=familyRedStars(members);
   const _starBulkEsc=buildBulkCpSearch(_starKeepers).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   const _mergeBulkEsc=buildBulkCpSearch(_mergeCands).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const _redBulkEsc=buildBulkCpSearch(_redStars).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 
   const leagueDots=['L','G','U','M'].map(lg=>{
     const col=lg==='L'?'var(--little)':lg==='G'?'var(--great)':lg==='U'?'var(--ultra)':'var(--master)';
@@ -752,6 +757,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
         ${famAllNames.length>1?`<button class="copy-search-btn" data-copy="${famSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 + Fam</button>`:''}
         ${_starKeepers.length?`<button class="copy-search-btn" data-copy="${_starBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'keepers',count:${_starKeepers.length}})" title="Copy GO search — all recommended keepers (CP) — paste into GO, select all, bulk-star">🔍⭐</button>`:''}
         ${_mergeCands.length?`<button class="copy-search-btn" data-copy="${_mergeBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'merge',count:${_mergeCands.length}})" title="Copy GO search — all merge candidates (CP)">🔍🔀</button>`:''}
+        ${_redStars.length?`<button class="copy-search-btn" data-copy="${_redBulkEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this);trackEvent('bulk_search_copy',{kind:'red',count:${_redStars.length}})" title="Copy GO search — all red starred (CP)">🔍🔴</button>`:''}
         ${goldCount?`<span class="fam-badge" style="color:var(--gold)">${goldCount}★</span>`:''}
         ${luckyCount?`<span class="fam-badge" style="color:var(--gold)">${luckyCount}🍀</span>`:''}
         ${binCount?`<span class="fam-badge" style="color:var(--muted)">${binCount}🗑</span>`:''}
