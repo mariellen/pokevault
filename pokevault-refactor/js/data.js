@@ -428,7 +428,12 @@ const VALID_EVOLUTIONS = {
   'Whirlipede':['Scolipede'],'Whismur':['Loudred','Exploud'],
   'Wiglett':['Wugtrio'],'Wimpod':['Golisopod'],'Wingull':['Pelipper'],
   'Woobat':['Swoobat'],'Wooloo':['Dubwool'],
-  'Wooper':['Quagsire','Clodsire'],'Wurmple':['Silcoon','Cascoon'],
+  'Wooper':['Quagsire','Clodsire'],
+  // #110: Pokégenie exports the FINAL evolution directly in Name(G/U/L) for most leagues
+  // (e.g. 'Beautifly'), not the intermediate cocoon — only Little often keeps 'Silcoon'/
+  // 'Cascoon' (CP cap). Both stages must be listed or validateEvo() silently rejects the
+  // CSV's evo target and the Wurmple never routes anywhere.
+  'Wurmple':['Silcoon','Cascoon','Beautifly','Dustox'],
   'Wynaut':['Wobbuffet'],'Yamask':['Cofagrigus','Runerigus'],
   'Yamper':['Boltund'],'Yanma':['Yanmega'],'Yungoos':['Gumshoos'],
   'Zigzagoon':['Linoone','Obstagoon'],'Zorua':['Zoroark'],

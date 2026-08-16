@@ -226,6 +226,61 @@ describe('Wurmple family — unknown-evo base-form keep + branch separation', ()
     expect(slotsOf(sil)).toContain('G');
     expect(slotsOf(cas)).toContain('G');             // distinct line → not displaced by Silcoon
   });
+
+  // #110: Pokégenie exports the FINAL evolution directly in Name (G/U/L) for most leagues
+  // (only Little often keeps the cocoon, since evolving further would bust the CP cap).
+  // VALID_EVOLUTIONS['Wurmple'] previously only listed Silcoon/Cascoon, so validateEvo()
+  // silently rejected 'Beautifly'/'Dustox' and the Wurmple fell back to routing as itself.
+  // IV Avg (= Master rank) is kept below the 70% tentative-Master floor throughout this
+  // block — same convention as eevee() above — so the CAPPED-league routing under test
+  // isn't preempted by this lone family member trivially grabbing the Master slot.
+  it('Wurmple with Name (G) = Beautifly routes to Beautifly, not raw Wurmple', () => {
+    const res = analyse(toCSV([
+      row({ Index: '1', Name: 'Wurmple', 'Pokemon Number': '265', Gender: '2', CP: '328',
+        'Atk IV': '13', 'Def IV': '15', 'Sta IV': '6', 'IV Avg': '50.0', 'Level Min': '5', Dust: '1000',
+        'Rank % (G)': '95.0', 'Name (G)': 'Beautifly' }),
+    ]));
+    const w = mon(res.pokemon, 'Wurmple', 328);
+    expect(w.evolvedNameG).toBe('Beautifly');
+    expect(slotsOf(w)).toContain('G');
+    expect(w.decision).toBe('keep');
+    expect(w.nickname).toMatch(/Beautif/);
+  });
+
+  it('Wurmple with Name (U) = Dustox routes to Dustox (female, not gender-locked)', () => {
+    const res = analyse(toCSV([
+      row({ Index: '1', Name: 'Wurmple', 'Pokemon Number': '265', Gender: '2', CP: '900',
+        'Atk IV': '15', 'Def IV': '13', 'Sta IV': '14', 'IV Avg': '50.0', 'Level Min': '20', Dust: '1000',
+        'Rank % (U)': '95.0', 'Name (U)': 'Dustox' }),
+    ]));
+    const w = mon(res.pokemon, 'Wurmple', 900);
+    expect(w.evolvedNameU).toBe('Dustox');
+    expect(slotsOf(w)).toContain('U');
+    expect(w.decision).toBe('keep');
+    expect(w.nickname).toMatch(/Dustox/);
+  });
+
+  it('Wurmple with Name (G) = Beautifly on a MALE individual also routes correctly (not gender-locked)', () => {
+    const res = analyse(toCSV([
+      row({ Index: '1', Name: 'Wurmple', 'Pokemon Number': '265', Gender: '1', CP: '328',
+        'Atk IV': '13', 'Def IV': '15', 'Sta IV': '6', 'IV Avg': '50.0', 'Level Min': '5', Dust: '1000',
+        'Rank % (G)': '56.7', 'Name (G)': 'Beautifly' }),
+    ]));
+    const w = mon(res.pokemon, 'Wurmple', 328);
+    expect(w.evolvedNameG).toBe('Beautifly');
+    expect(slotsOf(w)).toContain('G');
+  });
+
+  it('Wurmple with Name (L) = Silcoon still routes through the cocoon stage (unchanged)', () => {
+    const res = analyse(toCSV([
+      row({ Index: '1', Name: 'Wurmple', 'Pokemon Number': '265', Gender: '2', CP: '200',
+        'Atk IV': '10', 'Def IV': '12', 'Sta IV': '11', 'IV Avg': '50.0', 'Level Min': '5', Dust: '1000',
+        'Rank % (L)': '65.0', 'Name (L)': 'Silcoon' }),
+    ]));
+    const w = mon(res.pokemon, 'Wurmple', 200);
+    expect(w.evolvedNameL).toBe('Silcoon');
+    expect(slotsOf(w)).toContain('L');
+  });
 });
 
 // ─── Eevee — actual evolved form wins Master slot ────────────────────────────
