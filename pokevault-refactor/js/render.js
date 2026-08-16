@@ -218,6 +218,12 @@ function buildRow(p){
 
   const genderStr=p.gender==='♂'?' <span style="color:#6fa8dc;font-size:10px">♂</span>':p.gender==='♀'?' <span style="color:#ea9999;font-size:10px">♀</span>':'';
   const rowSearchEsc=(p.name.toLowerCase()+'&cp'+(p.cp||0)).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  // #107: red-starred / trade-decision rows get a clipboard icon that copies a Pokégenie
+  // search string (CP + raw IVs) — the fastest way to find that exact individual to delete.
+  const isCullCandidate=(p.starType==='red'||p.decision==='trade');
+  const pokegenieSearchEsc=isCullCandidate
+    ? `${p.cp||0} ${p.atkIV}/${p.defIV}/${p.staIV}`.replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    : '';
   const evoSearchTag=p._evoSearchTag||'';
   const isMergeCandidate=mergeCandidateKeys.has(p.stableKey);
 
@@ -225,7 +231,7 @@ function buildRow(p){
     <td style="min-width:44px;white-space:nowrap">${starCell(p)}<button class="edit-btn" onclick="toggleOverride('${p.stableKey}')" title="Overrides">✎</button></td>
     <td class="poke-name-cell">
       <div class="poke-variants">${variantTags(p)}</div>
-      <div class="poke-name">${esc(p.name)}${p.form?` <span class="poke-form">(${esc(p.form)})</span>`:''}${genderStr}${p.genderUnknownLocked?' <span title="Gender unknown — evo slot may be incorrect; rescan or set gender manually" style="color:var(--yellow);font-size:11px">⚠</span>':''}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button>${isMergeCandidate?`<button class="merge-icon-btn" onclick="event.stopPropagation();openMergeModal('${p.stableKey}')" title="Merge candidate — tap to review">🔀</button>`:''}</div>
+      <div class="poke-name">${esc(p.name)}${p.form?` <span class="poke-form">(${esc(p.form)})</span>`:''}${genderStr}${p.genderUnknownLocked?' <span title="Gender unknown — evo slot may be incorrect; rescan or set gender manually" style="color:var(--yellow);font-size:11px">⚠</span>':''}<button class="row-search-btn" data-search="${rowSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button>${isCullCandidate?`<button class="row-search-btn" data-search="${pokegenieSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy Pokégenie search (CP + IVs) to find this individual">📋</button>`:''}${isMergeCandidate?`<button class="merge-icon-btn" onclick="event.stopPropagation();openMergeModal('${p.stableKey}')" title="Merge candidate — tap to review">🔀</button>`:''}</div>
       ${evoIndicators}
     </td>
     <td style="font-size:11px;color:var(--muted)">${p.cp||'--'}</td>

@@ -2359,7 +2359,9 @@ async function clearOverride(idx) {
   const p = allPokemon.find(x => x.stableKey === idx);
   if (!p) return;
   p.isShiny = false; p.isDynamax = false; p.isGigantamax = false;
-  p.vivillonPattern = ''; p.manualDecision = ''; p.notes = '';
+  // #104: specialForm was never reset here — Set Forms modal treats a non-empty specialForm
+  // as "already set" (formUnset = !p.specialForm), so a cleared Pokémon never reappeared there.
+  p.specialForm = ''; p.vivillonPattern = ''; p.manualDecision = ''; p.notes = '';
   // Clearing all overrides also drops any nick override → restore suggested nick.
   if (p.nickOverridden && typeof applyNickOverride === 'function') {
     applyNickOverride(p, null, p.suggestedNickname);
