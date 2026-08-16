@@ -1126,13 +1126,16 @@ function analyse(rows) {
           const leagueDust = lg==='L'?p.dustL:lg==='G'?p.dustG:lg==='U'?p.dustU:null;
           // Business Rules: missing/null dust = 0 (already at/above cap, no investment needed) —
           // the most affordable outcome. For capped leagues (L/G/U) a null/undefined dust is
-          // treated as 0 so a powered-up Pokémon always WINS the dust tiebreak. Only Master
-          // (uncapped, leagueDust === null by definition) falls back to dustCostBest.
+          // treated as 0 so a powered-up Pokémon always WINS the dust tiebreak.
+          // For Master (uncapped): use remaining dust to L40 — a lower-level Pokémon needs
+          // MORE total dust to reach L40, so it is NOT cheaper. dustCostBest (= dustMin from
+          // capped leagues) was wrong here: a below-GL-cap Pokémon's dustG is the cheap league
+          // dust, not the remaining Master investment, making it look falsely affordable.
           let d;
           if (lg !== 'M') {
             d = (leagueDust === null || leagueDust === undefined) ? 0 : leagueDust;
           } else {
-            d = (leagueDust !== null && leagueDust !== undefined) ? leagueDust : (p.dustCostBest || 999999);
+            d = dustToMax(p.level || 1, 40);
           }
           return p.isLucky ? Math.round(d/2) : d;
         };
