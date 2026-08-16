@@ -352,6 +352,9 @@ function buildFamilySearchStr(members) {
 
 function renderFamily(fam,isOpen){
   const {key,members,primaryName}=fam;
+  // #109: key can contain an apostrophe (e.g. Oricorio's "Pa'u" form) which breaks the
+  // single-quoted JS string literal in the onclick handler below — escape for that use only.
+  const keyEsc=String(key).replace(/'/g,"\\'");
   const goldCount=members.filter(p=>p.isFavorite&&p.suggestStar).length;
   const luckyCount=members.filter(p=>p.isLucky).length;
   const binCount=members.filter(p=>!p.isFavorite&&p.decision!=='keep').length;
@@ -417,7 +420,7 @@ function renderFamily(fam,isOpen){
   </tr></thead>`;
 
   return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
-    <div class="${headerClass}" onclick="toggleFamily('fam-${key}')">
+    <div class="${headerClass}" onclick="toggleFamily('fam-${keyEsc}')">
       <div class="fam-header-row1">
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''} <span style="color:var(--dim);font-size:11px">(${members.length})</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>
@@ -595,6 +598,7 @@ function isMemberVisible(p, fam, opts){
 
 function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   const {key,members,primaryName}=fam;
+  const keyEsc=String(key).replace(/'/g,"\\'");
   const goldCount=members.filter(p=>p.isFavorite&&p.suggestStar).length;
   const luckyCount=members.filter(p=>p.isLucky).length;
   const binCount=members.filter(p=>!p.isFavorite&&p.decision!=='keep').length;
@@ -741,7 +745,7 @@ function renderFamilyFiltered(fam,isOpen,activeLeagues,rankMap){
   </tr></thead>`;
 
   return `<div class="family-card ${isOpen?'open':''}" id="fam-${key}">
-    <div class="${headerClass}" onclick="toggleFamily('fam-${key}')">
+    <div class="${headerClass}" onclick="toggleFamily('fam-${keyEsc}')">
       <div class="fam-header-row1">
         <span class="fam-count ${members.length>countThreshold?'fam-count-large':''}">${primaryName}${famFormStr?' '+famFormStr:''}${collBadge} <span style="color:var(--dim);font-size:11px">(${members.length})${activeLeagues.length>0?' · '+visible.length+' shown':''}</span></span>
         <button class="copy-search-btn" data-copy="${goSearchEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.copy,this)" title="Copy GO search — this form only">🔍 Me</button>

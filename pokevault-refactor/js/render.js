@@ -113,8 +113,11 @@ function formFilterSelect(primaryName, key){
     forms.filter(f => f && f !== 'Unknown').map(f =>
       `<option value="${esc(f)}"${active === f ? ' selected' : ''}>${esc(f)}</option>`)
   ).join('');
+  // #109: key can contain an apostrophe (e.g. Oricorio's "Pa'u" form) — esc() doesn't escape
+  // quotes, so escape separately for this single-quoted JS string literal argument.
+  const keyEsc = esc(key).replace(/'/g,"\\'");
   return `<select class="fam-form-filter" title="Filter this family by form" aria-label="Filter ${esc(primaryName)} by form"`
-    + ` onclick="event.stopPropagation()" onchange="event.stopPropagation();filterFamilyByForm('${esc(key)}',this.value)">${opts}</select>`
+    + ` onclick="event.stopPropagation()" onchange="event.stopPropagation();filterFamilyByForm('${keyEsc}',this.value)">${opts}</select>`
     + `<span class="fam-form-count" aria-live="polite"></span>`;
 }
 
