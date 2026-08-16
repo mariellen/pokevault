@@ -41,12 +41,16 @@ function goSpeciesToken(name){
     .replace(/é/g,'e');
 }
 
-// Join members into `token&cpNNN,...`, de-duping identical name+cp pairs.
+// Join members into `token&cpNNN&atkX&defY&staZ,...`, de-duping identical
+// name+cp+IV combos. IVs are included (not just CP) so two same-species,
+// same-CP Pokémon with different IVs don't collide into one GO search hit —
+// without them, bulk-deleting from a search result risks taking the wrong one.
 function buildBulkCpSearch(members){
   const seen=new Set();
   const parts=[];
   (members||[]).forEach(p=>{
-    const token=goSpeciesToken(p.name)+'&cp'+(p.cp||0);
+    const token=goSpeciesToken(p.name)+'&cp'+(p.cp||0)
+      +'&atk'+(p.atkIV??0)+'&def'+(p.defIV??0)+'&sta'+(p.staIV??0);
     if(seen.has(token)) return;
     seen.add(token);
     parts.push(token);
