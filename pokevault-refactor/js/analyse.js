@@ -1126,13 +1126,16 @@ function analyse(rows) {
           const leagueDust = lg==='L'?p.dustL:lg==='G'?p.dustG:lg==='U'?p.dustU:null;
           // Business Rules: missing/null dust = 0 (already at/above cap, no investment needed) —
           // the most affordable outcome. For capped leagues (L/G/U) a null/undefined dust is
-          // treated as 0 so a powered-up Pokémon always WINS the dust tiebreak. Only Master
-          // (uncapped, leagueDust === null by definition) falls back to dustCostBest.
+          // treated as 0 so a powered-up Pokémon always WINS the dust tiebreak.
+          // For Master (uncapped): use remaining dust to L40 — a lower-level Pokémon needs
+          // MORE total dust to reach L40, so it is NOT cheaper. dustCostBest (= dustMin from
+          // capped leagues) was wrong here: a below-GL-cap Pokémon's dustG is the cheap league
+          // dust, not the remaining Master investment, making it look falsely affordable.
           let d;
           if (lg !== 'M') {
             d = (leagueDust === null || leagueDust === undefined) ? 0 : leagueDust;
           } else {
-            d = (leagueDust !== null && leagueDust !== undefined) ? leagueDust : (p.dustCostBest || 999999);
+            d = dustToMax(p.level || 1, 40);
           }
           return p.isLucky ? Math.round(d/2) : d;
         };
@@ -1802,8 +1805,11 @@ function analyse(rows) {
             // candidate, not a capped winner) gets NO star — per brief "non-winning Dmax/Gmax
             // → keep, no star". The won*Master power-up candidates are starred below.
             p.slots.includes('best_overall') ||
-            p.wonDynamaxMaster ||
-            p.wonGigantamaxMaster ||
+            // #108: sub-threshold Dmax/Gmax Master winners (only Dmax in family but low IV)
+            // don't earn a star — not worth powering up. wonDynamaxMaster/wonGigantamaxMaster
+            // stay true for nick routing (NameⓂ{IV%}); the ladder below assigns grey instead.
+            (p.wonDynamaxMaster && (p.ivAvg||0) >= RULES.keepThreshold) ||
+            (p.wonGigantamaxMaster && (p.ivAvg||0) >= RULES.keepThreshold) ||
             // #64: a per-form collection keeper earns a star when it's a power-up candidate
             // (IV ≥ keepThreshold → green) or favourited (→ gold). Sub-threshold collection
             // keepers get a grey star via the ladder precedence below (no suggestStar).
@@ -1849,6 +1855,9 @@ function analyse(rows) {
       // false) gets a grey star — kept for collection completeness, not a power-up priority.
       // Favourited or IV≥90 collection keepers set suggestStar above and fall through to gold/green.
       else if (p.slots.includes('collection') && !p.suggestStar && !p.suggestStarCheaper && !p.isShiny) p.starType = 'grey';
+      // #108: sub-threshold Dmax/Gmax Master winner (only Dmax in family but IV below
+      // keepThreshold) — no real slot reason qualifies suggestStar, so it lands here.
+      else if ((p.wonDynamaxMaster || p.wonGigantamaxMaster) && (p.ivAvg||0) < RULES.keepThreshold && !p.suggestStar) p.starType = 'grey';
       else if (p.suggestStar && p.isFavorite && (!p.isShiny || hasRealSlot)) p.starType = 'gold';
       else if (p.suggestStar && !p.isFavorite && !p.suggestStarCheaper && (!p.isShiny || hasRealSlot)) p.starType = 'green';
       else if (p.suggestStarExpensive && p.isFavorite) p.starType = 'gold';
