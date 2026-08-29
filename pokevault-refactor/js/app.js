@@ -2314,18 +2314,12 @@ function setOverride(idx, field, value) {
       ? [...new Set([...(p.slots||[]), 'dynamax'])] : (p.slots||[]).filter(s => s !== 'dynamax');
     if (field === 'is_gigantamax') p.slots = value
       ? [...new Set([...(p.slots||[]), 'gigantamax'])] : (p.slots||[]).filter(s => s !== 'gigantamax');
-    const slots = p.slots || [];
-    const lgSlots = slots.filter(s => ['L','G','U','M'].includes(s));
-    let ns;
-    if (slots.includes('nundo')) ns = 'nundo';
-    else if (lgSlots.length > 0) {
-      const capped = lgSlots.filter(s => s !== 'M');
-      ns = capped.length > 0 ? capped.sort((a,b)=>(p['rankPct'+b]||0)-(p['rankPct'+a]||0))[0] : 'M';
-    } else if (slots.includes('shiny') || slots.includes('shiny_lower')) ns = 'shiny';
-    else if (slots.includes('lucky')) { const ll=['U','G','L','M'].find(l=>(p['rankPct'+l]||0)>=90); ns=ll||'M'; }
-    else if (slots.includes('dynamax')) ns = 'dynamax';
-    else if (slots.includes('gigantamax')) ns = 'gigantamax';
-    else ns = 'review';
+    // #118: this used to hand-roll its own slot→nick resolution, which lacked the
+    // keepThreshold guard in resolveNickSlot() — a Lucky/Shiny with only a tentative
+    // (sub-90%) league slot rendered the real league nick instead of falling through
+    // to the Ⓡ holding nick the instant you ticked a checkbox here. getNickSlot() is
+    // the single source of truth (analyse.js resolveNickSlot) — use it, not a copy.
+    const ns = resolveNickSlot(p);
     const suggested = buildNickname(p, ns);
     // Re-apply any nick override on top of the recomputed suggested nick so toggling
     // shiny/dmax/etc. doesn't silently discard a user's custom nick.
