@@ -243,8 +243,12 @@ function resolveNickSlot(p) {
       : (['M','U','G','L'].find(s => lgSlots.includes(s)) || lgSlots[0]);
   }
 
-  if (p.slots.includes('lucky') || p.isLucky) return 'lucky';
+  // #118: shiny checked before lucky — a shiny+lucky combo with no confirmed slot must use
+  // the shiny fallback (ivAvg-based, always correct) rather than the lucky fallback (which
+  // falls back to rankPctM — a value that has nothing to do with this Pokémon's IV%). A
+  // plain (non-shiny) Lucky is unaffected: this check simply doesn't match and falls through.
   if (p.slots.includes('shiny') || p.slots.includes('shiny_lower')) return 'shiny';
+  if (p.slots.includes('lucky') || p.isLucky) return 'lucky';
   if (p.slots.includes('dynamax')) return 'dynamax';
   if (p.slots.includes('gigantamax')) return 'gigantamax';
   if (p.slots.includes('best_overall')) return 'lucky';
@@ -1452,6 +1456,43 @@ function analyse(rows) {
         p.decision = 'keep';             // Lucky is never traded
       }
     });
+    // #119: Lucky blocks main pool for the SAME CURRENT SPECIES in the same league. The |lucky
+    // sub-group and the main (non-lucky) pool compete independently within the byEvoStage loop
+    // above, so a Lucky Dedenne winning Ultra never stops a separate non-lucky Dedenne from also
+    // winning Ultra — the main pool has no visibility into what the lucky pool did. A CONFIRMED
+    // Lucky slot is strictly the better recommendation (better-or-equal rank AND half dust), so it
+    // always blocks a main-pool win of the SAME species for that league — per Mariellen's explicit
+    // intent (brief issue-118-119, Q5): "Lucky always wins if it holds the slot."
+    // Keyed on p.name (not evoTarget): Flaaffy(lucky)+Mareep(non-lucky) both target Ampharos in
+    // Great but are DIFFERENT current species (different evolution investment) and must stay
+    // independent (Group 5/36 fixture) — only literally-the-same species (e.g. Dedenne+Dedenne,
+    // which doesn't evolve) is redundant enough to suppress. Shadow/purified untouched.
+    {
+      const luckyConfirmedSlots = new Set();
+      members.filter(p => p.isLucky).forEach(p => {
+        RULES.leagues.forEach(lg => {
+          if (!p.slots.includes(lg)) return;
+          const rank = lg === 'M' ? (p.ivAvg||0) : (p['rankPct'+lg]||0);
+          if (rank < RULES.keepThreshold) return; // only a CONFIRMED Lucky win blocks the main pool
+          luckyConfirmedSlots.add(lg + '|' + p.name);
+        });
+      });
+      if (luckyConfirmedSlots.size) {
+        members.filter(p => !p.isLucky && !p.isShadow && !p.isPurified).forEach(p => {
+          RULES.leagues.forEach(lg => {
+            if (!p.slots.includes(lg)) return;
+            if (!luckyConfirmedSlots.has(lg + '|' + p.name)) return;
+            p.slots = p.slots.filter(s => s !== lg && s !== lg+'_tentative' && s !== lg+'_affordable');
+            p.hasBattleSlot = false;
+            p.isExpensiveWinner = false;
+            p.isAffordableWinner = false;
+            if (p.expensiveForLeague === lg) p.expensiveForLeague = '';
+            p.slotConfirmed = p.slots.some(s => RULES.leagues.includes(s)
+              && (s==='M' ? (p.ivAvg||0) : (p['rankPct'+s]||0)) >= RULES.keepThreshold);
+          });
+        });
+      }
+    }
     members.filter(p=>p.isNundo).forEach(p=>p.slots.push('nundo'));
     // Dynamax: best-IV per evolution target gets 'dynamax' slot, unless it already holds a
     // league slot. Best-without-league-slot: if best-IV holds a league slot, the best remaining
@@ -1716,14 +1757,19 @@ function analyse(rows) {
           p.reason='Best available for '+lgNames.join(' + ')+' (below 90% threshold)';
           p.nickname=buildNickname(p,'review');
         }
+      } else if (p.slots.includes('shiny')||p.slots.includes('shiny_lower')) {
+        // #118: shiny checked before lucky — a shiny+lucky combo that reaches this branch has
+        // no confirmed capped/Master slot (hasLeagueSlot already routed the confirmed case
+        // above), so the lucky fallback below would show rankPctM instead of ivAvg. The shiny
+        // fallback is always ivAvg-based and correct for this case; a plain (non-shiny) Lucky
+        // is unaffected since this check simply doesn't match.
+        p.decision='keep'; p.reason='Shiny — always favourite';
+        p.nickname=buildNickname(p,'shiny');
       } else if (p.slots.includes('lucky')) {
         p.decision='keep'; p.reason='Lucky — always keep';
         // Lucky with a qualifying league gets circled-letter nick; fallback to Ⓡ for Master
         const luckyLeague = ['U','G','L','M'].find(l => (p['rankPct'+l]||0) >= RULES.keepThreshold);
         p.nickname=buildNickname(p, luckyLeague || 'M');
-      } else if (p.slots.includes('shiny')||p.slots.includes('shiny_lower')) {
-        p.decision='keep'; p.reason='Shiny — always favourite';
-        p.nickname=buildNickname(p,'shiny');
       } else if (p.slots.includes('dynamax')) {
         p.decision='keep'; p.reason='Best Dynamax — keep';
         p.nickname=buildNickname(p,'dynamax');
