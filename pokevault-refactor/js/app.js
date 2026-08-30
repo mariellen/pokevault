@@ -59,6 +59,13 @@ function trackSearchDebounced(term) {
 let showDynamaxOnly = false;
 let showGigantamaxOnly = false;
 
+// #117: Lucky/Shiny/100% filter flags — independent, combinable with each other
+// and with Dmax/Gmax (e.g. Dynamax + Lucky → only Lucky Dynamax rows survive, via
+// the same _leagueFiltered AND-stacking renderPage already uses for Dmax/Gmax).
+let showLuckyOnly = false;
+let showShinyOnly = false;
+let show100Only = false;
+
 // Best-in-league / costly shortcut filter state (go through applyFilters so Dmax survives sort changes)
 let bestLeagueOnly = false;
 let costlyOnly = false;
@@ -103,6 +110,10 @@ let dexQualDmax    = false;
 let dexQualGmax    = false;
 let dexQualHundo   = false;
 let dexShinyAvailOnly = false;
+
+// #121: Collection Tracker row selection — lowercase species names, insertion order preserved
+// (a JS Set iterates in insertion order), rebuilt into the header string on each toggle.
+let dexSelected = new Set();
 
 // ═══════════════════════════════════════════════
 // STAR PRIORITY (0=gold … 6=none)
@@ -461,6 +472,13 @@ function renderSummary(pokemon){
      <span style="color:var(--red)">Trade <strong>${tr.toLocaleString()}</strong></span>`;
 }
 
+// #117: 100% filter — 100% league rank (exact, as PvPoke/Pokégenie only ever emits a literal
+// "100.00%" when a Pokémon truly tops its rank pool — no rounding needed) OR a 15/15/15 hundo.
+function is100PctPokemon(p){
+  return p.rankPctG===100 || p.rankPctU===100 || p.rankPctL===100 || p.rankPctM===100 ||
+    (p.atkIV===15 && p.defIV===15 && p.staIV===15);
+}
+
 function applyFilters(){
   page=1;
   const term=searchTerm.toLowerCase();
@@ -487,6 +505,9 @@ function applyFilters(){
     else if(!['all','hundo','canEvolve','neverEvolved'].includes(decFilter)&&!fam.members.some(p=>p.decision===decFilter)) return false;
     if(showDynamaxOnly&&!fam.members.some(p=>p.isDynamax)) return false;
     if(showGigantamaxOnly&&!fam.members.some(p=>p.isGigantamax)) return false;
+    if(showLuckyOnly&&!fam.members.some(p=>p.isLucky)) return false;
+    if(showShinyOnly&&!fam.members.some(p=>p.isShiny)) return false;
+    if(show100Only&&!fam.members.some(is100PctPokemon)) return false;
     if(leagueFilters.size>0){
       // Row-level: does any member qualify for ALL selected leagues
       const ok=[...leagueFilters].some(lg=>fam.members.some(p=>(p[rankMap[lg]]||0)>=RULES.keepThreshold));
@@ -542,9 +563,14 @@ function renderPage(){
       } else {
         f.members.forEach(p=>p._leagueFiltered=false);
       }
-      // Row-level dmax/gmax filter (same individual-row semantics as shiny filter)
+      // Row-level dmax/gmax/lucky/shiny/100% filter — each stacks with AND semantics (only
+      // sets _leagueFiltered=true, never resets it), so e.g. Dynamax+Lucky together leaves
+      // only rows that are BOTH visible (#117 test case 5).
       if(showDynamaxOnly)    f.members.forEach(p=>{ if(!p.isDynamax)    p._leagueFiltered=true; });
       if(showGigantamaxOnly) f.members.forEach(p=>{ if(!p.isGigantamax) p._leagueFiltered=true; });
+      if(showLuckyOnly)      f.members.forEach(p=>{ if(!p.isLucky)      p._leagueFiltered=true; });
+      if(showShinyOnly)      f.members.forEach(p=>{ if(!p.isShiny)      p._leagueFiltered=true; });
+      if(show100Only)        f.members.forEach(p=>{ if(!is100PctPokemon(p)) p._leagueFiltered=true; });
       // Auto-open if league filter active, hundo filter active, or ≤3 families
       const hasQualifying=activeLeagueArr.length===0||f.members.some(p=>!p._leagueFiltered&&!p.hidden);
       const open=(autoOpen&&i===0)||activeLeagueArr.length>0||decFilter==='hundo';
@@ -904,6 +930,26 @@ function toggleGmaxFilter(btn){
   showGigantamaxOnly=!showGigantamaxOnly;
   if(showGigantamaxOnly){ showDynamaxOnly=false; document.getElementById('dmaxFilterBtn')?.classList.remove('active'); }
   btn.classList.toggle('active',showGigantamaxOnly);
+  applyFilters();
+}
+
+// #117: independent toggles (no mutual exclusion) — Lucky/Shiny/100% are meant to combine
+// with each other and with Dmax/Gmax, unlike the Dmax↔Gmax pair above.
+function toggleLuckyFilter(btn){
+  trackEvent('filter_click', { filter: 'lucky' });
+  showLuckyOnly=btn.classList.toggle('active');
+  applyFilters();
+}
+
+function toggleShinyFilter(btn){
+  trackEvent('filter_click', { filter: 'shiny' });
+  showShinyOnly=btn.classList.toggle('active');
+  applyFilters();
+}
+
+function toggle100Filter(btn){
+  trackEvent('filter_click', { filter: 'hundred' });
+  show100Only=btn.classList.toggle('active');
   applyFilters();
 }
 
@@ -1405,6 +1451,10 @@ function applyDexFilters(species) {
 
 function renderDexModal() {
   if (!allSpecies) return;
+  // #121 test 6: any filter/view/category change re-renders the row list from scratch, so the
+  // previous selection's checkboxes no longer correspond to anything real — reset it.
+  dexSelected.clear();
+  updateDexSelectionBar();
   updateDexFilterButtons();
 
   const filteredSpecies = applyDexFilters(allSpecies);
@@ -1737,17 +1787,63 @@ function renderDexMissingView(body, filteredSpecies) {
       }
     }
 
+    // #121: safeName only escapes a stray apostrophe for the inline onclick string — checked
+    // is re-read from dexSelected (not the DOM) so a row keeps its tick after any bugfix re-render.
+    const lowerName = s.name.toLowerCase();
+    const checked = dexSelected.has(lowerName) ? 'checked' : '';
     return `<div class="dex-row dex-row-missing${!s.is_in_go ? ' dex-not-in-go' : ''}" onclick="navigator.clipboard?.writeText('${safeName}')" title="Tap to copy GO search string">
   <div class="dex-row-main">
+    <input type="checkbox" class="dex-row-check" ${checked} onclick="event.stopPropagation()" onchange="toggleDexSelection('${safeName}',this.checked)" aria-label="Select ${esc(s.name)}">
     <span class="dex-num">#${numStr}</span>
     <button class="dex-name-link" onclick="event.stopPropagation();dexNavigate('${safeName}')">${esc(s.name)}</button>
     <span class="dex-types">${s.type1}${type2str}</span>
     ${noticeHtml}
     ${canEvolveHtml}
     ${familyLuckyHtml}
+    <button class="merge-icon-btn" onclick="event.stopPropagation();copyDexRowName('${safeName}')" title="Copy name" aria-label="Copy ${esc(s.name)}">📋</button>
   </div>
 </div>`;
   }).join('');
+}
+
+// #121: Collection Tracker row selection — per-row checkbox + copy icon, header running string.
+function toggleDexSelection(name, checked){
+  const n = name.toLowerCase();
+  if (checked) dexSelected.add(n); else dexSelected.delete(n);
+  updateDexSelectionBar();
+}
+
+function updateDexSelectionBar(){
+  const bar = document.getElementById('dex-selection-bar');
+  const strEl = document.getElementById('dex-selection-string');
+  if (!bar || !strEl) return;
+  if (dexSelected.size){
+    bar.style.display = 'flex';
+    strEl.textContent = [...dexSelected].join(', ');
+  } else {
+    bar.style.display = 'none';
+    strEl.textContent = '';
+  }
+}
+
+function copyDexSelection(){
+  const str = [...dexSelected].join(',');
+  if (!str) return;
+  navigator.clipboard.writeText(str)
+    .then(() => showToast('Copied!'))
+    .catch(() => showToast('Copy failed — use Ctrl+C'));
+}
+
+function copyDexRowName(name){
+  navigator.clipboard.writeText(name.toLowerCase())
+    .then(() => showToast('Copied!'))
+    .catch(() => showToast('Copy failed — use Ctrl+C'));
+}
+
+function clearDexSelection(){
+  dexSelected.clear();
+  document.querySelectorAll('.dex-row-check').forEach(cb => { cb.checked = false; });
+  updateDexSelectionBar();
 }
 
 // ── Cull modal ──────────────────────────────────

@@ -351,6 +351,7 @@ tr.row-merge-candidate{opacity:0.7;}
 .dex-row-missing:hover .dex-name-link{color:var(--great);}
 .dex-not-in-go{opacity:.45;}
 .dex-num{color:var(--muted);font-size:10px;min-width:30px;font-family:'Share Tech Mono',monospace;flex-shrink:0;}
+.dex-row-check{flex-shrink:0;cursor:pointer;margin:0;}
 .dex-name{font-weight:600;color:var(--text);}
 .dex-name-link{background:none;border:none;padding:0;cursor:pointer;color:var(--text);font-weight:600;font-size:12px;font-family:inherit;white-space:nowrap;}
 .dex-name-link:hover{color:var(--great);text-decoration:underline;}
