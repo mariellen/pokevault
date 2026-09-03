@@ -258,6 +258,63 @@ function resolveNickSlot(p) {
   return 'review';
 }
 
+// #126: single dispatch point for the decision block's post-hasLeagueSlot fallback branches
+// (shiny/lucky/dynamax/gigantamax/best_overall/shadow/purified). Calls resolveNickSlot(p) ONCE
+// and dispatches on its return value — no independent p.slots.includes() re-check decides WHICH
+// branch fires. That was the #118 bug shape: two independently-ordered priority chains (this one
+// and resolveNickSlot's) that silently disagreed. Now there is only one ordering, in
+// resolveNickSlot, and this function just reacts to it.
+//
+// resolveNickSlot legitimately collapses lucky/best_overall/shadow to the same 'lucky' nick slot
+// — all three already call buildNickname(p,'lucky') (or the lucky-specific league lookup) with
+// identical output, verified against the pre-refactor branches. The p.slots.includes() checks
+// below only choose which REASON STRING to show among those three (a concern resolveNickSlot
+// was never responsible for), in the exact same priority order the old chain used — they do not
+// influence which slot/nick is used. Given resolveNickSlot returns 'lucky' from exactly those
+// three lines, this priority check is exhaustive: something is always set when slot==='lucky'.
+//
+// Returns true if it handled decision/reason/nickname; false to let the chain fall through to
+// the qualifiesAny/collection/isLucky/hundo/trade branches, which resolveNickSlot doesn't own.
+function applyFallbackSlotDecision(p, isLegendary) {
+  const slot = resolveNickSlot(p);
+  if (slot === 'shiny') {
+    p.decision='keep'; p.reason='Shiny — always favourite';
+    p.nickname=buildNickname(p,'shiny');
+    return true;
+  }
+  if (slot === 'lucky') {
+    if (p.slots.includes('lucky')) {
+      p.decision='keep'; p.reason='Lucky — always keep';
+      // Lucky with a qualifying league gets circled-letter nick; fallback to Ⓡ for Master
+      const luckyLeague = ['U','G','L','M'].find(l => (p['rankPct'+l]||0) >= RULES.keepThreshold);
+      p.nickname=buildNickname(p, luckyLeague || 'M');
+    } else if (p.slots.includes('best_overall')) {
+      p.decision='keep'; p.reason=isLegendary?'Best Legendary — keep':'Best in family — keep';
+      p.nickname=buildNickname(p,'lucky');
+    } else { // the only other source of a 'lucky' nick slot in resolveNickSlot is 'shadow'
+      p.decision='keep'; p.reason='Best shadow — keep for raids/Master League';
+      p.nickname=buildNickname(p,'lucky'); // NameⓇIV format — same as Lucky no-league
+    }
+    return true;
+  }
+  if (slot === 'dynamax') {
+    p.decision='keep'; p.reason='Best Dynamax — keep';
+    p.nickname=buildNickname(p,'dynamax');
+    return true;
+  }
+  if (slot === 'gigantamax') {
+    p.decision='keep'; p.reason='Best Gigantamax — keep';
+    p.nickname=buildNickname(p,'gigantamax');
+    return true;
+  }
+  if (slot === 'review' && p.slots.includes('purified')) {
+    p.decision='keep'; p.reason='Best purified';
+    p.nickname=buildNickname(p,'review');
+    return true;
+  }
+  return false;
+}
+
 function buildNickname(p, slot, convention) {
   const iv = Math.round(p.ivAvg||0);
   const atkIV=p.atkIV||0, defIV=p.defIV||0, staIV=p.staIV||0;
@@ -1757,34 +1814,9 @@ function analyse(rows) {
           p.reason='Best available for '+lgNames.join(' + ')+' (below 90% threshold)';
           p.nickname=buildNickname(p,'review');
         }
-      } else if (p.slots.includes('shiny')||p.slots.includes('shiny_lower')) {
-        // #118: shiny checked before lucky — a shiny+lucky combo that reaches this branch has
-        // no confirmed capped/Master slot (hasLeagueSlot already routed the confirmed case
-        // above), so the lucky fallback below would show rankPctM instead of ivAvg. The shiny
-        // fallback is always ivAvg-based and correct for this case; a plain (non-shiny) Lucky
-        // is unaffected since this check simply doesn't match.
-        p.decision='keep'; p.reason='Shiny — always favourite';
-        p.nickname=buildNickname(p,'shiny');
-      } else if (p.slots.includes('lucky')) {
-        p.decision='keep'; p.reason='Lucky — always keep';
-        // Lucky with a qualifying league gets circled-letter nick; fallback to Ⓡ for Master
-        const luckyLeague = ['U','G','L','M'].find(l => (p['rankPct'+l]||0) >= RULES.keepThreshold);
-        p.nickname=buildNickname(p, luckyLeague || 'M');
-      } else if (p.slots.includes('dynamax')) {
-        p.decision='keep'; p.reason='Best Dynamax — keep';
-        p.nickname=buildNickname(p,'dynamax');
-      } else if (p.slots.includes('gigantamax')) {
-        p.decision='keep'; p.reason='Best Gigantamax — keep';
-        p.nickname=buildNickname(p,'gigantamax');
-      } else if (p.slots.includes('best_overall')) {
-        p.decision='keep'; p.reason=isLegendary?'Best Legendary — keep':'Best in family — keep';
-        p.nickname=buildNickname(p,'lucky');
-      } else if (p.slots.includes('shadow')) {
-        p.decision='keep'; p.reason='Best shadow — keep for raids/Master League';
-        p.nickname=buildNickname(p,'lucky'); // NameⓇIV format — same as Lucky no-league
-      } else if (p.slots.includes('purified')) {
-        p.decision='keep'; p.reason='Best purified';
-        p.nickname=buildNickname(p,'review');
+      } else if (applyFallbackSlotDecision(p, isLegendary)) {
+        // #126: shiny/lucky/dynamax/gigantamax/best_overall/shadow/purified — handled inside
+        // applyFallbackSlotDecision via a single resolveNickSlot(p) dispatch (see its comment).
       } else if (qualifiesAny && !p.slots.includes('collection')) {
         // #64: a per-form collection keeper (best of its tagged form) must be KEPT even when its
         // IV clears keepThreshold but it lost the form-blind, IV-based Master race to a
