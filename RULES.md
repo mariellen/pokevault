@@ -1,7 +1,7 @@
 # PokéVault — Business Rules & Design Reference
 
-> Last updated: 2026-06-23
-> Version: v3.5.56
+> Last updated: 2026-09-05 (audited against code, see §16)
+> Verified against: v3.5.84
 > Source of truth: analyse.js (refactor is canonical — HTML is retired)
 
 This is the single canonical reference for PokéVault's analysis engine. Where any
@@ -142,6 +142,22 @@ implemented in the decision/nick block of `analyse.js`.)
 `specialForm`/`vivillonPattern` set, the decision is upgraded to `review` with
 `Collection species — set pattern in override panel` (prompts the user to set the form).
 
+> **Implementation note — single dispatch point for rules 5–11 (v3.5.84, #126).** Rules 5–11
+> above (`lucky`/`shiny`/`dynamax`/`gigantamax`/`best_overall`/`shadow`/`purified`) are **not**
+> seven independent `if`/`else if` checks in the code — they're all resolved by ONE call,
+> `resolveNickSlot(p)`, dispatched through `applyFallbackSlotDecision(p, isLegendary)`. This
+> exists because the naive "seven independent `p.slots.includes(...)` checks in their own
+> order" shape is exactly what caused two real regressions: issue #91 (an independent copy in
+> `app.js` diverged from the engine), and issue #118 (a *third* independent copy inside
+> `setOverride()`'s nick-preview code re-broke it after #91's fix). If you need to change the
+> priority among these seven, change it **only** in `resolveNickSlot()` — every other call site
+> (the decision block, `getNickSlot()` in `app.js`, the override-toggle preview) reads its
+> answer rather than re-deriving it. `resolveNickSlot` legitimately collapses `lucky`/
+> `best_overall`/`shadow` to the same `'lucky'` nick slot (all three render identical
+> `buildNickname(p,'lucky')` output) — the decision block's `applyFallbackSlotDecision` picks
+> the *reason string* among those three via a `p.slots.includes()` check that does **not**
+> affect which nick is shown.
+
 ### Force-Keep Overrides (applied after the decision block)
 - Manual decision override from Supabase → replaces the computed decision.
 - `is_shiny` / `is_dynamax` / `is_gigantamax` overrides applied here (see §13 known-bug note about shiny set *after* nick build).
@@ -264,6 +280,48 @@ Shadow / purified / lucky are **separate slot groups** — a shadow Great winner
 Great winner coexist in the same family. **Gender-dimorphic** species get separate slot
 groups per gender (see §8).
 
+### Sub-group keepThreshold & cross-variant Lucky suppression (v3.5.82, #91/#118/#119)
+
+Because Shiny and Lucky each battle in their own private `|lucky` sub-group (§3 "Special
+slots" above — a Shiny that is *also* Lucky lands in `|lucky`; a Shiny that is not Lucky
+competes in the plain `''` pool with a type-priority tiebreak boost, see §3 sorting), a
+sub-group with only one member can win its own tiny "competition" at any rank above 0% (the
+v3.5.28 "no hard floor" rule, §3). Two guards prevent that trivial win from producing a real
+league nick or from duplicating a slot the main pool already needs:
+
+- **keepThreshold gate on the nick (issues #91, #118).** A Shiny or Lucky may render a real
+  league/Master nick (`Ⓖ`/`Ⓤ`/`Ⓛ`/`Ⓜ`) **only** when it holds a slot at `rank ≥ keepThreshold`
+  (or, for Master, `ivAvg ≥ keepThreshold`) — a purify-push slot counts too. Below that, it
+  falls through to the shiny/lucky special-slot nick (`NameⓇ{IV%}※` / `NameⓇ{IV%}`), even
+  though `p.slots` still contains the tentative league tag. Enforced by
+  `hasConfirmedCappedSlot` / `hasLeagueSlot`'s trailing clause in the decision block:
+  `!((p.isLucky||p.isShiny) && !hasConfirmedCappedSlot)`, and mirrored inside
+  `resolveNickSlot()`'s own `leagueAllowed` check — see the single-dispatch note under §2.
+  Confirmed example: a shiny-lucky Chesnaught winning its own 1-member `|lucky` Great
+  sub-group at 21% must render `ChesnaugⓇ93※` (ivAvg-based), not `ChesnaugⒼ21※`.
+  **Within this fallback, Shiny is checked before Lucky** — a Shiny+Lucky combo with no
+  confirmed slot uses the ivAvg-based shiny fallback, not the Master-rank-based lucky
+  fallback (they can disagree numerically; only the ivAvg-based one is correct here).
+- **A Lucky's CONFIRMED slot blocks a same-SPECIES non-lucky win of the same league
+  (issue #119).** The `|lucky` pool and the main (`''`) pool are independent competitions
+  within the same evo-stage group — nothing stops both from separately winning, say, Ultra
+  for the same species. Once a Lucky confirms (`≥90%`) a league, a post-pass strips that
+  league from any **non-lucky, non-shadow, non-purified** member of the **literal same
+  current species** (matched on `p.name`, not the eventual evo target) — the Lucky is both
+  equal-or-better ranked (it won its own contention) and half dust, so a second
+  recommendation for the identical role is redundant. Confirmed example: Lucky Dedenne at
+  99% Ultra blocks a separate non-lucky Dedenne at 96% Ultra from also getting an Ultra
+  recommendation.
+  - **Deliberately scoped to species name, not evo target.** Flaaffy (Lucky) and Mareep
+    (non-lucky) both battle toward `Ampharos` in Great, but they are **different current
+    species** (different evolution investment) — this rule does **not** suppress Mareep's
+    independent Great win. Only a literal same-species pair (e.g. Dedenne, which never
+    evolves) triggers the suppression. Do not "fix" this to key on evo target — it was tried
+    and breaks the Flaaffy/Mareep independence the Master-precedence section (§3, C2) and
+    Group 5/36 fixture tests both rely on.
+- Shadow and purified sub-groups are **untouched** by either guard — only Shiny/Lucky are in
+  scope for the keepThreshold gate, and only the plain main pool is suppressible by Lucky.
+
 ### Standalone-species exclusion
 If a Pokémon's `Name (G/U/L)` points to a `STANDALONE_SPECIES` (`Kleavor`, `Weezing|Galar`),
 that league's `rankPct` is ignored and no slot is assigned for that league.
@@ -374,6 +432,13 @@ Gmax, Dmax, and Normal serve non-substitutable Master roles (different Max Battl
   no slot) → `luckyNonWinner` → `NameⓇ{IV%}`, **no star**, **decision stays `keep`** (Lucky is
   never traded). Winners, pure raid/master Luckies (no capped claim), and Max/Master-flagged
   Luckies keep the `lucky` slot unchanged.
+- **Lucky can never be recommended for trade**, full stop — every path through the decision
+  block that reaches an `isLucky` member ends in `keep` (winner, non-winner, or the plain
+  `isLucky` fallthrough).
+- This is about **Lucky-vs-Lucky** contention. For **Lucky-vs-non-lucky** (a confirmed Lucky
+  suppressing a same-species non-lucky win of the same league) see §3 "Sub-group keepThreshold
+  & cross-variant Lucky suppression" (v3.5.82, #119) — a related but separate mechanism added
+  much later.
 
 ### Legendary / Mythical / Ultra Beast
 - Skip Master in regular league evaluation (handled by `best_overall`).
@@ -541,6 +606,14 @@ Star type is set by `p.starType` in `analyse.js` and rendered by `render.js`.
 0c. FORMSET 📝 formUnset — Burmy→Wormadam cloak not recorded (v3.5.56, #39). Placed high so it
              overrides GOLD/RED for a favourited keep-worthy Burmy. See the carve-out above.
              → "Form not set — record the Wormadam cloak in the override panel before evolving"
+0d. GREY  ★  Sub-threshold per-form collection keeper (v3.5.64, #64) — holds `collection` but
+             none of `suggestStar`/`suggestStarCheaper`/`isShiny` fired. Kept for set
+             completeness, not a power-up priority.
+0e. GREY  ★  Sub-threshold wonDynamaxMaster/wonGigantamaxMaster (v3.5.80, #108/#109) — the
+             family's best (possibly only) Dmax/Gmax, but `ivAvg < keepThreshold` so it isn't
+             worth powering up yet. The nick still shows `NameⓂ{IV%}Ⓓ`/`Ⓧ` (a useful raid-power
+             label) even though the star says "not now" — `wonDynamaxMaster`/
+             `wonGigantamaxMaster` stay true for nick routing regardless of this star gate.
 1. GOLD   ★  suggestStar && isFavorite && (!isShiny || hasRealSlot)
              OR suggestStarExpensive && isFavorite
              → "Starred correctly ✓"
@@ -939,6 +1012,48 @@ blue/expensive-winner path (it remains only on the affordable-winner self-flag);
 from the stable key; the shared-`Ⓡ` Master rule superseded by `Ⓜ` winner / `Ⓡ` non-winner;
 and the retired single-file HTML reference.
 
+### Audit — 2026-09-05 (Claude Code, brief `rules-md-audit-update`, verified against v3.5.84)
+
+Requested audit covered 9 items (star colours, Dmax/Gmax, forms, purify indicator, nick
+formats, ML placeholder, sub-group keepThreshold, Dmax/Gmax star threshold, Lucky
+non-winner). **Finding: 7 of the 9 were already accurate and current** — this document's
+header timestamp (previously "2026-06-23 / v3.5.56") was stale relative to its own body,
+which had in fact been incrementally kept current through at least v3.5.73 in most sections.
+The brief's premise ("not systematically updated since ~v3.5.53") held only for the header
+stamp, not the content. Re-verified line-by-line against `analyse.js` anyway rather than
+trusting the existing prose.
+
+**Genuinely added (previously undocumented):**
+1. §3 "Sub-group keepThreshold & cross-variant Lucky suppression" (v3.5.82, #91/#118/#119) —
+   entirely new section. This was live implementation work in the *same* multi-session thread
+   as this audit (PR #123 fixed the bug, PR #128/#126 removed the duplicate-logic root cause
+   afterward) — see the git log for `fix/issue-118-119-subgroup-keepthreshold-complete` and
+   `refactor/issue-126-resolvenickslot-refactor` for the full diagnostic trail if this summary
+   is insufficient.
+2. §6 decision-tree items 0d/0e (collection sub-threshold grey, Dmax/Gmax sub-threshold grey,
+   v3.5.64/v3.5.80) — these conditions existed in code long before this audit but were never
+   entered into the tree; only the ML-placeholder grey (item 8) had been.
+3. §2 implementation note on `applyFallbackSlotDecision`/`resolveNickSlot` single-dispatch
+   (v3.5.84, #126) — documents *why* rules 5–11 must never be re-implemented independently,
+   given two prior regressions (#91, #118) from exactly that mistake.
+4. §4 Lucky non-winner section — added a one-line cross-reference to the new §3 material so a
+   reader doesn't miss the Lucky-vs-non-lucky mechanism while reading the older Lucky-vs-Lucky
+   one.
+
+**Verified unchanged, no edit needed:** star colour table (§6, already had Gold/Green/Blue/
+Cyan/Grey/Red/None with matching definitions), all of §4's Dynamax/Gigantamax rules
+(type-priority ladder, three independent Master slots, categorical Gmax-suppression-of-Normal),
+the form system (§5, decorative-vs-decision, Rockruff/Burmy carve-outs), the purify indicator
+(§7, Sha/Pur-driven threshold + #73 dedup), and the ML-placeholder refinement (§6 item 8,
+#24/#37 strict-IV guard).
+
+**Not otherwise touched:** §14 Pending Bugs (out of this brief's scope — a separate audit
+would be needed to confirm which are still live against v3.5.84), and the duplicate, older
+`pokevault-refactor/RULES.md` file (a stale fork of an earlier version of this document —
+worth a decision on whether to delete it, since having two files both named `RULES.md` with
+diverging content is its own source of the "which one is current" confusion this audit was
+partly meant to fix; not deleted here since it wasn't in this brief's stated file list).
+
 ---
 
-*End of PokéVault Business Rules & Design Reference — v3.5.49, 2026-06-13.*
+*End of PokéVault Business Rules & Design Reference — v3.5.84, 2026-09-05.*
