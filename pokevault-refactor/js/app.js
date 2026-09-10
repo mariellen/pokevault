@@ -2269,6 +2269,74 @@ function specialNavigate(name){
   document.getElementById('searchClear')?.classList.add('visible');
 }
 
+// ── 100% modal (#135) ───────────────────────────
+// Actionable worklist: every Pokémon that is 100% (rounded league rank OR hundo IV) AND
+// still needs starring (green/cyan/blue). Gold/red/grey/none are excluded — gold means
+// already actioned, and the list self-clears as she stars things in GO (no "seen" state).
+// Pure/testable: takes a pokemon list, returns {p, leagues100, isHundoOnly}[] pre-sorted.
+const HUNDRED_LEAGUE_ORDER=['M','U','G','L'];
+function isHundredPercentPokemon(p){
+  return HUNDRED_LEAGUE_ORDER.some(lg=>Math.round(p['rankPct'+lg]||0)===100) ||
+    (p.atkIV===15&&p.defIV===15&&p.staIV===15);
+}
+function computeHundredPercentWorklist(pokemonList){
+  const leagues100=p=>HUNDRED_LEAGUE_ORDER.filter(lg=>Math.round(p['rankPct'+lg]||0)===100);
+  const list=(pokemonList||[])
+    .filter(p=>isHundredPercentPokemon(p)&&['green','cyan','blue'].includes(p.starType))
+    .map(p=>{
+      const l100=leagues100(p);
+      return {p,leagues100:l100,isHundoOnly:l100.length===0,primaryLeague:l100[0]||null};
+    });
+  list.sort((a,b)=>{
+    const ai=a.primaryLeague?HUNDRED_LEAGUE_ORDER.indexOf(a.primaryLeague):HUNDRED_LEAGUE_ORDER.length;
+    const bi=b.primaryLeague?HUNDRED_LEAGUE_ORDER.indexOf(b.primaryLeague):HUNDRED_LEAGUE_ORDER.length;
+    if(ai!==bi) return ai-bi;
+    if(a.primaryLeague&&b.primaryLeague){
+      const ar=a.p['rankPct'+a.primaryLeague]||0, br=b.p['rankPct'+b.primaryLeague]||0;
+      if(ar!==br) return br-ar;
+    }
+    return a.p.name.localeCompare(b.p.name)||((b.p.cp||0)-(a.p.cp||0));
+  });
+  return list;
+}
+
+function openHundredModal(){
+  if(!allPokemon.length){alert('Load your collection first');return;}
+  trackEvent('hundred_modal_open');
+  const modal=document.getElementById('hundred-modal');
+  const body=document.getElementById('hundred-modal-body');
+  const sub=document.getElementById('hundred-modal-sub');
+  const list=computeHundredPercentWorklist(allPokemon);
+  sub.textContent=list.length+' Pokémon at 100% ready to name and star';
+
+  const starClassFor={green:'star-green',cyan:'star-cyan',blue:'star-blue'};
+  body.innerHTML=!list.length
+    ? '<div class="pv-modal-empty">Nothing to action — every 100% is already starred ✓</div>'
+    : list.map(({p,leagues100,isHundoOnly})=>{
+        const nick=p.nickname||'';
+        const nickEsc=nick.replace(/"/g,'&quot;');
+        const searchStr=`${p.cp||0} ${p.atkIV}/${p.defIV}/${p.staIV}`;
+        const searchEsc=searchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+        const leagueLabel=isHundoOnly?'Hundo':leagues100.join('/');
+        const starClass=starClassFor[p.starType]||'star-none';
+        return `<div class="pv-modal-row">
+          <div class="pv-modal-info">
+            <div class="pv-modal-name">${esc(p.name)}${p.form?` <span class="poke-form">(${esc(p.form)})</span>`:''}</div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${p.atkIV}/${p.defIV}/${p.staIV} · ${Math.round(p.ivAvg)}% IV · <span class="${starClass}" style="font-weight:700">${leagueLabel}</span>${nick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${nickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(nick)}</span>`:''}</div>
+          </div>
+          <div class="pv-modal-controls">
+            <span class="${starClass}" style="font-size:16px" title="${esc(p.starType)}">★</span>
+            <button class="copy-search-btn" data-search="${searchEsc}" onclick="copyGoSearch(this.dataset.search,this)" title="Copy Pokégenie search (CP + IVs) to find this individual">📋</button>
+          </div>
+        </div>`;
+      }).join('');
+  modal.classList.add('open');
+}
+
+function closeHundredModal(){
+  document.getElementById('hundred-modal').classList.remove('open');
+}
+
 // ═══════════════════════════════════════════════
 // COPY SUGGESTED NICKS
 // ═══════════════════════════════════════════════
