@@ -1258,20 +1258,15 @@ function analyse(rows) {
           return String(a.stableKey||a.idx||'').localeCompare(String(b.stableKey||b.idx||''));
         });
 
-        // Option C+D: affordable-first two-pass. ML always single pass (Option D — exempt by design).
-        // Pass 1 (GL/UL/LL): affordable candidates only (effective dust ≤ lgAffordable).
-        // Pass 2 (GL/UL/LL): full eligible pool as fallback when no affordable candidate exists.
-        // ML non-shadow winner is chosen in a dedicated post-loop step (see "Non-shadow Master
-        // pick" below) so all variant groups (normal/lucky/purified) compete for ONE slot.
+        // #95/#36/#134: best-ranked candidate ALWAYS wins the slot, regardless of cost — the
+        // affordable subset must never replace the pool before comparison happens (that was the
+        // #134 bug: an affordable 90%+ candidate silently discarded a higher-ranked expensive one
+        // before they ever competed). `eligible` is already sorted best-rank-first (with dust only
+        // as a same-tier tiebreaker — see the sort above), so eligible[0] IS the winner. The
+        // affordable-alternative surfacing (isExpensiveWinner / isAffordableWinner, below) reads
+        // from `eligible` too, so it now sees the true winner instead of a pre-filtered pool.
         const lgAffordable = (DUST_THRESHOLDS[lg] || DUST_THRESHOLDS.G).affordable;
-        const eligiblePool = lg !== 'M' ? (() => {
-          const aff = eligible.filter(p =>
-            effectiveDust(p) <= lgAffordable && (p[rankField]||0) >= RULES.keepThreshold
-          );
-          return aff.length ? aff : eligible;
-        })() : eligible;
-
-        const best = eligiblePool[0];
+        const best = eligible[0];
         const bestRank = best[rankField]||0;
 
         // Before assigning: check if best rounds to 100% in a lower league
@@ -1294,9 +1289,9 @@ function analyse(rows) {
         });
 
         let actualBest = best;
-        if (shouldProtect && eligiblePool.length > 1) {
+        if (shouldProtect && eligible.length > 1) {
           // Try next best that doesn't have the same protection issue
-          const alternative = eligiblePool.slice(1).find(p => {
+          const alternative = eligible.slice(1).find(p => {
             const altShouldProtect = lowerLeagues.some(ll => {
               const lowerEvo = slotEvoTarget(p, ll); // form-aware (#39)
               if (lowerEvo === stageTarget) return false;
@@ -1940,6 +1935,9 @@ function analyse(rows) {
       else if (p.suggestStar && !p.isFavorite && !p.suggestStarCheaper && (!p.isShiny || hasRealSlot)) p.starType = 'green';
       else if (p.suggestStarExpensive && p.isFavorite) p.starType = 'gold';
       else if (p.suggestStarExpensive && !p.isFavorite) p.starType = 'blue';
+      // #134 Fix 2: gold wins when already favourited — blue/cyan are action signals for
+      // members NOT yet starred in GO, not status signals for ones that already are.
+      else if (p.suggestStarCheaper && p.isFavorite) p.starType = 'gold';
       else if (p.suggestStarCheaper && !p.isFavorite) p.starType = 'cyan';
       else if (p.isShiny) p.starType = 'shiny'; // shiny with no real PvP slot reason
       else if (!p.suggestStar && !p.suggestStarExpensive && !p.suggestStarCheaper && p.isFavorite) p.starType = 'red';
@@ -2292,6 +2290,15 @@ function analyse(rows) {
         }
       }
     }
+  });
+
+  // #134 Fix 3: a grey-starred member that is already favourited in GO reads as gold
+  // ("already actioned, no review needed") instead of resurfacing for review. Covers every
+  // path that sets starType='grey' above: gmaxSuppressedHundo, per-form collection keeper,
+  // sub-threshold Dmax/Gmax Master winner, and the ML placeholder pass. luckyNonWinner is
+  // intentionally 'none' (not grey) so a favourited losing Lucky still does not earn gold.
+  parsed.forEach(p => {
+    if (p.starType === 'grey' && p.isFavorite) p.starType = 'gold';
   });
 
   // ── Nick override (post-derivation) ───────────────────────

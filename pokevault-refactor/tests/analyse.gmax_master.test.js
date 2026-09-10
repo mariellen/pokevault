@@ -377,10 +377,10 @@ describe('Test 11b — Dmax beats Normal on the type tiebreak for a single GL sl
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// Test 15 — star ladder: gmaxSuppressedHundo beats a gold favourite (grey, not gold)
+// Test 15 — star ladder: gmaxSuppressedHundo + already favourited → gold (#134 Fix 3)
 // ───────────────────────────────────────────────────────────────────────────
-describe('Test 15 — gmaxSuppressedHundo beats gold favourite → grey', () => {
-  it('a favourited suppressed hundo gets grey, not gold', () => {
+describe('Test 15 — gmaxSuppressedHundo + favourited → gold (already actioned, no review needed)', () => {
+  it('a favourited suppressed hundo gets gold, not grey', () => {
     const specs = [
       { idx: 1, cp: 1500, a: 15, d: 14, s: 13, gmax: true },           // Gmax → Ⓜ
       { idx: 2, cp: 1490, a: 15, d: 15, s: 15, fav: true },            // favourite hundo → suppressed
@@ -388,6 +388,18 @@ describe('Test 15 — gmaxSuppressedHundo beats gold favourite → grey', () => 
     const mons = run(specs);
     const hundo = byIdx(mons, specs, 2);
     expect(hundo.isFavorite).toBe(true);
+    expect(hundo.gmaxSuppressedHundo).toBe(true);
+    expect(hundo.starType).toBe('gold');
+  });
+
+  it('an UNfavourited suppressed hundo still gets grey (unchanged)', () => {
+    const specs = [
+      { idx: 1, cp: 1500, a: 15, d: 14, s: 13, gmax: true },           // Gmax → Ⓜ
+      { idx: 2, cp: 1490, a: 15, d: 15, s: 15 },                       // non-favourite hundo → suppressed
+    ];
+    const mons = run(specs);
+    const hundo = byIdx(mons, specs, 2);
+    expect(hundo.isFavorite).toBe(false);
     expect(hundo.gmaxSuppressedHundo).toBe(true);
     expect(hundo.starType).toBe('grey');
   });

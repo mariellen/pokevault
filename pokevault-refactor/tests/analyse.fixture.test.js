@@ -1557,33 +1557,43 @@ describe('Group 27e — Dmax hundo Entei: hundo indicator in nick', () => {
   });
 });
 
-// ─── Group 29 — Greedent CP:1438 wins UL (Option C affordable-first) ─────────
-// Option C two-pass: affordable candidates (dust ≤ 300k for UL) win Pass 1.
-// Greedent CP:1438 (92.09% UL, affordable as final evo) beats expensive Skwovet CP:750 (98.58% UL).
-// GL is still won by Skwovet CP:496 (100%, affordable, dustG=0).
-// Behaviour changed intentionally by Feature 2 Option C (brief 2026-05-29).
+// ─── Group 29 — Skwovet CP:750 wins UL (Fix 1 — best rank always wins) ───────
+// #134/#95/#36: best-ranked candidate wins the slot regardless of cost. Skwovet CP:750
+// (98.58% UL, expensive dustU=350k) now beats Greedent CP:1438 (92.09% UL, affordable
+// dustU=250k) — the old affordable-first gate used to hand the slot to the lower-ranked
+// but cheaper candidate. Greedent CP:1438 surfaces as the affordable alternative instead
+// (U_affordable, cyan). GL is still won by Skwovet CP:496 (100%, affordable, dustG=0).
+// Behaviour changed intentionally by the #134 affordability-gate fix (2026-09-10).
 
-describe('Group 29 — Greedent CP:1438 wins UL (Option C); Skwovet CP:750 loses UL to affordable candidate', () => {
-  it('Greedent CP:1438 (92.09% UL, affordable) → wins UL slot (Option C Pass 1)', () => {
-    const p = find('Greedent', 1438);
+describe('Group 29 — Skwovet CP:750 wins UL (best rank wins); Greedent CP:1438 surfaces as affordable alternative', () => {
+  it('Skwovet CP:750 (98.58% UL, expensive dustU) → wins UL slot', () => {
+    const p = find('Skwovet', 750);
     expect(p).toBeDefined();
     expect(p.slots).toContain('U');
     expect(p.decision).toBe('keep');
   });
 
-  it('Skwovet CP:750 (98.58% UL, expensive dustU) → does NOT hold UL slot (Option C)', () => {
+  it('Skwovet CP:750 → isExpensiveWinner=true, blue star', () => {
     const p = find('Skwovet', 750);
-    expect(p.slots).not.toContain('U');
+    expect(p.isExpensiveWinner).toBe(true);
+    expect(p.starType).toBe('blue');
   });
 
-  it('Skwovet CP:750 does NOT hold GL either — CP:496 (100%) wins it', () => {
+  it('Greedent CP:1438 (92.09% UL, affordable) → does NOT hold plain UL slot, holds U_affordable instead', () => {
+    const p = find('Greedent', 1438);
+    expect(p.slots).not.toContain('U');
+    expect(p.slots).toContain('U_affordable');
+  });
+
+  it('Greedent CP:1438 → isAffordableWinner=true, cyan star', () => {
+    const p = find('Greedent', 1438);
+    expect(p.isAffordableWinner).toBe(true);
+    expect(p.starType).toBe('cyan');
+  });
+
+  it('Skwovet CP:750 does NOT hold GL — CP:496 (100%) wins it', () => {
     const p = find('Skwovet', 750);
     expect(p.slots).not.toContain('G');
-  });
-
-  it('Skwovet CP:750 (no league slot) → decision=review', () => {
-    const p = find('Skwovet', 750);
-    expect(p.decision).toBe('review');
   });
 });
 
@@ -1611,12 +1621,13 @@ describe('Group 30 — Skwovet CP:496 (99.78% GL) wins and is kept — regressio
     expect(p.nickname).toContain('100');
   });
 
-  it('Skwovet CP:496 holds GL; Greedent CP:1438 holds UL (Option C affordable-first)', () => {
-    // Option C: affordable Greedent CP:1438 wins UL in Pass 1; Skwovet CP:750 (expensive) loses UL.
+  it('Skwovet CP:496 holds GL; Skwovet CP:750 (not Greedent) holds UL (Fix 1 — best rank wins)', () => {
+    // Fix 1: Skwovet CP:750 (98.58%, expensive) now wins UL outright; Greedent CP:1438
+    // (92.09%, affordable) surfaces as the affordable alternative (U_affordable) instead.
     const p496 = find('Skwovet', 496);
-    const greedent = find('Greedent', 1438);
+    const p750 = find('Skwovet', 750);
     expect(p496.slots).toContain('G');
-    expect(greedent.slots).toContain('U');
+    expect(p750.slots).toContain('U');
   });
 });
 
