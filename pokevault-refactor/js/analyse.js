@@ -879,12 +879,21 @@ function analyse(rows) {
       const formKey = isRegionalPoke ? r['Name'] + '|' + pForm : null;
       const validEvos = (formKey && typeof VALID_EVOLUTIONS !== 'undefined' && VALID_EVOLUTIONS[formKey])
         || (typeof VALID_EVOLUTIONS !== 'undefined' && VALID_EVOLUTIONS[r['Name']]);
-      if (!validEvos) return '';
+      // #134 Step 0: these two branches silently discarded Pokegenie's answer, dropping the
+      // member into the wrong byEvoStage pool with no trace. Purely additive — behavior
+      // (return '') is unchanged; this only makes the drop observable.
+      if (!validEvos) {
+        console.warn('[validateEvo] no VALID_EVOLUTIONS entry for "' + r['Name'] + '" — dropped target "' + name + '"');
+        return '';
+      }
       // Support form-qualified evo targets ('Arcanine|Hisui'): match by base species name
       const baseName = name.split('|')[0];
       const match = validEvos.find(v => v === name || v.split('|')[0] === baseName);
-      if (!match) return '';
-      if (STANDALONE_SPECIES.has(match.split('|')[0])) return '';
+      if (!match) {
+        console.warn('[validateEvo] "' + r['Name'] + '" has VALID_EVOLUTIONS ' + JSON.stringify(validEvos) + ' but target "' + name + '" is not in it — dropped');
+        return '';
+      }
+      if (STANDALONE_SPECIES.has(match.split('|')[0])) return ''; // intentional — not a drop, no warning
       return match; // may be 'Arcanine|Hisui' for Hisui Growlithe
     };
 
