@@ -241,7 +241,7 @@ re-exports or a cloud reload, whereas `stableKey` (pokeNum|form|gender|IVs) is i
   as `dust = 0` (already there, no investment) — the most affordable outcome, always wins
   the dust tiebreak against a same-ranked Pokémon with non-zero dust.
 - **Lucky half-dust applies in the tiebreak** (`Math.round(dust/2)`), consistent with the
-  two-pass affordable-first logic.
+  affordable-alternative surfacing logic below.
 - Comprehensive coverage lives in `analyse.dust_tiebreak.test.js` — must stay green.
 
 **Rank tiers:** Tier 0 ≥99.99% (exact 100) · Tier 1 ≥99.0% · Tier 2 ≥90.0% ·
@@ -251,16 +251,31 @@ Tier 3 below 90% (tentative — review, no circled-letter nick).
 regardless of rank. Master retains a 70% floor (ivAvg-based) in the next-best pass.
 `slotConfirmed` requires rank ≥ `keepThreshold` — slot membership alone is not enough.
 
-### Affordable winner vs expensive winner (Pass 2)
+### Affordable winner vs expensive winner (#134 fix, 2026-09-10)
+The **best-ranked candidate always wins the slot, regardless of cost** — `best = eligible[0]`,
+where `eligible` is already sorted best-rank-first (§ tiebreak above). Cost never removes a
+candidate from contention; it only decides which *additional* alternative gets surfaced
+alongside the winner.
+
+**Prior bug (#134/#95/#36):** an earlier "two-pass affordable-first" implementation replaced
+the whole eligible pool with the affordable subset whenever ≥1 affordable candidate qualified
+at ≥90%, discarding higher-ranked but expensive candidates *before any comparison happened*.
+On the real collection this dropped 333 rank-≥90% members from their rightful slot (189
+favourited → red star, 170 unfavourited → **no star at all**, silently deletable). Fixed by
+letting the winner be chosen purely by rank, then layering the affordable-alternative logic
+below on top of the true winner instead of a pre-filtered pool.
+
 If the best candidate's effective dust exceeds the league's affordable threshold:
-- The best candidate gets `isExpensiveWinner` → **blue star** (`suggestStarExpensive`).
-  **Fires at any evo stage** (no `isFinalEvoStage` guard on this path).
+- The best candidate gets `isExpensiveWinner` → **blue star** (`suggestStarExpensive`), unless
+  already favourited → **gold** (§ star colour reference above). **Fires at any evo stage**
+  (no `isFinalEvoStage` guard on this path).
 - The best affordable alternative (effective dust ≤ threshold, rank ≥ 90%) gets an
-  `X_affordable` slot and `suggestStarCheaper` (cyan).
+  `X_affordable` slot and `suggestStarCheaper` → **cyan**, unless already favourited → **gold**.
 
 If the best candidate is itself affordable, it gets `isAffordableWinner` — **but only when
 it is the final evo stage and confirmed** (the `isFinalEvoStage` guard remains on *this*
-self-flag path only, not on the blue/expensive path).
+self-flag path only, not on the blue/expensive path). It does not pair with a cyan
+alternative — a plain green/gold win, no partner.
 
 ### Special slots
 | Slot | Rule |
@@ -674,16 +689,36 @@ The `starType` strings, the grey ML-placeholder, and the visibility star
 | 🟡 Gold | `gold` | Already starred in GO — correct, no action needed |
 | 🟢 Green | `green` | Should be starred, action needed, affordable |
 | 🔵 Blue | `blue` | Should be starred but expensive ($$$) — correct recommendation, unlikely to power up soon |
-| 🩵 Cyan | `cyan` | A cheaper option exists at the same rank as something already starred — check before acting |
-| ⭐ Grey | `grey` | Collection keeper or ML placeholder — keep but not a power-up priority |
+| 🩵 Cyan | `cyan` | A cheaper alternative exists for the same slot — check before assuming, may not be worth switching |
+| ⭐ Grey | `grey` | Collection keeper, ML placeholder, or sub-threshold Dmax/Gmax — keep but not a power-up priority |
 | 🔴 Red | `red` | Starred in GO but superseded by a better recommendation |
 | · None | `none` | Not starred, not recommended |
 
-**Blue vs Cyan distinction:**
-- **Blue** = the best recommendation but expensive. Correct pick, just costly.
-- **Cyan** = NOT the best pick overall, but cheaper than something already starred at the same rounded rank. A "heads up" — check if you've already invested in the more expensive one. Does not fire when the cheaper option has strictly better stats — that case gets green.
+**Gold wins when already favourited (#134 Fix 2/3).** Blue, cyan, and grey are *action*
+signals for members NOT yet starred in GO — the point is to inform starring/powering-up
+decisions before dust is spent. Once a member IS favourited, showing blue/cyan/grey again
+would be a stale reminder for a decision already made, so the ladder renders **gold** instead:
+a blue-eligible (expensive) winner that's favourited → gold; a cyan-eligible (cheaper
+alternative) member that's favourited → gold; any grey-eligible member that's favourited →
+gold. The one deliberate exception is `luckyNonWinner`, which stays `none` even if
+favourited — a losing Lucky was never a recommendation to act on.
 
-**Cyan only fires when** a cheaper Pokémon is the winner of `eligible.sort` AND there is an already-favourited Pokémon in the same family at the same rounded rank with higher effective dust. The cheaper one gets `cheaperAlternativeLeagues` pushed; that resolves to `isCheaperAlternative=true` → `suggestStarCheaper` → cyan.
+**Blue vs Cyan distinction:**
+- **Blue** = the best-ranked recommendation but expensive. Correct pick, just costly.
+- **Cyan** = a cheaper alternative for the *same slot*, not the pick itself. Two triggers:
+  1. **Affordable alternative to an expensive winner (#134 Fix 1).** When the best-ranked
+     candidate wins a slot but is unaffordable (`isExpensiveWinner`/blue), the best
+     *affordable* qualifier for that same slot (rank ≥ `keepThreshold`, effective dust ≤ the
+     league's affordable threshold) gets an `X_affordable` slot instead of stealing the real
+     one, and `suggestStarCheaper` → cyan. This is the "blue + cyan pair, same slot, two
+     options, choose on dust" case described in §"Affordable winner vs expensive winner"
+     below.
+  2. **Cheaper option at the same rank as something already starred.** A cheaper Pokémon is
+     the winner of `eligible.sort` AND there is an already-favourited Pokémon in the same
+     family at the same rounded rank with higher effective dust. The cheaper one gets
+     `cheaperAlternativeLeagues` pushed; that resolves to `isCheaperAlternative=true` →
+     `suggestStarCheaper` → cyan. Does not fire when the cheaper option has strictly better
+     stats — that case gets green instead.
 
 ### Key flags
 - **`suggestStar`** (green/gold): `suggestStarExpensive=false` AND any of — `decision='keep'`

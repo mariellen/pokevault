@@ -67,17 +67,24 @@ describe('Option C — expensive Skwovet CP:750 loses GL to affordable Skwovet C
   });
 });
 
-// ─── Option C Scenario 3: affordable UL candidate wins (same pattern as GL) ──
-// Greedent CP:1438 (affordable dustU ≤ UL threshold, 92% UL) wins UL in Pass 1.
+// ─── Fix 1 Scenario 3: best-ranked UL candidate wins outright, even if expensive ──
+// Skwovet CP:750 (98.58% UL, expensive dustU=350k) beats Greedent CP:1438 (92.09% UL,
+// affordable dustU=250k) — best rank always wins the slot (#134 fix, 2026-09-10).
+// Greedent CP:1438 surfaces as the affordable alternative (U_affordable) instead.
 
-describe('Option C — affordable UL candidate wins directly (Pass 1)', () => {
-  it('Greedent CP:1438 holds U slot (affordable UL winner)', () => {
-    const p = find('Greedent', 1438);
+describe('Fix 1 — best-ranked UL candidate wins directly, affordable alt surfaces alongside', () => {
+  it('Skwovet CP:750 (98.58% UL, expensive) holds U slot', () => {
+    const p = find('Skwovet', 750);
     expect(p).toBeDefined();
     expect(p.slots).toContain('U');
   });
-  it('Greedent CP:1438 decision is keep', () => {
-    expect(find('Greedent', 1438).decision).toBe('keep');
+  it('Skwovet CP:750 decision is keep', () => {
+    expect(find('Skwovet', 750).decision).toBe('keep');
+  });
+  it('Greedent CP:1438 (92.09% UL, affordable) holds U_affordable, not plain U', () => {
+    const p = find('Greedent', 1438);
+    expect(p.slots).not.toContain('U');
+    expect(p.slots).toContain('U_affordable');
   });
 });
 
@@ -100,17 +107,18 @@ describe('Option D — ML exempt from two-pass (single pass)', () => {
   });
 });
 
-// ─── Option C Scenario 5: expensive Skwovet loses GL, wins UL (Pass 2) ──────
-// Skwovet CP:750 — expensive for GL (affordable Skwovet CP:496 wins GL in Pass 1).
-// Skwovet CP:750 has high UL rank — if no affordable UL candidate, wins UL in Pass 2.
-// In our fixture: Greedent CP:1438 is affordable for UL, so CP:750 loses UL too.
+// ─── Fix 1 Scenario 5: Skwovet CP:750 loses GL (to a higher-ranked same-species
+// GL winner) but wins UL outright on rank, expensive or not ───────────────────
+// Skwovet CP:750 loses GL to Skwovet CP:496 (99.78%, higher rank). For UL, CP:750
+// (98.58%) out-ranks Greedent CP:1438 (92.09%) and wins despite being expensive —
+// the #134 fix means cost never removes a candidate from contention.
 
-describe('Option C — expensive Skwovet CP:750 falls to review (both GL and UL taken)', () => {
-  it('Skwovet CP:750 holds no league slot', () => {
+describe('Fix 1 — Skwovet CP:750 loses GL to a higher-ranked rival, but wins UL on rank alone', () => {
+  it('Skwovet CP:750 holds exactly one league slot (U)', () => {
     const p = find('Skwovet', 750);
-    expect(p.slots.filter(s => ['L','G','U','M'].includes(s))).toHaveLength(0);
+    expect(p.slots.filter(s => ['L','G','U','M'].includes(s))).toEqual(['U']);
   });
-  it('Skwovet CP:750 decision is review (no slot)', () => {
-    expect(find('Skwovet', 750).decision).toBe('review');
+  it('Skwovet CP:750 decision is keep (won UL)', () => {
+    expect(find('Skwovet', 750).decision).toBe('keep');
   });
 });
