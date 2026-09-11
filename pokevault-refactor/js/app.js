@@ -1096,11 +1096,16 @@ function openPurifyModal(){
     return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
         padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px${isHundoOnly?';background:rgba(255,215,0,0.05)':''}">
       <div>
-        <div style="font-weight:700;color:var(--text)">${esc(p.name)}${p.purifyEvo&&p.purifyEvo!==p.name?' <span style="color:var(--muted);font-size:11px;font-weight:400">→ '+esc(p.purifyEvo)+'</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
+        <div style="font-weight:700;color:var(--text)"><span onclick="modalNavigateToFamily('${p.name.replace(/'/g,"\\'")}')" style="cursor:pointer;text-decoration:underline" title="View family in main list">${esc(p.name)}</span>${p.purifyEvo&&p.purifyEvo!==p.name?' <span style="color:var(--muted);font-size:11px;font-weight:400">→ '+esc(p.purifyEvo)+'</span>':''} <span style="color:var(--muted);font-weight:400">CP:${p.cp}</span>
           ${p.purifyHundo?'<span style="color:var(--gold);font-size:10px"> ✨ Becomes hundo!</span>':''}
         </div>
         <div style="color:var(--muted);font-size:11px">IVs: ${ivStr} → ${purifiedIvStr}${lg?' · <span style="color:'+lgColor+';font-weight:700">'+lgName+'</span> est. <span style="font-weight:700;color:var(--green)">'+p.purifyRankPct+'%</span>':''} · dust: <span style="color:var(--cyan)">${purifyDust>0?purifyDust.toLocaleString():'at cap'}</span></div>
       </div>
+      <!-- #144: these three stay domain-specific rather than the shared helpers — the search
+           needs a "&shadow" qualifier (a plain name+cp search would land on the WRONG,
+           already-purified individual), "IV" copies pre-purify IVs for comparison (not a
+           search string or a nick), and this nick is the PROJECTED post-purify nick, not
+           p.nickname. All three already route through the shared copyGoSearch handler. -->
       <button class="copy-search-btn" onclick="copyGoSearch('${p.name}&cp${p.cp}&shadow',this)" title="Copy name+CP+shadow to find in GO/Pokégenie">🔍</button>
       <button class="copy-search-btn" onclick="copyGoSearch('${ivStr}',this)" title="Copy IVs to search in Pokégenie">IV</button>
       <span onclick="copyGoSearch('${purifyNick}',this)" style="font-family:monospace;color:var(--gold);cursor:pointer;font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;white-space:nowrap" title="Click to copy purified nick">${esc(purifyNick)}</span>
@@ -1921,19 +1926,18 @@ function openCullModal(focusFam){
     const cullBorderStyle=cullTier==='gold'?'border-left:3px solid var(--gold)':cullTier==='green'?'border-left:3px solid var(--green)':cullTier==='blue'?'border-left:3px solid var(--cyan)':'';
 
     const keeperLines=keepers.map(p=>{
-      const nick=p.nickname||'';
-      const nickEscAttr=nick.replace(/"/g,'&quot;');
       return `<div style="font-size:11px;color:var(--muted);padding-left:4px;margin-top:2px">
         <span style="color:${p.isMlPlaceholder?'var(--muted)':'var(--gold)'}">${p.isMlPlaceholder?'☆':'★'}</span>
         ${esc(p.name)} CP:${p.cp}
-        ${nick?`<span style="font-family:monospace;color:${p.isMlPlaceholder?'var(--muted)':'var(--green)'};cursor:pointer" data-nick="${nickEscAttr}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy">${esc(nick)}</span>`:''}
+        ${p.nickname?renderNickCopyButton(p):''}
+        ${renderSearchCopyButton(p)}
         ${p.isMlPlaceholder?'<span style="font-size:9px;color:var(--dim)">(ML placeholder)</span>':''}
       </div>`;
     }).join('');
 
     return `<div style="padding:8px 16px;border-bottom:1px solid var(--border)${cullBorderStyle?';'+cullBorderStyle:''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span data-name="${nameEsc}" onclick="navigateToFamily(this.dataset.name)" style="font-weight:700;font-size:13px;cursor:pointer;color:var(--cyan)" title="View family in main list">${esc(fam.primaryName)}</span>
+        <span data-name="${nameEsc}" onclick="modalNavigateToFamily(this.dataset.name)" style="font-weight:700;font-size:13px;cursor:pointer;color:var(--cyan)" title="View family in main list">${esc(fam.primaryName)}</span>
         <span style="color:var(--muted);font-size:11px">${fam.members.length}</span>
         <span style="font-size:11px">: <span style="color:var(--red)">${redCount}★</span> &nbsp;<span style="color:var(--gold)">${luckyCount}🍀</span>&nbsp; <span style="color:var(--muted)">${unstarredCount}🗑</span></span>
         <button class="copy-search-btn" data-copy="${searchEsc}" onclick="copyGoSearch(this.dataset.copy,this)" title="Copy GO search — whole family">🔍 Fam</button>
@@ -1944,12 +1948,6 @@ function openCullModal(focusFam){
 
   body.innerHTML=rows;
   modal.style.display='flex';
-}
-
-function navigateToFamily(name){
-  closeCullModal();
-  const box=document.getElementById('searchBox');
-  if(box){box.value=name;box.dispatchEvent(new Event('input'));}
 }
 
 function closeCullModal(){
@@ -2138,14 +2136,12 @@ function openCleanupModal(){
     ? sortBtns+'<div class="pv-modal-empty">All forms already set! ✓</div>'
     : sortBtns+needsForm.map(p=>{
         const opts=(FORM_DROPDOWNS[p.name]||[]).map(f=>`<option value="${f}" ${p.specialForm===f?'selected':''}>${f}</option>`).join('');
-        const cleanNick=p.nickname||'';
-        const cleanNickEsc=cleanNick.replace(/"/g,'&quot;');
         const cleanNameEsc=p.name.replace(/"/g,'&quot;');
         const scanStr=fmtScan(p.scanDate);
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
-            <div class="pv-modal-name"><a href="#" data-name="${cleanNameEsc}" onclick="event.preventDefault();cleanupNavigate(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${esc(p.name)}</a></div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV · ${p.atkIV}/${p.defIV}/${p.staIV}${cleanNick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${cleanNickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(cleanNick)}</span>`:''}${scanStr?' · '+scanStr:''}</div>
+            <div class="pv-modal-name"><a href="#" data-name="${cleanNameEsc}" onclick="event.preventDefault();modalNavigateToFamily(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${esc(p.name)}</a> ${renderSearchCopyButton(p)}</div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${Math.round(p.ivAvg)}% IV · ${p.atkIV}/${p.defIV}/${p.staIV}${p.nickname?` · ${renderNickCopyButton(p)}`:''}${scanStr?' · '+scanStr:''}</div>
           </div>
           <div class="pv-modal-controls">
             <select class="pv-modal-select" onchange="setOverride('${p.stableKey}','special_form',this.value);allPokemon.find(x=>x.stableKey==='${p.stableKey}').specialForm=this.value;">${opts}</select>
@@ -2158,15 +2154,6 @@ function openCleanupModal(){
 function closeCleanupModal(){
   document.getElementById('cleanup-modal').classList.remove('open');
   const si=document.getElementById('cleanupSearch'); if(si) si.value='';
-}
-
-function cleanupNavigate(name){
-  closeCleanupModal();
-  const box=document.getElementById('searchBox');
-  if(box) box.value=name;
-  searchTerm=name.toLowerCase();
-  applyFilters();
-  document.getElementById('searchClear')?.classList.add('visible');
 }
 
 function openSpecialModal(){
@@ -2313,20 +2300,16 @@ function openHundredModal(){
   body.innerHTML=!list.length
     ? '<div class="pv-modal-empty">Nothing to action — every 100% is already starred ✓</div>'
     : list.map(({p,leagues100,isHundoOnly})=>{
-        const nick=p.nickname||'';
-        const nickEsc=nick.replace(/"/g,'&quot;');
-        const searchStr=`${p.cp||0} ${p.atkIV}/${p.defIV}/${p.staIV}`;
-        const searchEsc=searchStr.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
         const leagueLabel=isHundoOnly?'Hundo':leagues100.join('/');
         const starClass=starClassFor[p.starType]||'star-none';
+        const nameEsc=p.name.replace(/"/g,'&quot;');
         return `<div class="pv-modal-row">
           <div class="pv-modal-info">
-            <div class="pv-modal-name">${esc(p.name)}${p.form?` <span class="poke-form">(${esc(p.form)})</span>`:''}</div>
-            <div class="pv-modal-meta">CP:${p.cp} · ${p.atkIV}/${p.defIV}/${p.staIV} · ${Math.round(p.ivAvg)}% IV · <span class="${starClass}" style="font-weight:700">${leagueLabel}</span>${nick?` · <span style="font-family:monospace;color:var(--green);cursor:pointer" data-nick="${nickEsc}" onclick="copyNick(this,this.dataset.nick)" title="Click to copy nick">${esc(nick)}</span>`:''}</div>
+            <div class="pv-modal-name"><a href="#" data-name="${nameEsc}" onclick="event.preventDefault();modalNavigateToFamily(this.dataset.name)" style="color:inherit;text-decoration:underline;cursor:pointer">${esc(p.name)}</a>${p.form?` <span class="poke-form">(${esc(p.form)})</span>`:''} ${renderSearchCopyButton(p)}</div>
+            <div class="pv-modal-meta">CP:${p.cp} · ${p.atkIV}/${p.defIV}/${p.staIV} · ${Math.round(p.ivAvg)}% IV · <span class="${starClass}" style="font-weight:700">${leagueLabel}</span>${p.nickname?` · ${renderNickCopyButton(p)}`:''}</div>
           </div>
           <div class="pv-modal-controls">
             <span class="${starClass}" style="font-size:16px" title="${esc(p.starType)}">★</span>
-            <button class="copy-search-btn" data-search="${searchEsc}" onclick="copyGoSearch(this.dataset.search,this)" title="Copy Pokégenie search (CP + IVs) to find this individual">📋</button>
           </div>
         </div>`;
       }).join('');
@@ -2557,6 +2540,45 @@ function fallbackCopy(text, cb) {
   try { document.execCommand('copy'); } catch(e) {}
   document.body.removeChild(ta);
   if(cb) cb();
+}
+
+// ── Shared modal-row helpers (#144) ─────────────────────────────────────────
+// Three row-level behaviours that were built once per modal — consolidated here so every
+// list-style modal uses the same implementation instead of a local copy.
+
+// #1 Search-copy: CP-only (`species&cpNNN`) — the ONLY confirmed-working format in GO/
+// Pokégenie. Do NOT use CP+IV here — that format is broken (#143), tracked separately;
+// this deliberately routes around it rather than attempting a fix. Mirrors the main list's
+// 🔍 button (render.js rowSearchEsc), but via goSpeciesToken for special-character species
+// (Farfetch'd, Mr. Mime, Ho-Oh, …) since a modal's search-copy has no other row-level
+// affordance to fall back on if the token is wrong.
+function renderSearchCopyButton(p){
+  const search=(goSpeciesToken(p.name)+'&cp'+(p.cp||0)).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  return `<button class="row-search-btn" data-search="${search}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Copy GO/Pokégenie search for this Pokémon">🔍</button>`;
+}
+
+// #2 Nick-copy: copies the current suggested/overridden nick. Wired to copyGoSearch (not
+// copyNick) — copyGoSearch already just copies whatever string it's given, so this avoids a
+// second clipboard handler that does the same thing with different button feedback.
+function renderNickCopyButton(p){
+  const nick=p.nickname||'';
+  if(!nick) return '';
+  const nickEsc=nick.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  return `<span style="font-family:monospace;color:var(--green);cursor:pointer" data-search="${nickEsc}" onclick="event.stopPropagation();copyGoSearch(this.dataset.search,this)" title="Click to copy nick">${esc(nick)}</span>`;
+}
+
+// #3 Name click-through: highlights the Pokémon's family in the main list. Deliberately does
+// NOT close the calling modal — these are worklists you process several rows from (100%
+// worklist, Cull, …), and closing on every click would force a re-open + re-scroll for each
+// subsequent row. The main list is updated and ready underneath by the time the modal is
+// eventually closed. If the current search/filter would hide the target family, this clears
+// the search so it becomes visible.
+function modalNavigateToFamily(name){
+  const box=document.getElementById('searchBox');
+  if(box) box.value=name;
+  searchTerm=name.toLowerCase();
+  applyFilters();
+  document.getElementById('searchClear')?.classList.add('visible');
 }
 
 function copyNick(el, text) {
