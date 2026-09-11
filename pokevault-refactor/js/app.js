@@ -110,6 +110,12 @@ let dexQualDmax    = false;
 let dexQualGmax    = false;
 let dexQualHundo   = false;
 let dexShinyAvailOnly = false;
+// #145: league-rank-100 filter — independent of dexQualHundo (which always means
+// atkIV===15&&defIV===15&&staIV===15). A set of 'L'/'G'/'U' toggles (Master omitted — Master
+// rank = ivAvg, so it's redundant with hundo). Combinable (AND) with the hundo filter, same as
+// the existing shiny+lucky combination — deliberately NOT a single checkbox whose meaning
+// depends on other selected state.
+let dexLeagueRank100 = new Set();
 
 // #121: Collection Tracker row selection — lowercase species names, insertion order preserved
 // (a JS Set iterates in insertion order), rebuilt into the header string on each toggle.
@@ -1249,6 +1255,7 @@ function encodeStateToHash() {
     if (dexQualDmax)  params.set('dmax',  'true');
     if (dexQualGmax)  params.set('gmax',  'true');
     if (dexQualHundo) params.set('hundos', 'true');
+    if (dexLeagueRank100.size) params.set('rank100leagues', [...dexLeagueRank100].join(','));
     if (dexShinyAvailOnly) params.set('shinyavail', 'true');
     if (dexTypes.size) params.set('types', [...dexTypes].join(','));
     if (dexSolo)  params.set('solo', 'true');
@@ -1291,6 +1298,8 @@ function applyHashState() {
     dexQualGmax  = params.get('gmax')  === 'true';
     if (dexQualDmax && dexQualGmax) dexQualGmax = false; // mutual exclusion safety
     dexQualHundo = params.get('hundos') === 'true';
+    const r100 = params.get('rank100leagues');
+    if (r100) dexLeagueRank100 = new Set(r100.split(',').filter(l => ['L','G','U'].includes(l)));
     dexShinyAvailOnly = params.get('shinyavail') === 'true';
     const types = params.get('types');
     if (types) dexTypes = new Set(types.split(',').filter(Boolean));
@@ -1395,6 +1404,11 @@ function toggleDexType(type) {
   renderDexModal();
 }
 
+function toggleDexLeagueRank100(lg) {
+  if (dexLeagueRank100.has(lg)) dexLeagueRank100.delete(lg); else dexLeagueRank100.add(lg);
+  renderDexModal();
+}
+
 function toggleDexTypes() {
   dexTypesOpen = !dexTypesOpen;
   document.getElementById('dex-types-row').style.display = dexTypesOpen ? 'flex' : 'none';
@@ -1414,6 +1428,9 @@ function updateDexFilterButtons() {
   document.getElementById('dex-qual-dmax')?.classList.toggle('dex-filter-active', dexQualDmax);
   document.getElementById('dex-qual-gmax')?.classList.toggle('dex-filter-active', dexQualGmax);
   document.getElementById('dex-qual-hundo')?.classList.toggle('dex-filter-active', dexQualHundo);
+  ['L','G','U'].forEach(lg => {
+    document.getElementById('dex-rank100-'+lg)?.classList.toggle('dex-filter-active', dexLeagueRank100.has(lg));
+  });
   document.getElementById('dex-shiny-avail')?.classList.toggle('dex-filter-active', dexShinyAvailOnly);
   // Solo / Spare / Exclude evolvable
   document.getElementById('dex-solo')?.classList.toggle('dex-filter-active', dexSolo);
@@ -1490,6 +1507,21 @@ function renderDexHaveView(body, filteredSpecies) {
   if (dexQualDmax)  matched = matched.filter(p => p.isDynamax);
   if (dexQualGmax)  matched = matched.filter(p => p.isGigantamax);
   if (dexQualHundo) matched = matched.filter(p => p.isHundo);
+  // #145: independent of dexQualHundo, and independent at the SPECIES level rather than
+  // per-individual — a species qualifies if hundo AND league-100 are each satisfied by SOME
+  // owned individual, not necessarily the SAME one (explicit in the brief: "can be the same or
+  // different individuals"). Computed against the full `allPokemon` pool (not the
+  // already-narrowed `matched`) so a non-hundo Great-100 individual still counts toward
+  // qualifying its species even when dexQualHundo has filtered `matched` down to a different,
+  // non-Great-100 individual of that species.
+  if (dexLeagueRank100.size) {
+    const leagueQualifyingNums = new Set(
+      allPokemon
+        .filter(p => speciesNums.has(Number(p.pokeNum)) && [...dexLeagueRank100].some(lg => Math.round(p['rankPct'+lg]||0) === 100))
+        .map(p => Number(p.pokeNum))
+    );
+    matched = matched.filter(p => leagueQualifyingNums.has(Number(p.pokeNum)));
+  }
 
   // Group by species (one row per species, not per individual Pokémon)
   const bySpecies = new Map(); // pokedex_number → [pokemon, ...]
@@ -1519,6 +1551,7 @@ function renderDexHaveView(body, filteredSpecies) {
   if (dexQualDmax)  qualParts.push('Dynamax');
   if (dexQualGmax)  qualParts.push('Gigantamax');
   if (dexQualHundo) qualParts.push('hundo');
+  if (dexLeagueRank100.size) qualParts.push([...dexLeagueRank100].map(lg => LEAGUE_NAMES_P[lg]).join('/') + ' 100%');
   const qualLabel = qualParts.length ? ' with ' + qualParts.join(' + ') : '';
   const soloLabel = dexSolo ? ' (solo only)' : dexSpare ? ' (spares only)' : '';
   const catLabel = dexCat !== 'all' ? dexCat.toLowerCase() + ' ' : '';
@@ -1696,6 +1729,16 @@ function renderDexMissingView(body, filteredSpecies) {
     const haveHundoNums = new Set(allPokemon.filter(p => p.isHundo).map(p => Number(p.pokeNum)));
     missing = missing.filter(s => !haveHundoNums.has(s.pokedex_number));
   }
+  // #145: species with no owned rounded-100%-in-league individual in any selected league.
+  // Deliberately the "dumb" version — no reachability/CP-cap check, matching the brief exactly.
+  if (dexLeagueRank100.size) {
+    const haveRank100Nums = new Set(
+      allPokemon
+        .filter(p => [...dexLeagueRank100].some(lg => Math.round(p['rankPct'+lg]||0) === 100))
+        .map(p => Number(p.pokeNum))
+    );
+    missing = missing.filter(s => !haveRank100Nums.has(s.pokedex_number));
+  }
 
   // Apply exclude-evolvable filter — walk full chain, not just immediate pre-evo
   if (dexExcludeEvolvable) {
@@ -1748,6 +1791,7 @@ function renderDexMissingView(body, filteredSpecies) {
   if (dexQualDmax)  missingQualParts.push('Dynamax');
   if (dexQualGmax)  missingQualParts.push('Gigantamax');
   if (dexQualHundo) missingQualParts.push('hundo');
+  if (dexLeagueRank100.size) missingQualParts.push([...dexLeagueRank100].map(lg => LEAGUE_NAMES_P[lg]).join('/') + ' 100%');
   const qualLabel = missingQualParts.length ? missingQualParts.join(' + ') + ' ' : '';
   const catLabel  = dexCat !== 'all' ? dexCat.toLowerCase() + ' ' : '';
   const evolveLabel = dexExcludeEvolvable ? ' (excl. evolvable)' : '';
