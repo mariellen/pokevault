@@ -64,17 +64,17 @@ describe('#135 — 100% worklist inclusion rule', () => {
 });
 
 describe('#135 — Test 6: copy affordances match the main list', () => {
-  it('nick shown is exactly p.nickname (same source main list uses for copyNick)', () => {
-    const p = mon({ rankPctU: 100, starType: 'cyan', nickname: 'SpecialⓊ100' });
+  // As of #144, openHundredModal renders its search/nick copy buttons via the shared
+  // renderSearchCopyButton()/renderNickCopyButton() helpers (CP-only goSpeciesToken format —
+  // the #107-era local CP+IV implementation this test originally described was the BROKEN
+  // format per #143 and has been replaced). Full coverage for those helpers, including the
+  // exact format assertion, lives in modal-row-helpers.test.js. This file keeps only the
+  // worklist-selection-specific check: the row carries the real p object those helpers read.
+  it('worklist row carries the same p object main-list rendering reads nickname/cp/IVs from', () => {
+    const p = mon({ cp: 1234, atkIV: 3, defIV: 15, staIV: 14, rankPctL: 100, starType: 'green', nickname: 'SpecialⓁ100' });
     const [{ p: rowP }] = computeHundredPercentWorklist([p]);
-    expect(rowP.nickname).toBe('SpecialⓊ100');
-  });
-
-  it('search string components (cp/atk/def/sta) match main list #107 format ({cp} {atk}/{def}/{sta})', () => {
-    const p = mon({ cp: 1234, atkIV: 3, defIV: 15, staIV: 14, rankPctL: 100, starType: 'green' });
-    const [{ p: rowP }] = computeHundredPercentWorklist([p]);
-    const expectedSearch = `${rowP.cp} ${rowP.atkIV}/${rowP.defIV}/${rowP.staIV}`;
-    expect(expectedSearch).toBe('1234 3/15/14');
+    expect(rowP).toBe(p);
+    expect(rowP.nickname).toBe('SpecialⓁ100');
   });
 });
 
