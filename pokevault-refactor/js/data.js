@@ -368,7 +368,7 @@ const VALID_EVOLUTIONS = {
   'Rhydon':['Rhyperior'],'Rhyhorn':['Rhydon','Rhyperior'],
   'Riolu':['Lucario'],'Rockruff':['Lycanroc'],
   'Roggenrola':['Boldore','Gigalith'],'Rolycoly':['Carkol','Coalossal'],
-  'Rookidee':['Corvisquire','Corviknight'],'Roselia':['Roserade'],
+  'Rookidee':['Corvisquire','Corviknight'],'Corvisquire':['Corviknight'],'Roselia':['Roserade'],
   'Rowlet':['Dartrix','Decidueye'],'Rufflet':['Braviary'],
   'Salandit':['Salazzle'],'Sandile':['Krokorok','Krookodile'],
   'Sandshrew':['Sandslash'],'Sandygast':['Palossand'],
