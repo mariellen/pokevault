@@ -1647,6 +1647,31 @@ function analyse(rows) {
           RULES.leagues.some(s => p.slots.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)
         ).map(p => p.name)
       );
+      // #46: family already has a confirmed Master keeper — by ANY mechanism (ordinary pool
+      // winner via hundo/favourited tiebreak, Dmax winner, Gmax winner), not a flag whitelist.
+      // "Family" = this whole `members` group (one evolutionary line), not the byEvoStage
+      // groupKey that Master-pool competition itself splits on (that split is intentional —
+      // it's what lets a `|lucky` sub-group exist independently — but Trumbeak/Toucannon are
+      // still the same family for this check). Luckies are untouched — they never go through
+      // this best_overall pass at all.
+      //
+      // Suppression must be scoped to genuine PRE-EVOLUTION stages of the keeper's own line —
+      // not "any other member" and not "anyone masterDemoted". masterDemoted also fires for a
+      // sibling final evolution that directly competed in and lost the SAME shared Master pool
+      // (branching evolutions, e.g. Glaceon beating Vaporeon — both are final forms of Eevee,
+      // neither is an ancestor of the other) — those must keep surfacing via best_overall so
+      // they don't strand as a review "…m" placeholder (regression-protected,
+      // analyse.eevee_master.test.js / master_league.test.js). isEvoAncestor uses
+      // VALID_EVOLUTIONS to test a real evolves-into relationship, which correctly excludes
+      // siblings and correctly includes multi-stage pre-evos (Corvisquire -> Corviknight,
+      // Trumbeak -> Toucannon) regardless of which stage happened to win the Master pool.
+      const masterKeeper = members.find(m =>
+        (m.slots.includes('M') && m.slotConfirmed) || m.wonDynamaxMaster || m.wonGigantamaxMaster
+      );
+      const isEvoAncestor = (preEvoName, finalName) =>
+        preEvoName !== finalName &&
+        typeof VALID_EVOLUTIONS !== 'undefined' &&
+        (VALID_EVOLUTIONS[preEvoName] || []).includes(finalName);
       const bestOverallBySpecies = {};
       members.filter(p => {
         if (p.isDynamax || p.isGigantamax) return false;
@@ -1657,6 +1682,9 @@ function analyse(rows) {
         if (p.slots.some(s => RULES.leagues.includes(s) && (p['rankPct'+s]||0) >= RULES.keepThreshold)) return false;
         if (!isLegendary && !RULES.leagues.some(l => (p[`rankPct${l}`]||0) >= RULES.keepThreshold)) return false;
         if (speciesWithConfirmedKeeper.has(p.name) && !p.masterDemoted) return false;
+        // #46: this candidate is a pre-evolution stage of the family's confirmed Master
+        // keeper — redundant, the keeper already represents this line at Master.
+        if (masterKeeper && isEvoAncestor(p.name, masterKeeper.name)) return false;
         return true;
       }).forEach(p => {
         const k = p.name;
