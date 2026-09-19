@@ -229,4 +229,83 @@ describe('Trading Tracker — General Trading Days (v1)', () => {
     m.applyTradingShortcutGeneralTradingDays();
     expect(m.getDexModalBodyHtml()).toContain('pv-modal-empty');
   });
+
+  // v2 fixes, from feedback after using v1: sort by fewest-covered-first, and make Category/
+  // Types keep working no matter when they're clicked (v1 bypassed dexView entirely, so a
+  // Category click while viewing this list silently bounced back to Have/Missing).
+  it('sorts by fewest leagues covered first (most urgent), alphabetical within the same count', () => {
+    const THREE = [
+      { pokedex_number: 1, name: 'ZzzNeedsNone', category: 'Regular', type1: 'Normal', type2: null, is_in_go: true },
+      { pokedex_number: 2, name: 'AaaNeedsOne', category: 'Regular', type1: 'Normal', type2: null, is_in_go: true },
+      { pokedex_number: 3, name: 'BbbNeedsThree', category: 'Regular', type1: 'Normal', type2: null, is_in_go: true },
+      { pokedex_number: 4, name: 'CccNeedsThree', category: 'Regular', type1: 'Normal', type2: null, is_in_go: true },
+    ];
+    const m = load();
+    m.setAllSpecies(THREE);
+    m.setAllPokemon([
+      mon(2, 100, 100, 0),   // needs 1 more (Ultra)
+      // 1 (ZzzNeedsNone) fully covered — won't appear at all
+      mon(1, 100, 100, 100),
+      // 3 and 4 need all three — no individuals at all
+    ]);
+    m.applyTradingShortcutGeneralTradingDays();
+    const html = m.getDexModalBodyHtml();
+    const posOf = name => html.indexOf(name);
+    // Needs-3 species (Bbb, Ccc) should both sort before needs-1 species (Aaa).
+    expect(posOf('BbbNeedsThree')).toBeGreaterThan(-1);
+    expect(posOf('CccNeedsThree')).toBeGreaterThan(-1);
+    expect(posOf('AaaNeedsOne')).toBeGreaterThan(-1);
+    expect(posOf('BbbNeedsThree')).toBeLessThan(posOf('AaaNeedsOne'));
+    expect(posOf('CccNeedsThree')).toBeLessThan(posOf('AaaNeedsOne'));
+    // Within the same needs-3 count, alphabetical: Bbb before Ccc.
+    expect(posOf('BbbNeedsThree')).toBeLessThan(posOf('CccNeedsThree'));
+    expect(html).not.toContain('ZzzNeedsNone');
+  });
+
+  it('Category filter applies (via the same applyDexFilters as Have/Missing)', () => {
+    const MIXED = [
+      { pokedex_number: 130, name: 'Gyarados', category: 'Regular', type1: 'Water', type2: 'Flying', is_in_go: true },
+      { pokedex_number: 150, name: 'Mewtwo', category: 'Legendary', type1: 'Psychic', type2: null, is_in_go: true },
+    ];
+    const m = load();
+    m.setAllSpecies(MIXED);
+    // Both owned but with zero coverage — both would normally appear on the list.
+    m.setAllPokemon([mon(130, 0, 0, 0), mon(150, 0, 0, 0)]);
+    m.setDexCat('Legendary');
+    m.applyTradingShortcutGeneralTradingDays();
+    const html = m.getDexModalBodyHtml();
+    expect(html).toContain('Mewtwo');
+    expect(html).not.toContain('Gyarados');
+  });
+
+  it('Category filter keeps applying even when clicked WHILE already viewing this list (the v1 bug)', () => {
+    const MIXED = [
+      { pokedex_number: 130, name: 'Gyarados', category: 'Regular', type1: 'Water', type2: 'Flying', is_in_go: true },
+      { pokedex_number: 150, name: 'Mewtwo', category: 'Legendary', type1: 'Psychic', type2: null, is_in_go: true },
+    ];
+    const m = load();
+    m.setAllSpecies(MIXED);
+    m.setAllPokemon([mon(130, 0, 0, 0), mon(150, 0, 0, 0)]);
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.getDexModalBodyHtml()).toContain('Gyarados'); // both shown, no category filter yet
+    // Simulate clicking the Legendary category button while this view is showing — this used
+    // to call the plain renderDexModal() dispatcher, which in v1 always fell through to
+    // Have/Missing since dexView never actually became 'general'.
+    m.setDexCat('Legendary');
+    m.renderDexModal();
+    const html = m.getDexModalBodyHtml();
+    expect(html).toContain('Mewtwo');
+    expect(html).not.toContain('Gyarados');
+  });
+
+  it('the shortcut button is reported active only while dexView is "general"', () => {
+    const m = load();
+    m.setAllSpecies(GYARADOS_SPECIES);
+    m.setAllPokemon([mon(130, 100, 100, 100)]);
+    expect(m.isGeneralTradingDaysActive()).toBe(false);
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.isGeneralTradingDaysActive()).toBe(true);
+    m.setDexView('have');
+    expect(m.isGeneralTradingDaysActive()).toBe(false);
+  });
 });

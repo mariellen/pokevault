@@ -1299,7 +1299,7 @@ function applyHashState() {
 
   if (prefix === 'dex') {
     const v = params.get('view');
-    if (v === 'have' || v === 'missing') dexView = v;
+    if (v === 'have' || v === 'missing' || v === 'general') dexView = v;
     const cat = params.get('category');
     if (cat) dexCat = cat;
     dexQualShiny = params.get('shiny') === 'true';
@@ -1452,34 +1452,49 @@ function isFriendshipFridaysActive() {
     dexLeagueRank100.size === 0;
 }
 
-// "General Trading Days" (v1 — deliberately self-contained, expect to iterate). A species
-// still needs trading unless it has a rounded-100% individual in EACH of Little, Great, AND
-// Ultra — possibly different physical individuals. Confirmed against Mariellen's own example:
-// three separate 100% Gyarados (one per league) correctly excludes Magikarp's whole family.
+// "General Trading Days" (v2 — now a real dexView mode, see renderDexModal's dispatch). A
+// species still needs trading unless it has a rounded-100% individual in EACH of Little,
+// Great, AND Ultra — possibly different physical individuals. Confirmed against Mariellen's
+// own example: three separate 100% Gyarados (one per league) correctly excludes Gyarados.
 // This is the opposite combination shape from #145's dexLeagueRank100 filter, which excludes a
 // species once it has 100% in ANY ONE selected league — that's why it isn't built by reusing
 // that filter with all three leagues pre-selected.
 //
-// Bypasses dexView/renderDexModal's Have/Missing dispatch entirely rather than becoming a
-// third view there, so it can't affect or be broken by that existing, working code. Category/
-// type filters (dexCat/dexTypes) are respected via applyDexFilters since that's free; the
-// Have/Missing-specific qualifiers (shiny, lucky, hundo, etc.) don't apply here and are simply
-// ignored — the filter bar stays visible but inert while this view is showing, a known rough
-// edge for a later pass if it's confusing in practice.
+// v1 bypassed dexView/renderDexModal's dispatch entirely to stay self-contained, but that had a
+// real bug: Category/Type buttons (which go through the normal renderDexModal() dispatcher)
+// would silently bounce the view back to Have/Missing instead of staying on this list. Fixed by
+// making 'general' a real dexView value renderDexModal() dispatches to — Category/Type filters
+// (applied via the same applyDexFilters as everywhere else) now keep working no matter when
+// they're clicked. The Have/Missing-specific qualifiers (shiny, lucky, hundo, etc.) still don't
+// apply here — they're hidden while this view is active instead of left clickable-but-inert
+// (see updateDexFilterButtons).
 function hasGeneralTradingLeagueRank100(pokedexNumber, lg) {
   return allPokemon.some(p => Number(p.pokeNum) === pokedexNumber && Math.round(p['rankPct' + lg] || 0) === 100);
 }
 
 function applyTradingShortcutGeneralTradingDays() {
-  const body = document.getElementById('dex-modal-body');
+  dexView = 'general';
+  renderDexModal();
+}
+
+function isGeneralTradingDaysActive() {
+  return dexView === 'general';
+}
+
+function renderGeneralTradingDaysView(body, filteredSpecies) {
   const sub = document.getElementById('dex-modal-sub');
   if (!body || !allSpecies || !allPokemon) return;
 
-  const scoped = applyDexFilters(allSpecies);
   const coverage = s => ['L', 'G', 'U'].map(lg => hasGeneralTradingLeagueRank100(s.pokedex_number, lg));
-  const needsTrading = scoped
+  const needsTrading = filteredSpecies
     .filter(s => coverage(s).some(has => !has))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      // Fewest leagues covered first — species needing all three is more urgent than one
+      // needing just the last of three. Alphabetical as the tiebreak within the same count.
+      const countCovered = arr => arr.filter(Boolean).length;
+      const diff = countCovered(coverage(a)) - countCovered(coverage(b));
+      return diff !== 0 ? diff : a.name.localeCompare(b.name);
+    });
 
   if (sub) sub.textContent = `${needsTrading.length} species still need a 100% in Little, Great, and/or Ultra`;
 
@@ -1560,17 +1575,17 @@ function updateDexFilterButtons() {
   document.getElementById('dex-excl-family')?.classList.toggle('dex-filter-active', dexExcludeFamily);
   document.getElementById('dex-excl-lucky')?.classList.toggle('dex-filter-active', dexExcludeLucky);
   document.getElementById('dex-excl-keeps')?.classList.toggle('dex-filter-active', dexExcludeKeeps);
-  // Solo/Spares/Excl.Lucky/Excl.Keeps are Have-view concepts — hide them in Missing view
+  // Solo/Spares/Excl.Lucky/Excl.Keeps are Have-view concepts — hide them outside Have view
   const haveOnlyIds = ['dex-solo', 'dex-spare', 'dex-excl-lucky', 'dex-excl-keeps'];
   haveOnlyIds.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = dexView === 'missing' ? 'none' : '';
+    if (el) el.style.display = dexView === 'have' ? '' : 'none';
   });
-  // Excl.Family and Excl.Evolvable are Missing-view concepts — hide them in Have view
+  // Excl.Family and Excl.Evolvable are Missing-view concepts — hide them outside Missing view
   const missingOnlyIds = ['dex-excl-evolve', 'dex-excl-family'];
   missingOnlyIds.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = dexView === 'have' ? 'none' : '';
+    if (el) el.style.display = dexView === 'missing' ? '' : 'none';
   });
   // "Available only" is only relevant in Missing+Shiny view
   const shinyAvailEl = document.getElementById('dex-shiny-avail');
@@ -1581,10 +1596,23 @@ function updateDexFilterButtons() {
   if (ivUnderRow) ivUnderRow.style.display = (dexView === 'missing' && dexQualLucky) ? 'inline-flex' : 'none';
   const ivUnderInput = document.getElementById('dex-iv-under');
   if (ivUnderInput && document.activeElement !== ivUnderInput) ivUnderInput.value = dexIvUnder != null ? dexIvUnder : '';
+  // General Trading Days: none of the Have/Missing-specific qualifiers apply (they don't
+  // combine meaningfully with "needs all three leagues") — hide them entirely rather than
+  // leave them visible-but-inert. Category and Types stay visible; they DO apply (both route
+  // through the same applyDexFilters as Have/Missing).
+  const generalHiddenIds = [
+    'dex-qual-shiny', 'dex-qual-lucky', 'dex-qual-dmax', 'dex-qual-gmax', 'dex-qual-hundo',
+    'dex-rank100-L', 'dex-rank100-G', 'dex-rank100-U',
+  ];
+  generalHiddenIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = dexView === 'general' ? 'none' : '';
+  });
   // Trading Tracker shortcut buttons — active only while the current state exactly matches
-  // their preset (see isSpecialTradesActive/isFriendshipFridaysActive).
+  // their preset (see isSpecialTradesActive/isFriendshipFridaysActive/isGeneralTradingDaysActive).
   document.getElementById('trading-special-trades')?.classList.toggle('dex-filter-active', isSpecialTradesActive());
   document.getElementById('trading-friendship-fridays')?.classList.toggle('dex-filter-active', isFriendshipFridaysActive());
+  document.getElementById('trading-general-trading-days')?.classList.toggle('dex-filter-active', isGeneralTradingDaysActive());
   // Type pills
   document.querySelectorAll('.dex-type-pill').forEach(btn => {
     btn.classList.toggle('dex-type-pill-active', dexTypes.has(btn.textContent));
@@ -1621,6 +1649,8 @@ function renderDexModal() {
 
   if (dexView === 'have') {
     renderDexHaveView(body, filteredSpecies);
+  } else if (dexView === 'general') {
+    renderGeneralTradingDaysView(body, filteredSpecies);
   } else {
     renderDexMissingView(body, filteredSpecies);
   }
