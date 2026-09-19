@@ -1299,7 +1299,7 @@ function applyHashState() {
 
   if (prefix === 'dex') {
     const v = params.get('view');
-    if (v === 'have' || v === 'missing' || v === 'general') dexView = v;
+    if (v === 'have' || v === 'missing' || v === 'general' || v === 'special') dexView = v;
     const cat = params.get('category');
     if (cat) dexCat = cat;
     dexQualShiny = params.get('shiny') === 'true';
@@ -1396,21 +1396,76 @@ function openTradingTrackerModal() {
   openDexModal();
 }
 
-// One-click shortcut: species missing a shiny (mirrors the "Special Trades" link Mariellen
-// hands to trade partners). Clears unrelated qualifiers for a clean, predictable result.
+// "Special Trades" (v2 — own dexView mode, like General Trading Days). Originally just
+// "missing shiny" (mirroring Mariellen's hand-built link), but that undercounted: a species
+// with zero owned individuals at all IS logically "missing a shiny" too (you can't own a shiny
+// of something you don't own), yet the "no shiny in GO" availability check silently dropped
+// those species if their line has no shiny release — hiding genuinely-missing species from a
+// trading list for an unrelated reason. Fixed by explicitly unioning two predicates: species
+// not owned at all, and species owned but missing a shiny (with shiny-availability/family/
+// evolve-chain exclusions, same as the original).
+//
+// Deliberately does not try to stay expressible as one exact combination of the regular
+// checkbox filters, per Mariellen's own call: these shortcuts are bespoke "special selections"
+// a friend uses, not required to line up with the general filter bar. Category/Type still
+// apply (via applyDexFilters, same as General Trading Days) since those remain meaningful.
 function applyTradingShortcutSpecialTrades() {
-  dexView = 'missing';
-  dexQualShiny = true;
-  dexShinyAvailOnly = true;
-  dexExcludeEvolvable = true;
-  dexExcludeFamily = true;
-  dexQualLucky = false;
-  dexIvUnder = null;
-  dexQualDmax = false;
-  dexQualGmax = false;
-  dexQualHundo = false;
-  dexLeagueRank100 = new Set();
+  dexView = 'special';
   renderDexModal();
+}
+
+function isSpecialTradesActive() {
+  return dexView === 'special';
+}
+
+function renderSpecialTradesView(body, filteredSpecies) {
+  const sub = document.getElementById('dex-modal-sub');
+  if (!body || !allSpecies || !allPokemon) return;
+
+  const { speciesById, evolvesInto } = buildSpeciesLookups(allSpecies);
+  const ownedNums = new Set(allPokemon.map(p => Number(p.pokeNum)));
+  const shinyNums = new Set(allPokemon.filter(p => p.isShiny).map(p => Number(p.pokeNum)));
+  const familyShinyNums = new Set();
+  for (const num of shinyNums) {
+    const s = speciesById.get(num);
+    if (s) getFullFamilyNums(s, speciesById, evolvesInto).forEach(n => familyShinyNums.add(n));
+  }
+
+  // Predicate A: not owned at all (and not reachable by evolving something already owned).
+  const notOwned = s => !ownedNums.has(s.pokedex_number) && !findOwnedAncestor(s, speciesById, ownedNums);
+  // Predicate B: owned, but no shiny of it yet — same exclusions the original had (shiny must
+  // actually be released in GO for the line, not reachable by evolving, no family member
+  // already shiny).
+  const missingShiny = s =>
+    !shinyNums.has(s.pokedex_number) &&
+    isShinyAvailableInChain(s, speciesById) &&
+    !findOwnedAncestor(s, speciesById, ownedNums) &&
+    !familyShinyNums.has(s.pokedex_number);
+
+  const rows = filteredSpecies
+    .filter(s => notOwned(s) || missingShiny(s))
+    .map(s => ({ s, reason: notOwned(s) ? 'Not owned' : 'No shiny yet' }))
+    .sort((a, b) => a.s.name.localeCompare(b.s.name));
+
+  if (sub) sub.textContent = `${rows.length} species to look for on a special trade day`;
+
+  body.innerHTML = !rows.length
+    ? '<div class="pv-modal-empty">Nothing to trade for right now! 🎉</div>'
+    : rows.map(({ s, reason }) => {
+        const type2str = s.type2 ? `/${s.type2}` : '';
+        const numStr = String(s.pokedex_number).padStart(3, '0');
+        const safeName = s.name.replace(/'/g, "\\'");
+        const reasonClass = reason === 'Not owned' ? 'dex-notice-grey' : 'dex-notice-amber';
+        return `<div class="dex-row" onclick="navigator.clipboard?.writeText('${safeName}')" title="Tap to copy GO search string">
+  <div class="dex-row-main">
+    <span class="dex-num">#${numStr}</span>
+    <button class="dex-name-link" onclick="event.stopPropagation();dexNavigate('${safeName}')">${esc(s.name)}</button>
+    <span class="dex-types">${s.type1}${type2str}</span>
+    <span class="${reasonClass}">${reason}</span>
+    <button class="merge-icon-btn" onclick="event.stopPropagation();copyDexRowName('${safeName}')" title="Copy name" aria-label="Copy ${esc(s.name)}">📋</button>
+  </div>
+</div>`;
+      }).join('');
 }
 
 // One-click shortcut: species that still need a better lucky — either no lucky owned at all,
@@ -1433,17 +1488,10 @@ function applyTradingShortcutFriendshipFridays() {
   renderDexModal();
 }
 
-// Is the CURRENT filter state exactly the Special Trades / Friendship Fridays preset? Computed
-// fresh on every render rather than tracked as a separate "was this clicked" flag — so the
-// shortcut buttons light up only while the state genuinely matches, and turn off the instant
-// anything changes, with no bookkeeping to keep in sync.
-function isSpecialTradesActive() {
-  return dexView === 'missing' && dexQualShiny === true && dexShinyAvailOnly === true &&
-    dexExcludeEvolvable === true && dexExcludeFamily === true &&
-    dexQualLucky === false && dexIvUnder == null &&
-    dexQualDmax === false && dexQualGmax === false && dexQualHundo === false &&
-    dexLeagueRank100.size === 0;
-}
+// Is the CURRENT filter state exactly the Friendship Fridays preset? Computed fresh on every
+// render rather than tracked as a separate "was this clicked" flag — so the button lights up
+// only while the state genuinely matches, and turns off the instant anything changes, with no
+// bookkeeping to keep in sync. (Special Trades has its own dexView-based check above now.)
 function isFriendshipFridaysActive() {
   return dexView === 'missing' && dexQualLucky === true && dexIvUnder === 90 &&
     dexQualShiny === false && dexShinyAvailOnly === false &&
@@ -1468,8 +1516,29 @@ function isFriendshipFridaysActive() {
 // they're clicked. The Have/Missing-specific qualifiers (shiny, lucky, hundo, etc.) still don't
 // apply here — they're hidden while this view is active instead of left clickable-but-inert
 // (see updateDexFilterButtons).
-function hasGeneralTradingLeagueRank100(pokedexNumber, lg) {
-  return allPokemon.some(p => Number(p.pokeNum) === pokedexNumber && Math.round(p['rankPct' + lg] || 0) === 100);
+//
+// v1 was also slow: it rescanned the ENTIRE allPokemon array per species per league (3x), and
+// then did it AGAIN on every sort comparison instead of precomputing once. v2 builds a single
+// per-species coverage index in one pass over allPokemon, then filters/sorts against that O(1)
+// lookup — the species/league loop no longer touches allPokemon at all.
+//
+// v2 also permanently excludes three categories of species from this view specifically (not as
+// togglable filters — Mariellen's own framing: "a shortcut to a special selection", not
+// required to line up with the regular checkboxes): Legendary (rarely tradeable the normal
+// way), not released in GO (can't exist yet), and species with ZERO owned individuals at all
+// (that's a "go catch it" problem, not a trading problem — already covered by the plain
+// Missing view). Skipping zero-owned species also means their coverage never needs computing.
+function buildGeneralTradingCoverageIndex() {
+  const coverageByNum = new Map(); // pokedex_number -> {L, G, U} booleans
+  allPokemon.forEach(p => {
+    const num = Number(p.pokeNum);
+    let cov = coverageByNum.get(num);
+    if (!cov) { cov = { L: false, G: false, U: false }; coverageByNum.set(num, cov); }
+    ['L', 'G', 'U'].forEach(lg => {
+      if (Math.round(p['rankPct' + lg] || 0) === 100) cov[lg] = true;
+    });
+  });
+  return coverageByNum;
 }
 
 function applyTradingShortcutGeneralTradingDays() {
@@ -1485,32 +1554,35 @@ function renderGeneralTradingDaysView(body, filteredSpecies) {
   const sub = document.getElementById('dex-modal-sub');
   if (!body || !allSpecies || !allPokemon) return;
 
-  const coverage = s => ['L', 'G', 'U'].map(lg => hasGeneralTradingLeagueRank100(s.pokedex_number, lg));
-  const needsTrading = filteredSpecies
-    .filter(s => coverage(s).some(has => !has))
-    .sort((a, b) => {
-      // Fewest leagues covered first — species needing all three is more urgent than one
-      // needing just the last of three. Alphabetical as the tiebreak within the same count.
-      const countCovered = arr => arr.filter(Boolean).length;
-      const diff = countCovered(coverage(a)) - countCovered(coverage(b));
-      return diff !== 0 ? diff : a.name.localeCompare(b.name);
-    });
-
-  if (sub) sub.textContent = `${needsTrading.length} species still need a 100% in Little, Great, and/or Ultra`;
+  const coverageByNum = buildGeneralTradingCoverageIndex();
+  const eligible = filteredSpecies.filter(s =>
+    s.category !== 'Legendary' && s.is_in_go && coverageByNum.has(s.pokedex_number)
+  );
 
   const LEAGUE_BADGE_COLOR = { L: 'var(--little)', G: 'var(--great)', U: 'var(--ultra)' };
   const badge = (label, has) =>
     `<span style="display:inline-block;min-width:20px;text-align:center;padding:2px 4px;border-radius:3px;font-size:10px;font-weight:700;margin-right:2px;background:${has ? LEAGUE_BADGE_COLOR[label] : 'transparent'};color:${has ? '#000' : 'var(--muted)'};border:1px solid ${has ? LEAGUE_BADGE_COLOR[label] : 'var(--border)'}">${label}</span>`;
 
+  const needsTrading = eligible
+    .map(s => {
+      const cov = coverageByNum.get(s.pokedex_number);
+      const count = (cov.L ? 1 : 0) + (cov.G ? 1 : 0) + (cov.U ? 1 : 0);
+      return { s, cov, count };
+    })
+    .filter(x => x.count < 3)
+    // Fewest leagues covered first — species needing all three is more urgent than one needing
+    // just the last of three. Alphabetical as the tiebreak within the same count. Both values
+    // are precomputed above, so this comparator is O(1) — no rescanning during the sort.
+    .sort((a, b) => a.count - b.count || a.s.name.localeCompare(b.s.name));
+
+  if (sub) sub.textContent = `${needsTrading.length} species still need a 100% in Little, Great, and/or Ultra`;
+
   body.innerHTML = !needsTrading.length
-    ? '<div class="pv-modal-empty">Every species has a 100% Little, Great, and Ultra individual! 🎉</div>'
-    : needsTrading.map(s => {
-        const [hasL, hasG, hasU] = coverage(s);
-        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--border);font-size:12px">
+    ? '<div class="pv-modal-empty">Every eligible species has a 100% Little, Great, and Ultra individual! 🎉</div>'
+    : needsTrading.map(({ s, cov }) => `<div style="display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--border);font-size:12px">
           <span style="flex:1">${esc(s.name)}</span>
-          ${badge('L', hasL)}${badge('G', hasG)}${badge('U', hasU)}
-        </div>`;
-      }).join('');
+          ${badge('L', cov.L)}${badge('G', cov.G)}${badge('U', cov.U)}
+        </div>`).join('');
 }
 
 function closeDexModal() {
@@ -1596,17 +1668,18 @@ function updateDexFilterButtons() {
   if (ivUnderRow) ivUnderRow.style.display = (dexView === 'missing' && dexQualLucky) ? 'inline-flex' : 'none';
   const ivUnderInput = document.getElementById('dex-iv-under');
   if (ivUnderInput && document.activeElement !== ivUnderInput) ivUnderInput.value = dexIvUnder != null ? dexIvUnder : '';
-  // General Trading Days: none of the Have/Missing-specific qualifiers apply (they don't
-  // combine meaningfully with "needs all three leagues") — hide them entirely rather than
-  // leave them visible-but-inert. Category and Types stay visible; they DO apply (both route
-  // through the same applyDexFilters as Have/Missing).
-  const generalHiddenIds = [
+  // General Trading Days / Special Trades: none of the Have/Missing-specific qualifiers apply
+  // to these bespoke shortcut views — hide them entirely rather than leave them
+  // visible-but-inert. Category and Types stay visible; they DO apply (both route through the
+  // same applyDexFilters as Have/Missing).
+  const bespokeViewHiddenIds = [
     'dex-qual-shiny', 'dex-qual-lucky', 'dex-qual-dmax', 'dex-qual-gmax', 'dex-qual-hundo',
     'dex-rank100-L', 'dex-rank100-G', 'dex-rank100-U',
   ];
-  generalHiddenIds.forEach(id => {
+  const inBespokeView = dexView === 'general' || dexView === 'special';
+  bespokeViewHiddenIds.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = dexView === 'general' ? 'none' : '';
+    if (el) el.style.display = inBespokeView ? 'none' : '';
   });
   // Trading Tracker shortcut buttons — active only while the current state exactly matches
   // their preset (see isSpecialTradesActive/isFriendshipFridaysActive/isGeneralTradingDaysActive).
@@ -1651,6 +1724,8 @@ function renderDexModal() {
     renderDexHaveView(body, filteredSpecies);
   } else if (dexView === 'general') {
     renderGeneralTradingDaysView(body, filteredSpecies);
+  } else if (dexView === 'special') {
+    renderSpecialTradesView(body, filteredSpecies);
   } else {
     renderDexMissingView(body, filteredSpecies);
   }
@@ -1834,20 +1909,25 @@ function isShinyAvailableInChain(s, speciesById) {
   return false;
 }
 
-function renderDexMissingView(body, filteredSpecies) {
-  // p.pokeNum is a raw CSV string; convert to number before comparing with s.pokedex_number (integer)
-  const ownedNums  = new Set(allPokemon.map(p => Number(p.pokeNum)));
-  const speciesById = new Map(allSpecies.map(s => [s.pokedex_number, s]));
-
-  // evolvesInto: Map<parent_num, child_num[]> — needed for full-family walks
+// speciesById + evolvesInto (Map<parent_num, child_num[]>) — shared between renderDexMissingView
+// and renderSpecialTradesView, both of which need to walk evolution chains.
+function buildSpeciesLookups(species) {
+  const speciesById = new Map(species.map(s => [s.pokedex_number, s]));
   const evolvesInto = new Map();
-  for (const s of allSpecies) {
+  for (const s of species) {
     if (s.evolves_from) {
       const arr = evolvesInto.get(s.evolves_from) || [];
       arr.push(s.pokedex_number);
       evolvesInto.set(s.evolves_from, arr);
     }
   }
+  return { speciesById, evolvesInto };
+}
+
+function renderDexMissingView(body, filteredSpecies) {
+  // p.pokeNum is a raw CSV string; convert to number before comparing with s.pokedex_number (integer)
+  const ownedNums  = new Set(allPokemon.map(p => Number(p.pokeNum)));
+  const { speciesById, evolvesInto } = buildSpeciesLookups(allSpecies);
 
   // Lucky counts by pokedex number — for family lucky indicator
   const luckyCountByNum = new Map();

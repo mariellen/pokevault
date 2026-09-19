@@ -60,7 +60,7 @@ function load() {
     \nreturn {
       renderDexHaveView, renderDexMissingView, renderDexModal, applyDexFilters, encodeStateToHash, applyHashState,
       applyTradingShortcutSpecialTrades, applyTradingShortcutFriendshipFridays,
-      applyTradingShortcutGeneralTradingDays, hasGeneralTradingLeagueRank100,
+      applyTradingShortcutGeneralTradingDays,
       isSpecialTradesActive, isFriendshipFridaysActive, isGeneralTradingDaysActive,
       setDexCat: v => { dexCat = v; },
       setAllPokemon: v => { allPokemon = v; },
