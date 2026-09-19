@@ -1452,6 +1452,52 @@ function isFriendshipFridaysActive() {
     dexLeagueRank100.size === 0;
 }
 
+// "General Trading Days" (v1 — deliberately self-contained, expect to iterate). A species
+// still needs trading unless it has a rounded-100% individual in EACH of Little, Great, AND
+// Ultra — possibly different physical individuals. Confirmed against Mariellen's own example:
+// three separate 100% Gyarados (one per league) correctly excludes Magikarp's whole family.
+// This is the opposite combination shape from #145's dexLeagueRank100 filter, which excludes a
+// species once it has 100% in ANY ONE selected league — that's why it isn't built by reusing
+// that filter with all three leagues pre-selected.
+//
+// Bypasses dexView/renderDexModal's Have/Missing dispatch entirely rather than becoming a
+// third view there, so it can't affect or be broken by that existing, working code. Category/
+// type filters (dexCat/dexTypes) are respected via applyDexFilters since that's free; the
+// Have/Missing-specific qualifiers (shiny, lucky, hundo, etc.) don't apply here and are simply
+// ignored — the filter bar stays visible but inert while this view is showing, a known rough
+// edge for a later pass if it's confusing in practice.
+function hasGeneralTradingLeagueRank100(pokedexNumber, lg) {
+  return allPokemon.some(p => Number(p.pokeNum) === pokedexNumber && Math.round(p['rankPct' + lg] || 0) === 100);
+}
+
+function applyTradingShortcutGeneralTradingDays() {
+  const body = document.getElementById('dex-modal-body');
+  const sub = document.getElementById('dex-modal-sub');
+  if (!body || !allSpecies || !allPokemon) return;
+
+  const scoped = applyDexFilters(allSpecies);
+  const coverage = s => ['L', 'G', 'U'].map(lg => hasGeneralTradingLeagueRank100(s.pokedex_number, lg));
+  const needsTrading = scoped
+    .filter(s => coverage(s).some(has => !has))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (sub) sub.textContent = `${needsTrading.length} species still need a 100% in Little, Great, and/or Ultra`;
+
+  const LEAGUE_BADGE_COLOR = { L: 'var(--little)', G: 'var(--great)', U: 'var(--ultra)' };
+  const badge = (label, has) =>
+    `<span style="display:inline-block;min-width:20px;text-align:center;padding:2px 4px;border-radius:3px;font-size:10px;font-weight:700;margin-right:2px;background:${has ? LEAGUE_BADGE_COLOR[label] : 'transparent'};color:${has ? '#000' : 'var(--muted)'};border:1px solid ${has ? LEAGUE_BADGE_COLOR[label] : 'var(--border)'}">${label}</span>`;
+
+  body.innerHTML = !needsTrading.length
+    ? '<div class="pv-modal-empty">Every species has a 100% Little, Great, and Ultra individual! 🎉</div>'
+    : needsTrading.map(s => {
+        const [hasL, hasG, hasU] = coverage(s);
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--border);font-size:12px">
+          <span style="flex:1">${esc(s.name)}</span>
+          ${badge('L', hasL)}${badge('G', hasG)}${badge('U', hasU)}
+        </div>`;
+      }).join('');
+}
+
 function closeDexModal() {
   document.getElementById('dex-modal').style.display = 'none';
   updateHash();

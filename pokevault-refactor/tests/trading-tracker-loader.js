@@ -24,12 +24,23 @@ function buildStubEl(overrides) {
 
 function makeEnv() {
   const dexModalStub = buildStubEl({ style: { display: 'flex' } });
+  // Persistent stubs (not rebuilt per getElementById call) for the two elements
+  // applyTradingShortcutGeneralTradingDays writes into directly, so tests can inspect what it
+  // wrote afterward — same need as passing `body` as a parameter elsewhere in this codebase,
+  // but this function reaches for these two IDs itself rather than taking them as arguments.
+  const dexModalBodyStub = buildStubEl();
+  const dexModalSubStub = buildStubEl();
   const windowShim = {
     addEventListener() {}, location: { hash: '', origin: '', pathname: '' },
     scrollTo() {}, console,
   };
   const documentShim = {
-    getElementById: (id) => id === 'dex-modal' ? dexModalStub : buildStubEl(),
+    getElementById: (id) => {
+      if (id === 'dex-modal') return dexModalStub;
+      if (id === 'dex-modal-body') return dexModalBodyStub;
+      if (id === 'dex-modal-sub') return dexModalSubStub;
+      return buildStubEl();
+    },
     querySelector: () => null,
     querySelectorAll: () => [],
     createElement: () => buildStubEl(),
@@ -38,7 +49,7 @@ function makeEnv() {
   const localStorageShim = { getItem: () => null, setItem() {}, removeItem() {} };
   const navigatorShim = { clipboard: { writeText: () => Promise.resolve() } };
   const historyShim = { replaceState() {}, pushState() {} };
-  return { documentShim, windowShim, localStorageShim, navigatorShim, historyShim };
+  return { documentShim, windowShim, localStorageShim, navigatorShim, historyShim, dexModalBodyStub, dexModalSubStub };
 }
 
 function load() {
@@ -49,6 +60,7 @@ function load() {
     \nreturn {
       renderDexHaveView, renderDexMissingView, applyDexFilters, encodeStateToHash, applyHashState,
       applyTradingShortcutSpecialTrades, applyTradingShortcutFriendshipFridays,
+      applyTradingShortcutGeneralTradingDays, hasGeneralTradingLeagueRank100,
       isSpecialTradesActive, isFriendshipFridaysActive,
       setAllPokemon: v => { allPokemon = v; },
       setAllSpecies: v => { allSpecies = v; },
@@ -67,6 +79,8 @@ function load() {
   );
   const mod = factory(env.documentShim, env.windowShim, env.localStorageShim, env.navigatorShim, env.historyShim);
   mod.__window = env.windowShim;
+  mod.getDexModalBodyHtml = () => env.dexModalBodyStub.innerHTML;
+  mod.getDexModalSubText = () => env.dexModalSubStub.textContent;
   return mod;
 }
 

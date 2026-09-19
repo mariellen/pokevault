@@ -167,3 +167,66 @@ describe('Trading Tracker — "needs a better lucky" rule (generic Lucky + IV-un
     expect(namesIn(body.innerHTML).sort()).toEqual(['Bulbasaur', 'Seviper']);
   });
 });
+
+// v1, self-contained per Mariellen's request — bypasses dexView entirely, writes directly to
+// #dex-modal-body/#dex-modal-sub. Real-world scenario: three separate physical Gyarados, one
+// each at rounded-100% Little/Great/Ultra, must exclude Gyarados from the list — the case that
+// rules out reusing #145's dexLeagueRank100 filter (which is OR-based: any ONE league at 100%
+// already excludes a species, not "all three required").
+describe('Trading Tracker — General Trading Days (v1)', () => {
+  const GYARADOS_SPECIES = [
+    { pokedex_number: 130, name: 'Gyarados', category: 'Regular', type1: 'Water', type2: 'Flying', evolves_from: 129, is_in_go: true },
+    { pokedex_number: 1, name: 'Bulbasaur', category: 'Regular', type1: 'Grass', type2: 'Poison', evolves_from: null, is_in_go: true },
+  ];
+  const mon = (pokeNum, rl, rg, ru) => ({
+    pokeNum: String(pokeNum), cp: 1000, atkIV: 10, defIV: 10, staIV: 10,
+    rankPctL: rl, rankPctG: rg, rankPctU: ru, rankPctM: 0,
+    isLucky: false, isShiny: false, isDynamax: false, isGigantamax: false, isHundo: false, decision: 'keep',
+  });
+
+  it("Mariellen's Gyarados example: three separate 100% individuals (one per league) excludes it from the list", () => {
+    const m = load();
+    m.setAllSpecies(GYARADOS_SPECIES);
+    m.setAllPokemon([
+      mon(130, 100, 0, 0),   // Little 100%
+      mon(130, 0, 100, 0),   // Great 100%
+      mon(130, 0, 0, 100),   // Ultra 100%
+    ]);
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.getDexModalBodyHtml()).not.toContain('Gyarados');
+  });
+
+  it('missing even ONE of the three leagues keeps the species on the list', () => {
+    const m = load();
+    m.setAllSpecies(GYARADOS_SPECIES);
+    m.setAllPokemon([
+      mon(130, 100, 100, 0), // Little + Great covered, Ultra not
+    ]);
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.getDexModalBodyHtml()).toContain('Gyarados');
+  });
+
+  it('a single individual covering all three leagues at once also satisfies it (not required to be different individuals)', () => {
+    const m = load();
+    m.setAllSpecies(GYARADOS_SPECIES);
+    m.setAllPokemon([mon(130, 100, 100, 100)]);
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.getDexModalBodyHtml()).not.toContain('Gyarados');
+  });
+
+  it('a completely unowned species stays on the list', () => {
+    const m = load();
+    m.setAllSpecies(GYARADOS_SPECIES);
+    m.setAllPokemon([mon(130, 100, 100, 100)]); // Gyarados fully covered, Bulbasaur unowned
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.getDexModalBodyHtml()).toContain('Bulbasaur');
+  });
+
+  it('empty state renders cleanly when every species is fully covered', () => {
+    const m = load();
+    m.setAllSpecies([GYARADOS_SPECIES[0]]);
+    m.setAllPokemon([mon(130, 100, 100, 100)]);
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.getDexModalBodyHtml()).toContain('pv-modal-empty');
+  });
+});
