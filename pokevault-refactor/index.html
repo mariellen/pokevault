@@ -187,8 +187,8 @@
          Have/Missing data and filters as the rest of this modal, just pre-applied. -->
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:rgba(0,212,255,0.04)">
       <span style="color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Trading Tracker:</span>
-      <button class="dex-filter-btn" onclick="applyTradingShortcutSpecialTrades()" title="Species missing a shiny (that has one released in GO)">🔄 Special Trades</button>
-      <button class="dex-filter-btn" onclick="applyTradingShortcutFriendshipFridays()" title="Species with no lucky, or only luckies under 90% IV">🍀 Friendship Fridays</button>
+      <button id="trading-special-trades" class="dex-filter-btn" onclick="applyTradingShortcutSpecialTrades()" title="Species missing a shiny (that has one released in GO)">🔄 Special Trades</button>
+      <button id="trading-friendship-fridays" class="dex-filter-btn" onclick="applyTradingShortcutFriendshipFridays()" title="Species with no lucky, or only luckies under the IV% threshold">🍀 Friendship Fridays</button>
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
       <button id="dex-view-have"    onclick="dexView='have';renderDexModal()"    class="dex-view-btn">Have</button>
@@ -201,6 +201,13 @@
       <span style="color:var(--border);font-size:14px;padding:0 2px">|</span>
       <button id="dex-qual-shiny" class="dex-filter-btn" onclick="dexQualShiny=!dexQualShiny;renderDexModal()">✨ Shiny</button>
       <button id="dex-qual-lucky" class="dex-filter-btn" onclick="dexQualLucky=!dexQualLucky;renderDexModal()">🍀 Lucky</button>
+      <label id="dex-iv-under-row" style="display:none;align-items:center;gap:4px;font-size:11px;color:var(--muted)">
+        IV% under: <input type="number" id="dex-iv-under" min="1" max="100"
+          style="width:40px;background:var(--surf);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);font-size:11px;text-align:center"
+          onchange="dexIvUnder=this.value?Math.max(1,Math.min(100,parseInt(this.value)||100)):null;renderDexModal()"
+          title="Missing view: a species still counts as missing a good lucky if every owned lucky is under this IV%"
+          aria-label="IV percent under threshold">
+      </label>
       <button id="dex-qual-dmax"  class="dex-filter-btn" onclick="dexQualDmax=!dexQualDmax;if(dexQualDmax){dexQualGmax=false;}renderDexModal()">Ⓓ Dynamax</button>
       <button id="dex-qual-gmax"  class="dex-filter-btn" onclick="dexQualGmax=!dexQualGmax;if(dexQualGmax){dexQualDmax=false;}renderDexModal()">Ⓧ Gigantamax</button>
       <button id="dex-qual-hundo" class="dex-filter-btn" onclick="dexQualHundo=!dexQualHundo;renderDexModal()">Ⓗ Hundos</button>

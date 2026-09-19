@@ -116,12 +116,15 @@ let dexShinyAvailOnly = false;
 // the existing shiny+lucky combination — deliberately NOT a single checkbox whose meaning
 // depends on other selected state.
 let dexLeagueRank100 = new Set();
-// Trading Tracker "Friendship Fridays" — Missing-view only. A species qualifies (still "needs
-// a better lucky") when it has NO owned lucky at all, OR every owned lucky is under 90% IV%.
-// Confirmed by example against a naive "best rank in any league" rule: a lucky ranking 99%
-// Ultra but only 89% IV% (Master) must still count as needing a better one — the rule is
-// purely about raw IV%, not about whether the lucky is already a good capped-league pick.
-let dexQualNeedsBetterLucky = false;
+// Trading Tracker "Friendship Fridays" (Missing view) — generic IV% threshold, combines with
+// the existing dexQualLucky rather than being its own special-cased boolean. When both are set:
+// a species still counts as missing if it has NO owned lucky at all, OR every owned lucky is
+// under this IV%. null = off. Confirmed by example against a naive "best rank in any league"
+// rule: a lucky ranking 99% Ultra but only 89% IV% (Master) must still count as needing a
+// better one — the rule is purely about raw IV%, not whether it's already a good capped-league
+// pick. Kept generic (a plain threshold, not hardcoded to 90) so it's reusable for any future
+// "under X%" need, not just this one shortcut.
+let dexIvUnder = null;
 
 // #121: Collection Tracker row selection — lowercase species names, insertion order preserved
 // (a JS Set iterates in insertion order), rebuilt into the header string on each toggle.
@@ -1262,7 +1265,7 @@ function encodeStateToHash() {
     if (dexQualGmax)  params.set('gmax',  'true');
     if (dexQualHundo) params.set('hundos', 'true');
     if (dexLeagueRank100.size) params.set('rank100leagues', [...dexLeagueRank100].join(','));
-    if (dexQualNeedsBetterLucky) params.set('needsbetterlucky', 'true');
+    if (dexIvUnder != null) params.set('ivunder', String(dexIvUnder));
     if (dexShinyAvailOnly) params.set('shinyavail', 'true');
     if (dexTypes.size) params.set('types', [...dexTypes].join(','));
     if (dexSolo)  params.set('solo', 'true');
@@ -1307,7 +1310,8 @@ function applyHashState() {
     dexQualHundo = params.get('hundos') === 'true';
     const r100 = params.get('rank100leagues');
     if (r100) dexLeagueRank100 = new Set(r100.split(',').filter(l => ['L','G','U'].includes(l)));
-    dexQualNeedsBetterLucky = params.get('needsbetterlucky') === 'true';
+    const ivu = params.get('ivunder');
+    dexIvUnder = ivu ? Math.max(1, Math.min(100, parseInt(ivu, 10) || 100)) : null;
     dexShinyAvailOnly = params.get('shinyavail') === 'true';
     const types = params.get('types');
     if (types) dexTypes = new Set(types.split(',').filter(Boolean));
@@ -1401,7 +1405,7 @@ function applyTradingShortcutSpecialTrades() {
   dexExcludeEvolvable = true;
   dexExcludeFamily = true;
   dexQualLucky = false;
-  dexQualNeedsBetterLucky = false;
+  dexIvUnder = null;
   dexQualDmax = false;
   dexQualGmax = false;
   dexQualHundo = false;
@@ -1410,13 +1414,14 @@ function applyTradingShortcutSpecialTrades() {
 }
 
 // One-click shortcut: species that still need a better lucky — either no lucky owned at all,
-// or every owned lucky is under 90% IV%. See dexQualNeedsBetterLucky's declaration for why
-// this is IV%-based rather than "best rank in any league" (a 99%-Ultra-but-89%-IV% lucky must
-// still count as needing a better one).
+// or every owned lucky is under the IV% threshold. Built from the plain Lucky toggle + the
+// generic IV-under filter (not a special-cased flag), so "🍀 Lucky" correctly shows as active.
+// See dexIvUnder's declaration for why this is IV%-based rather than "best rank in any league"
+// (a 99%-Ultra-but-89%-IV% lucky must still count as needing a better one).
 function applyTradingShortcutFriendshipFridays() {
   dexView = 'missing';
-  dexQualNeedsBetterLucky = true;
-  dexQualLucky = false;
+  dexQualLucky = true;
+  dexIvUnder = 90;
   dexQualShiny = false;
   dexShinyAvailOnly = false;
   dexExcludeEvolvable = true;
@@ -1426,6 +1431,25 @@ function applyTradingShortcutFriendshipFridays() {
   dexQualHundo = false;
   dexLeagueRank100 = new Set();
   renderDexModal();
+}
+
+// Is the CURRENT filter state exactly the Special Trades / Friendship Fridays preset? Computed
+// fresh on every render rather than tracked as a separate "was this clicked" flag — so the
+// shortcut buttons light up only while the state genuinely matches, and turn off the instant
+// anything changes, with no bookkeeping to keep in sync.
+function isSpecialTradesActive() {
+  return dexView === 'missing' && dexQualShiny === true && dexShinyAvailOnly === true &&
+    dexExcludeEvolvable === true && dexExcludeFamily === true &&
+    dexQualLucky === false && dexIvUnder == null &&
+    dexQualDmax === false && dexQualGmax === false && dexQualHundo === false &&
+    dexLeagueRank100.size === 0;
+}
+function isFriendshipFridaysActive() {
+  return dexView === 'missing' && dexQualLucky === true && dexIvUnder === 90 &&
+    dexQualShiny === false && dexShinyAvailOnly === false &&
+    dexExcludeEvolvable === true && dexExcludeFamily === true &&
+    dexQualDmax === false && dexQualGmax === false && dexQualHundo === false &&
+    dexLeagueRank100.size === 0;
 }
 
 function closeDexModal() {
@@ -1505,6 +1529,16 @@ function updateDexFilterButtons() {
   // "Available only" is only relevant in Missing+Shiny view
   const shinyAvailEl = document.getElementById('dex-shiny-avail');
   if (shinyAvailEl) shinyAvailEl.style.display = (dexView === 'missing' && dexQualShiny) ? '' : 'none';
+  // IV-under threshold is only relevant in Missing+Lucky view — keep its input synced to state
+  // so a shortcut (or a deep link) setting dexIvUnder is reflected, not just user typing.
+  const ivUnderRow = document.getElementById('dex-iv-under-row');
+  if (ivUnderRow) ivUnderRow.style.display = (dexView === 'missing' && dexQualLucky) ? 'inline-flex' : 'none';
+  const ivUnderInput = document.getElementById('dex-iv-under');
+  if (ivUnderInput && document.activeElement !== ivUnderInput) ivUnderInput.value = dexIvUnder != null ? dexIvUnder : '';
+  // Trading Tracker shortcut buttons — active only while the current state exactly matches
+  // their preset (see isSpecialTradesActive/isFriendshipFridaysActive).
+  document.getElementById('trading-special-trades')?.classList.toggle('dex-filter-active', isSpecialTradesActive());
+  document.getElementById('trading-friendship-fridays')?.classList.toggle('dex-filter-active', isFriendshipFridaysActive());
   // Type pills
   document.querySelectorAll('.dex-type-pill').forEach(btn => {
     btn.classList.toggle('dex-type-pill-active', dexTypes.has(btn.textContent));
@@ -1741,7 +1775,7 @@ function renderDexMissingView(body, filteredSpecies) {
 
   // Lucky counts by pokedex number — for family lucky indicator
   const luckyCountByNum = new Map();
-  if (dexQualLucky || dexQualNeedsBetterLucky) {
+  if (dexQualLucky) {
     allPokemon.filter(p => p.isLucky).forEach(p => {
       const n = Number(p.pokeNum);
       luckyCountByNum.set(n, (luckyCountByNum.get(n) || 0) + 1);
@@ -1750,7 +1784,7 @@ function renderDexMissingView(body, filteredSpecies) {
 
   // Excl. Family — build sets of all nums sharing a family with any owned lucky or shiny
   const familyLuckyNums = new Set();
-  if ((dexQualLucky || dexQualNeedsBetterLucky) && dexExcludeFamily) {
+  if (dexQualLucky && dexExcludeFamily) {
     for (const [num] of luckyCountByNum) {
       const s = speciesById.get(num);
       if (s) getFullFamilyNums(s, speciesById, evolvesInto).forEach(n => familyLuckyNums.add(n));
@@ -1770,16 +1804,17 @@ function renderDexMissingView(body, filteredSpecies) {
     missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number && p.isShiny && p.isLucky));
   } else if (dexQualShiny) {
     missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number && p.isShiny));
-  } else if (dexQualLucky) {
-    missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number && p.isLucky));
-  } else if (dexQualNeedsBetterLucky) {
-    // "Friendship Fridays": species with no owned lucky, OR where every owned lucky is under
-    // 90% IV%. Unlike the other qualifiers above, a species CAN already be "owned" here and
-    // still count as missing — the base ownership check alone isn't the right predicate.
+  } else if (dexQualLucky && dexIvUnder != null) {
+    // "Friendship Fridays" (generic IV-under + Lucky combo): species with no owned lucky, OR
+    // where every owned lucky is under the IV% threshold. Unlike plain dexQualLucky below, a
+    // species CAN already be "owned" here and still count as missing — the base ownership
+    // check alone isn't the right predicate once a quality bar is involved.
     missing = filteredSpecies.filter(s => {
       const luckies = allPokemon.filter(p => Number(p.pokeNum) === s.pokedex_number && p.isLucky);
-      return luckies.length === 0 || luckies.every(p => (p.ivAvg || 0) < 90);
+      return luckies.length === 0 || luckies.every(p => (p.ivAvg || 0) < dexIvUnder);
     });
+  } else if (dexQualLucky) {
+    missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number && p.isLucky));
   } else {
     missing = filteredSpecies.filter(s => !allPokemon.some(p => Number(p.pokeNum) === s.pokedex_number));
   }
@@ -1805,7 +1840,7 @@ function renderDexMissingView(body, filteredSpecies) {
   }
 
   // Excl. Family: hide missing species where any family member is lucky or shiny
-  if ((dexQualLucky || dexQualNeedsBetterLucky) && dexExcludeFamily) {
+  if (dexQualLucky && dexExcludeFamily) {
     missing = missing.filter(s => !familyLuckyNums.has(s.pokedex_number));
   }
   if (dexQualShiny && dexExcludeFamily) {
@@ -1846,8 +1881,8 @@ function renderDexMissingView(body, filteredSpecies) {
 
   const missingQualParts = [];
   if (dexQualShiny) missingQualParts.push('shiny');
-  if (dexQualLucky) missingQualParts.push('lucky');
-  if (dexQualNeedsBetterLucky) missingQualParts.push('lucky under 90% IV%');
+  if (dexQualLucky && dexIvUnder != null) missingQualParts.push(`lucky under ${dexIvUnder}% IV`);
+  else if (dexQualLucky) missingQualParts.push('lucky');
   if (dexQualDmax)  missingQualParts.push('Dynamax');
   if (dexQualGmax)  missingQualParts.push('Gigantamax');
   if (dexQualHundo) missingQualParts.push('hundo');
