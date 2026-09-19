@@ -30,25 +30,59 @@ function setup() {
 
 const namesIn = (html) => SPECIES.filter(s => html.includes(s.name)).map(s => s.name);
 
-describe('Trading Tracker — Special Trades shortcut', () => {
-  it('sets missing view + shiny + shiny-available + hide-evolvable + hide-family, clears other qualifiers', () => {
+describe('Trading Tracker — Special Trades shortcut (v2: own dexView, union of not-owned + missing-shiny)', () => {
+  it('sets dexView to "special"', () => {
     const m = setup();
-    m.setDexIvUnder(90);
-    m.setDexQualLucky(true);
     m.applyTradingShortcutSpecialTrades();
-    expect(m.getDexView()).toBe('missing');
-    expect(m.getDexQualShiny()).toBe(true);
-    expect(m.getDexQualLucky()).toBe(false);
-    expect(m.getDexIvUnder()).toBeNull();
-    expect(m.getDexExcludeEvolvable()).toBe(true);
-    expect(m.getDexExcludeFamily()).toBe(true);
+    expect(m.getDexView()).toBe('special');
   });
 
-  it('is reported active immediately after being applied', () => {
+  it('is reported active immediately after being applied, and not once the view changes', () => {
     const m = setup();
     m.applyTradingShortcutSpecialTrades();
     expect(m.isSpecialTradesActive()).toBe(true);
     expect(m.isFriendshipFridaysActive()).toBe(false);
+    m.setDexView('have');
+    expect(m.isSpecialTradesActive()).toBe(false);
+  });
+
+  it('includes a completely unowned species (the gap that prompted this fix)', () => {
+    const m = setup();
+    m.setAllSpecies([
+      { pokedex_number: 1, name: 'Bulbasaur', category: 'Regular', type1: 'Grass', type2: 'Poison', evolves_from: null, is_in_go: true },
+      { pokedex_number: 4, name: 'Charmander', category: 'Regular', type1: 'Fire', type2: null, evolves_from: null, is_in_go: true },
+    ]);
+    // Owns something (Charmander) so allPokemon isn't empty, but owns zero Bulbasaur.
+    m.setAllPokemon([{ pokeNum: '4', cp: 500, atkIV: 10, defIV: 10, staIV: 10, isShiny: false, isLucky: false, decision: 'keep' }]);
+    m.applyTradingShortcutSpecialTrades();
+    expect(m.getDexModalBodyHtml()).toContain('Bulbasaur');
+  });
+
+  it('includes an owned species that has no shiny yet (shiny released in GO)', () => {
+    const m = setup();
+    const SP = [{ pokedex_number: 1, name: 'Bulbasaur', category: 'Regular', type1: 'Grass', type2: 'Poison', evolves_from: null, is_in_go: true, is_shiny_available: true }];
+    m.setAllSpecies(SP);
+    m.setAllPokemon([{ pokeNum: '1', cp: 500, atkIV: 10, defIV: 10, staIV: 10, isShiny: false, isLucky: false, decision: 'keep' }]);
+    m.applyTradingShortcutSpecialTrades();
+    expect(m.getDexModalBodyHtml()).toContain('Bulbasaur');
+  });
+
+  it('excludes a species that already has an owned shiny', () => {
+    const m = setup();
+    const SP = [{ pokedex_number: 1, name: 'Bulbasaur', category: 'Regular', type1: 'Grass', type2: 'Poison', evolves_from: null, is_in_go: true, is_shiny_available: true }];
+    m.setAllSpecies(SP);
+    m.setAllPokemon([{ pokeNum: '1', cp: 500, atkIV: 10, defIV: 10, staIV: 10, isShiny: true, isLucky: false, decision: 'keep' }]);
+    m.applyTradingShortcutSpecialTrades();
+    expect(m.getDexModalBodyHtml()).not.toContain('Bulbasaur');
+  });
+
+  it('excludes an owned species with no shiny yet, when no shiny has been released for it in GO', () => {
+    const m = setup();
+    const SP = [{ pokedex_number: 1, name: 'Bulbasaur', category: 'Regular', type1: 'Grass', type2: 'Poison', evolves_from: null, is_in_go: true, is_shiny_available: false }];
+    m.setAllSpecies(SP);
+    m.setAllPokemon([{ pokeNum: '1', cp: 500, atkIV: 10, defIV: 10, staIV: 10, isShiny: false, isLucky: false, decision: 'keep' }]);
+    m.applyTradingShortcutSpecialTrades();
+    expect(m.getDexModalBodyHtml()).not.toContain('Bulbasaur');
   });
 });
 
@@ -214,12 +248,28 @@ describe('Trading Tracker — General Trading Days (v1)', () => {
     expect(m.getDexModalBodyHtml()).not.toContain('Gyarados');
   });
 
-  it('a completely unowned species stays on the list', () => {
+  it('a completely unowned species is excluded (that gap belongs to the plain Missing view, not here)', () => {
     const m = load();
     m.setAllSpecies(GYARADOS_SPECIES);
     m.setAllPokemon([mon(130, 100, 100, 100)]); // Gyarados fully covered, Bulbasaur unowned
     m.applyTradingShortcutGeneralTradingDays();
-    expect(m.getDexModalBodyHtml()).toContain('Bulbasaur');
+    expect(m.getDexModalBodyHtml()).not.toContain('Bulbasaur');
+  });
+
+  it('a Legendary species is always excluded, even if it needs leagues', () => {
+    const m = load();
+    m.setAllSpecies([{ pokedex_number: 150, name: 'Mewtwo', category: 'Legendary', type1: 'Psychic', type2: null, is_in_go: true }]);
+    m.setAllPokemon([mon(150, 0, 0, 0)]); // owned, needs all three
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.getDexModalBodyHtml()).not.toContain('Mewtwo');
+  });
+
+  it('a species not yet released in GO is always excluded, even if it needs leagues', () => {
+    const m = load();
+    m.setAllSpecies([{ pokedex_number: 999, name: 'FutureMon', category: 'Regular', type1: 'Normal', type2: null, is_in_go: false }]);
+    m.setAllPokemon([mon(999, 0, 0, 0)]);
+    m.applyTradingShortcutGeneralTradingDays();
+    expect(m.getDexModalBodyHtml()).not.toContain('FutureMon');
   });
 
   it('empty state renders cleanly when every species is fully covered', () => {
@@ -246,7 +296,9 @@ describe('Trading Tracker — General Trading Days (v1)', () => {
       mon(2, 100, 100, 0),   // needs 1 more (Ultra)
       // 1 (ZzzNeedsNone) fully covered — won't appear at all
       mon(1, 100, 100, 100),
-      // 3 and 4 need all three — no individuals at all
+      // 3 and 4 are owned (so they're not excluded as zero-owned) but need all three leagues
+      mon(3, 0, 0, 0),
+      mon(4, 0, 0, 0),
     ]);
     m.applyTradingShortcutGeneralTradingDays();
     const html = m.getDexModalBodyHtml();
@@ -265,36 +317,38 @@ describe('Trading Tracker — General Trading Days (v1)', () => {
   it('Category filter applies (via the same applyDexFilters as Have/Missing)', () => {
     const MIXED = [
       { pokedex_number: 130, name: 'Gyarados', category: 'Regular', type1: 'Water', type2: 'Flying', is_in_go: true },
-      { pokedex_number: 150, name: 'Mewtwo', category: 'Legendary', type1: 'Psychic', type2: null, is_in_go: true },
+      { pokedex_number: 151, name: 'Mew', category: 'Mythical', type1: 'Psychic', type2: null, is_in_go: true },
     ];
     const m = load();
     m.setAllSpecies(MIXED);
-    // Both owned but with zero coverage — both would normally appear on the list.
-    m.setAllPokemon([mon(130, 0, 0, 0), mon(150, 0, 0, 0)]);
-    m.setDexCat('Legendary');
+    // Both owned but with zero coverage — both would normally appear on the list. Mythical
+    // (not Legendary) so the permanent Legendary-exclusion doesn't interfere with what this
+    // test is actually checking (that Category filtering itself works).
+    m.setAllPokemon([mon(130, 0, 0, 0), mon(151, 0, 0, 0)]);
+    m.setDexCat('Mythical');
     m.applyTradingShortcutGeneralTradingDays();
     const html = m.getDexModalBodyHtml();
-    expect(html).toContain('Mewtwo');
+    expect(html).toContain('Mew');
     expect(html).not.toContain('Gyarados');
   });
 
   it('Category filter keeps applying even when clicked WHILE already viewing this list (the v1 bug)', () => {
     const MIXED = [
       { pokedex_number: 130, name: 'Gyarados', category: 'Regular', type1: 'Water', type2: 'Flying', is_in_go: true },
-      { pokedex_number: 150, name: 'Mewtwo', category: 'Legendary', type1: 'Psychic', type2: null, is_in_go: true },
+      { pokedex_number: 151, name: 'Mew', category: 'Mythical', type1: 'Psychic', type2: null, is_in_go: true },
     ];
     const m = load();
     m.setAllSpecies(MIXED);
-    m.setAllPokemon([mon(130, 0, 0, 0), mon(150, 0, 0, 0)]);
+    m.setAllPokemon([mon(130, 0, 0, 0), mon(151, 0, 0, 0)]);
     m.applyTradingShortcutGeneralTradingDays();
     expect(m.getDexModalBodyHtml()).toContain('Gyarados'); // both shown, no category filter yet
-    // Simulate clicking the Legendary category button while this view is showing — this used
+    // Simulate clicking the Mythical category button while this view is showing — this used
     // to call the plain renderDexModal() dispatcher, which in v1 always fell through to
     // Have/Missing since dexView never actually became 'general'.
-    m.setDexCat('Legendary');
+    m.setDexCat('Mythical');
     m.renderDexModal();
     const html = m.getDexModalBodyHtml();
-    expect(html).toContain('Mewtwo');
+    expect(html).toContain('Mew');
     expect(html).not.toContain('Gyarados');
   });
 
