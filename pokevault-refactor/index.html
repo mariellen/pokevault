@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PokéVault v3.5.88</title>
+  <title>PokéVault v3.5.89</title>
   <!-- Security headers -->
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="X-Frame-Options" content="DENY">
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://www.google-analytics.com https://region1.google-analytics.com; img-src 'self' data: https://www.google-analytics.com https://www.google.com; frame-src 'none'; object-src 'none';">
-  <link rel="stylesheet" href="css/styles.css?v=3.5.88">
+  <link rel="stylesheet" href="css/styles.css?v=3.5.89">
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-8TPX6P50XM"></script>
   <script>
@@ -24,7 +24,7 @@
 </head>
 <body>
 <header>
-  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.88</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">📂</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
+  <div class="logo">Poké<em>Vault</em> <span style="font-size:10px;color:var(--muted);font-weight:400">v3.5.89</span><span id="csvFilename" style="display:none;font-size:10px;color:var(--muted);font-weight:400"></span><button id="loadNewCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none;background:none;border:none;cursor:pointer;padding:0 4px;font-size:13px;color:var(--muted);line-height:1;vertical-align:middle" title="Load new CSV">📂</button><input type="file" id="csvFileInput" accept=".csv" style="display:none"></div>
   <div id="hdr-stats"><span>Import your Pokégenie CSV to begin</span></div>
   <div style="display:flex;align-items:center;gap:12px">
     <a href="https://ko-fi.com/mariellenm" target="_blank" rel="noopener" class="btn-donation" title="Support PokéVault">☕ Support</a>
@@ -181,6 +181,14 @@
         <button onclick="copyCurrentLink()" title="Copy link to this view" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:2px 4px">🔗</button>
         <button class="pv-modal-close" onclick="closeDexModal()">✕</button>
       </div>
+    </div>
+    <!-- Trading Tracker shortcuts — one-click jumps to the filter combos used with trade
+         partners, instead of hand-building/remembering a deep-link URL. Same underlying
+         Have/Missing data and filters as the rest of this modal, just pre-applied. -->
+    <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:rgba(0,212,255,0.04)">
+      <span style="color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Trading Tracker:</span>
+      <button class="dex-filter-btn" onclick="applyTradingShortcutSpecialTrades()" title="Species missing a shiny (that has one released in GO)">🔄 Special Trades</button>
+      <button class="dex-filter-btn" onclick="applyTradingShortcutFriendshipFridays()" title="Species with no lucky, or only luckies under 90% IV">🍀 Friendship Fridays</button>
     </div>
     <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
       <button id="dex-view-have"    onclick="dexView='have';renderDexModal()"    class="dex-view-btn">Have</button>
@@ -340,6 +348,7 @@
     <button class="btn" onclick="openPurifyModal()" title="Shadow purify candidates" aria-label="Open Purify modal">🌟 Purify</button>
     <button class="btn" onclick="openShinyModal()" title="Shiny Pokémon tagged via overrides" aria-label="Open Shinies modal">✨ Shinies</button>
     <button class="btn" onclick="openDexModal()" title="Collection Tracker — see what you have and what's missing" aria-label="Open Pokédex tracker">📖 Pokédex</button>
+    <button class="btn" onclick="openTradingTrackerModal()" title="One-click shortcuts for trade partners (Special Trades, Friendship Fridays)" aria-label="Open Trading Tracker">🔁 Trading Tracker</button>
     <button class="btn" onclick="openCleanupModal()" title="Set forms/patterns for Vivillon, Furfrou etc" aria-label="Set forms">🎨 Set Forms</button>
     <button class="btn" onclick="openSpecialModal()" title="Mark new shinies, Gigantamax, Dynamax" aria-label="Mark Special Pokémon">✨ Mark Special</button>
     <button class="btn" id="movesToggleBtn" onclick="toggleMovesColumn(this)" title="Show/hide moves column" aria-label="Toggle moves column">Moves ⟨/⟩</button>
@@ -360,16 +369,16 @@
 <!-- Load order matters: config → data → supabase → auth → pokemon_go_base_stats → analyse → render → app -->
 <!-- Local assets carry ?v=<version> for cache-busting (#61): browsers re-fetch JS/CSS on every
      release instead of serving a stale copy after a CloudFront invalidation. MUST be bumped with
-     the version in <title>/logo each release — bump the bare number globally: sed 's/3\.5\.62/3.5.88/g'. -->
+     the version in <title>/logo each release — bump the bare number globally: sed 's/3\.5\.62/3.5.89/g'. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=3.5.88"></script>
-<script src="js/data.js?v=3.5.88"></script>
-<script src="js/supabase.js?v=3.5.88"></script>
-<script src="js/auth.js?v=3.5.88"></script>
-<script src="js/pokemon_go_base_stats.js?v=3.5.88"></script>
-<script src="js/analyse.js?v=3.5.88"></script>
-<script src="js/render.js?v=3.5.88"></script>
-<script src="js/app.js?v=3.5.88"></script>
+<script src="js/config.js?v=3.5.89"></script>
+<script src="js/data.js?v=3.5.89"></script>
+<script src="js/supabase.js?v=3.5.89"></script>
+<script src="js/auth.js?v=3.5.89"></script>
+<script src="js/pokemon_go_base_stats.js?v=3.5.89"></script>
+<script src="js/analyse.js?v=3.5.89"></script>
+<script src="js/render.js?v=3.5.89"></script>
+<script src="js/app.js?v=3.5.89"></script>
 
 </body>
 </html>
