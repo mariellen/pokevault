@@ -58,10 +58,11 @@ function load() {
     'document', 'window', 'localStorage', 'navigator', 'history',
     src + `
     \nreturn {
-      renderDexHaveView, renderDexMissingView, applyDexFilters, encodeStateToHash, applyHashState,
+      renderDexHaveView, renderDexMissingView, renderDexModal, applyDexFilters, encodeStateToHash, applyHashState,
       applyTradingShortcutSpecialTrades, applyTradingShortcutFriendshipFridays,
       applyTradingShortcutGeneralTradingDays, hasGeneralTradingLeagueRank100,
-      isSpecialTradesActive, isFriendshipFridaysActive,
+      isSpecialTradesActive, isFriendshipFridaysActive, isGeneralTradingDaysActive,
+      setDexCat: v => { dexCat = v; },
       setAllPokemon: v => { allPokemon = v; },
       setAllSpecies: v => { allSpecies = v; },
       setDexQualLucky: v => { dexQualLucky = v; },
